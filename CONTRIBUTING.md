@@ -20,7 +20,7 @@ Thank you for contributing to L2SS-Py!
 ## How to Get Help
 
 The easiest way to get help or ask a question regarding L2SS-Py is in 
-the EOSDIS Slack #harmony-l2-subsetter channel, or by asking a question 
+the EOSDIS Slack #harmony-l2ss-py channel, or by asking a question 
 on the [PO.DAAC Forum](https://podaac.jpl.nasa.gov/forum/viewforum.php?f=6).
 
 ## How to Contribute
