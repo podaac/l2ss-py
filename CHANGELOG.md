@@ -1,0 +1,163 @@
+# Changelog
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.16.0]
+### Added
+### Changed 
+- PODAAC-3530: Improved logic that determines coordinate variables
+- Updated UMM-S record to indicate temporal subsetting is available 
+### Deprecated 
+### Removed 
+### Fixed 
+- PODAAC-3627: Fix subsetting MERGED_TP_J1_OSTM_OST_CYCLES_V42 collection
+### Security
+
+## [0.15.0]
+### Added
+- Added VIIRS and S6 collection associations
+- PODAAC-3441: Added temporal subsetting capability
+### Changed
+- Updated dependency versions. (harmony-serivce-lib to 1.0.9)
+### Deprecated 
+### Removed 
+### Fixed 
+- PODAAC-3494
+  - Fix filename derived_from in the json_history metadata.
+- PODAAC-3493
+  - Fix subsetted granule is larger than original file.
+### Security
+
+## [0.13.0]
+### Added
+- PODAAC-3353
+  - Sync associations with hitide umm-t
+- PODAAC-3361
+  - Add history_json attribute after subsetting
+### Changed 
+### Deprecated 
+### Removed 
+### Fixed 
+- Removed ending slash from UMM-S entry so it works with EDSC
+### Security
+
+## [0.11.0]
+
+### Added
+- PODAAC-3209
+  - Added the ability to subset granules with groups
+### Changed 
+- PODAAC-3158
+  - Upgraded `harmony-service-lib` to 1.0.4
+  - Use `harmony-service-lib` from PyPI instead of nexus/maven
+- PODAAC-2660
+  - Coord variables are retained in a variable subset, even if not requested
+- PODAAC-3353
+  - Sync associations with hitide umm-t
+### Deprecated 
+### Removed 
+### Fixed 
+### Security
+- PODAAC-3158
+  - Updated dependencies to address Snyk warning
+
+## [0.10.0]
+
+### Added
+### Changed 
+### Deprecated 
+### Removed 
+### Fixed 
+### Security
+- PODAAC-3011 
+    - Added pillow 8.1.0 and pyyaml 5.4 to fix vulnerabilities from snyk
+
+## [0.9.0]
+
+### Added
+### Changed 
+- HARMONY-616 - Updated to 0.0.30 of the harmony service library
+- Updated UMM-S record to indicate spatial and variable subsetting are supported
+### Deprecated 
+### Removed 
+### Fixed 
+### Security
+
+## [0.8.0]
+
+### Added
+- PCESA-2282 - Added harmony-service to deploy podaac/subsetter directly into Harmony ecosystem
+- PCESA-2307 - Added variable subsetting to harmony-service
+- PCESA-2280 - Subset returns new spatial bounds after subset
+- PCESA-2324 - Added shapefile subset capabilities to the subset.py module
+### Changed 
+- PCESA-2308 
+    - Updated Jenkins pipeline to push to ECC nexus
+    - Moved harmony service into the built poetry project
+### Deprecated 
+### Removed 
+### Fixed 
+### Security
+
+## [0.7.0]
+
+### Added
+- PCESA-1750 - Added UMM-S updater service and cmr/ directory that stores the json profile and associations.txt (which contains concept-ids) locally
+### Changed 
+- PCESA-2231 - Updated to use the new SNS baseworker, Job Service, and Staging Service 
+- PCESA-2195 - Subset will not fail when bounding box contains no data. Instead, an empty file is returned.
+- PCESA-2296 - Updated L2SS to use both CAE artifactory and the PODAAC artifactory settings, added tool.poetry.source in pypyoject.toml 
+### Deprecated 
+### Removed 
+### Fixed 
+### Security
+
+## [0.6.1]
+
+### Fixed
+- Added missing ops.tfvars
+
+## [0.6.0]
+
+### Added
+- PCESA-2177 - Added CodeBuild to build pytest Integration Tests
+- PCESA-2176 - Added pytest integration tests (IT) to run at SIT
+- PCESA-2192 - Added automatic End-to-End deployment (Artifactory and ECR) to Jenkins pipeline
+### Changed 
+- PCESA-2174 - Simultaneously deploy sit and sit-#### stacks via terraform+workspaces to the SIT environment.
+- PCESA-2175 - L2SS jenkins job, upon creation of a PR, deploys the l2ss to the sit environment using the developer/PR workspace and stack naming conventions
+- PCESA-1789 - Increased memory of ECS tasks to 750
+- PCESA-2178 - Upon completion of the automated testing destroy the SIT DEV stack.
+### Fixed 
+- PCESA-2203 - Fixed the JobException to use the parent exception error message.
+- PCESA-2202 - Update L2SS to destroy.sh to verify that terraform workspace matches ticket, then after complete delete workspace ticket 
+
+## [0.5.0]
+### Changed
+- PCESA-1639 - Use t3 instances to enable 'unlimited' credits by default for cpu bursting
+- PCESA-1815 - Parse incoming `variables` json field and pass to subsetter
+
+## [0.4.0]
+### Added
+- PCESA-1779 - Added ESB subscription to SNS topic instead of placing message on SQS
+### Changed 
+### Deprecated 
+### Removed 
+### Fixed 
+### Security 
+
+## [0.3.0]
+### Added
+- PCESA-1530 - Throw error when bbox cannot be parsed
+- PCESA-1530 - Throw error when 'lat' and 'lon' not in variables
+- PCESA-1530 - Throw error when data dimensions is < 2
+- PCESA-1824 - Added new JSON format logging using python-json-logger library
+### Changed 
+- PCESA-1550 - Updated to use amazon2 linux ECS ami 
+- PCESA-1413 - Added pre-baked terraform usage to Jenkins
+### Deprecated 
+### Removed 
+### Fixed 
+### Security 
