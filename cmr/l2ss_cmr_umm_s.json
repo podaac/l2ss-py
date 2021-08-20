@@ -1,0 +1,68 @@
+{
+    "URL": {
+        "Description": "PROJECT HOME PAGE",
+        "URLValue": "https://harmony.earthdata.nasa.gov"
+    },
+    "Type": "Harmony",
+    "ServiceKeywords": [
+        {
+            "ServiceCategory": "EARTH SCIENCE SERVICES",
+            "ServiceTopic": "DATA MANAGEMENT/DATA HANDLING",
+            "ServiceTerm": "SUBSETTING/SUPERSETTING"
+        }
+    ],
+    "ServiceOrganizations": [
+        {
+            "Roles": [
+                "ORIGINATOR"
+            ],
+            "ShortName": "NASA/JPL/PODAAC",
+            "LongName": "Physical Oceanography Distributed Active Archive Center, Jet Propulsion Laboratory, NASA"
+        }
+    ],
+    "OperationMetadata": [
+        {
+            "OperationName": "SPATIAL_SUBSETTING"
+        },
+        {
+            "OperationName": "VARIABLE_SUBSETTING"
+        },
+        {
+            "OperationName": "TEMPORAL_SUBSETTING"
+        }
+    ],
+    "AccessConstraints": "None",
+    "Description": "Endpoint for subsetting L2 Subsetter via Harmony",
+    "Version": "#.#.#",
+    "Name": "PODAAC L2 Cloud Subsetter",
+    "ServiceOptions": {
+        "SupportedReformattings": [
+            {
+                "SupportedInputFormat": "HDF5",
+                "SupportedOutputFormats": [
+                    "NETCDF-4"
+                ]
+            },
+            {
+                "SupportedInputFormat": "NETCDF-4",
+                "SupportedOutputFormats": [
+                    "NETCDF-4"
+                ]
+            }
+        ],
+        "Subset": {
+            "VariableSubset": {
+                "AllowMultipleValues": true
+            },
+            "SpatialSubset": {
+                "BoundingBox": {
+                    "AllowMultipleValues": false
+                }
+            },
+            "TemporalSubset": {
+                "AllowMultipleValues": false
+            }
+        }
+    },
+    "LongName": "PODAAC Level 2 Cloud Subsetter"
+}

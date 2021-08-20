@@ -1,0 +1,59 @@
+# Copyright 2019, by the California Institute of Technology.
+# ALL RIGHTS RESERVED. United States Government Sponsorship acknowledged.
+# Any commercial use must be negotiated with the Office of Technology
+# Transfer at the California Institute of Technology.
+#
+# This software may be subject to U.S. export control laws. By accepting
+# this software, the user agrees to comply with all applicable U.S. export
+# laws and regulations. User has the responsibility to obtain export
+# licenses, or other export authority as may be required before exporting
+# such information to foreign countries or providing access to foreign
+# persons.
+
+[tool.poetry]
+name = "podaac-subsetter"
+version = "1.0.0-alpha.0"
+description = "L2 Subsetter Service"
+authors = ["podaac-tva <podaac-tva@jpl.nasa.gov>"]
+license = "Apache-2.0"
+readme = "README.md"
+repository = "https://github.com/podaac/l2ss-py"
+classifiers = [
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
+exclude = ['contrib', 'docs', 'tests']
+packages = [
+    { include = "podaac" },
+]
+
+[tool.poetry.dependencies]
+python = "~3.7"
+netCDF4 = "^1.5"
+xarray ="^.18"
+geopandas ="0.6.1"
+Shapely = "^1.7.1"
+dask = {version = "2.1.0", extras = ["complete"]}
+harmony-service-lib = { version = "^1", optional = true }
+pystac = { version = "^0.5.3", optional = true }
+julian = "^0.14"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+flake8 = "^3.7"
+pytest-cov = "^2.8"
+pylint = "^2.4"
+sphinx = "^2.2"
+pytest-benchmark = "^3.2.3"
+moto = "1.3.14"
+jsonschema = "^3.2.0"
+
+[tool.poetry.extras]
+harmony = ["harmony-service-lib", "pystac"]
+
+[tool.poetry.scripts]
+run_worker = 'podaac.subsetter.subset_worker:main'
+l2ss_harmony = 'podaac.subsetter.subset_harmony:main'
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
