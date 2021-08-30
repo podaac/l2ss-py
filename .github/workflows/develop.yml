@@ -40,7 +40,10 @@ jobs:
           poetry run pylint podaac
           poetry run flake8 podaac
       - name: Test and coverage
-        run: poetry run pytest --cov=podaac/ --cov-report=xml -m "not aws and not integration" tests/
+        run: |
+          poetry env list --full-path
+          poetry run pip freeze
+          poetry run pytest --cov=podaac/ --cov-report=xml -m "not aws and not integration" tests/
       - name: SonarCloud Scan
         uses: sonarsource/sonarcloud-github-action@master
         env:
