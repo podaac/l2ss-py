@@ -10,7 +10,7 @@
 # such information to foreign countries or providing access to foreign
 # persons.
 
-FROM python:3.7-slim
+FROM python:3.8-slim
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
@@ -29,12 +29,6 @@ ENV HOME /home/dockeruser
 ENV PYTHONPATH "${PYTHONPATH}:/home/dockeruser/.local/bin"
 ENV PATH="/home/dockeruser/.local/bin:${PATH}"
 
-# Add artifactory as a trusted pip index
-RUN mkdir $HOME/.pip
-RUN echo "[global]" >> $HOME/.pip/pip.conf && \
-    echo "index-url = https://pypi.org/simple"" >> $HOME/.pip/pip.conf" && \
-    echo "trusted-host = pypi.org" >> $HOME/.pip/pip.conf
-
 # The 'SOURCE' argument is what will be used in 'pip install'.
 ARG SOURCE
 
@@ -49,8 +43,9 @@ WORKDIR /worker
 
 COPY --chown=dockeruser $DIST_PATH $DIST_PATH
 USER dockeruser
-RUN pip3 install --use-feature=2020-resolver --force $SOURCE --user \
+RUN pip3 install --no-cache-dir --force --user --index-url https://pypi.org/simple/ --extra-index-url https://test.pypi.org/simple/ $SOURCE \
     && rm -rf $DIST_PATH
 
+COPY --chown=dockeruser ./docker/docker-entrypoint.sh docker-entrypoint.sh
 # Run the subsetter
-ENTRYPOINT ["l2ss_harmony"]
+ENTRYPOINT ["./docker-entrypoint.sh"]

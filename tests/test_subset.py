@@ -17,27 +17,27 @@ test_subset.py
 
 Test the subsetter functionality.
 """
+import json
 import operator
+import os
 import shutil
 import tempfile
 import unittest
-import json
-import os
-from jsonschema import validate
-from datetime import datetime
 from os import listdir
 from os.path import dirname, join, realpath, isfile, basename
 
-from shapely.geometry import Point
 import geopandas as gpd
+import importlib_metadata
 import netCDF4 as nc
 import numpy as np
-import xarray as xr
 import pandas as pd
 import pytest
-import importlib_metadata
+import xarray as xr
+from jsonschema import validate
+from shapely.geometry import Point
 
 from podaac.subsetter import subset
+from podaac.subsetter.subset import SERVICE_NAME
 
 
 class TestSubsetter(unittest.TestCase):
@@ -49,6 +49,7 @@ class TestSubsetter(unittest.TestCase):
     - podaac.subsetter.subset.py
     - podaac.subsetter.xarray_enhancements.py
     """
+
     @classmethod
     def setUpClass(cls):
         cls.test_dir = dirname(realpath(__file__))
@@ -57,55 +58,54 @@ class TestSubsetter(unittest.TestCase):
         cls.test_files = [f for f in listdir(cls.test_data_dir)
                           if isfile(join(cls.test_data_dir, f)) and f.endswith(".nc")]
 
-
         cls.history_json_schema = {
-           "$schema": "https://json-schema.org/draft/2020-12/schema",
-           "$id": "https://harmony.earthdata.nasa.gov/history.schema.json",
-           "title": "Data Processing History",
-           "description": "A history record of processing that produced a given data file. For more information, see: https://wiki.earthdata.nasa.gov/display/TRT/In-File+Provenance+Metadata+-+TRT-42",
-           "type": [ "array", "object" ],
-           "items": { "$ref": "#/definitions/history_record" },
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://harmony.earthdata.nasa.gov/history.schema.json",
+            "title": "Data Processing History",
+            "description": "A history record of processing that produced a given data file. For more information, see: https://wiki.earthdata.nasa.gov/display/TRT/In-File+Provenance+Metadata+-+TRT-42",
+            "type": ["array", "object"],
+            "items": {"$ref": "#/definitions/history_record"},
 
-           "definitions": {
-              "history_record": {
-                 "type": "object",
-                 "properties": {
-                    "date_time": {
-                       "description": "A Date/Time stamp in ISO-8601 format, including time-zone, GMT (or Z) preferred",
-                       "type": "string",
-                       "format": "date-time"
+            "definitions": {
+                "history_record": {
+                    "type": "object",
+                    "properties": {
+                        "date_time": {
+                            "description": "A Date/Time stamp in ISO-8601 format, including time-zone, GMT (or Z) preferred",
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "derived_from": {
+                            "description": "List of source data files used in the creation of this data file",
+                            "type": ["array", "string"],
+                            "items": {"type": "string"}
+                        },
+                        "program": {
+                            "description": "The name of the program which generated this data file",
+                            "type": "string"
+                        },
+                        "version": {
+                            "description": "The version identification of the program which generated this data file",
+                            "type": "string"
+                        },
+                        "parameters": {
+                            "description": "The list of parameters to the program when generating this data file",
+                            "type": ["array", "string"],
+                            "items": {"type": "string"}
+                        },
+                        "program_ref": {
+                            "description": "A URL reference that defines the program, e.g., a UMM-S reference URL",
+                            "type": "string"
+                        },
+                        "$schema": {
+                            "description": "The URL to this schema",
+                            "type": "string"
+                        }
                     },
-                    "derived_from": {
-                       "description": "List of source data files used in the creation of this data file",
-                       "type": [ "array", "string" ],
-                       "items": { "type": "string" }
-                    },
-                    "program": {
-                       "description": "The name of the program which generated this data file",
-                       "type": "string"
-                    },
-                    "version": {
-                       "description": "The version identification of the program which generated this data file",
-                       "type": "string"
-                    },
-                    "parameters": {
-                       "description": "The list of parameters to the program when generating this data file",
-                       "type": [ "array", "string" ],
-                       "items": { "type": "string" }
-                    },
-                    "program_ref": {
-                       "description": "A URL reference that defines the program, e.g., a UMM-S reference URL",
-                       "type": "string"
-                    },
-                    "$schema": {
-                       "description": "The URL to this schema",
-                       "type": "string"
-                    }
-                 },
-                 "required": [ "date_time", "program" ],
-                 "additionalProperties": False
-              }
-           }
+                    "required": ["date_time", "program"],
+                    "additionalProperties": False
+                }
+            }
         }
 
     @classmethod
@@ -330,8 +330,8 @@ class TestSubsetter(unittest.TestCase):
         ds_360 = xr.open_dataset(join(
             self.test_data_dir,
             "ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc"),
-                                 decode_times=False,
-                                 decode_coords=False)
+            decode_times=False,
+            decode_coords=False)
 
         # Elements in each tuple are:
         # ds type, lon_range, expected_result
@@ -456,14 +456,17 @@ class TestSubsetter(unittest.TestCase):
         Tests that the history metadata header is appended to when it
         already exists.
         """
-        output_file = "{}_{}".format(self._testMethodName, self.test_files[0])
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
         subset.subset(
-            file_to_subset=join(self.test_data_dir, self.test_files[0]),
+            file_to_subset=join(self.test_data_dir, test_file),
             bbox=np.array(((-180, 180), (-90.0, 90))),
             output_file=join(self.subset_output_dir, output_file)
         )
 
-        in_nc = xr.open_dataset(join(self.test_data_dir, self.test_files[0]))
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
         out_nc = xr.open_dataset(join(self.subset_output_dir, output_file))
 
         # Assert that the original granule contains history
@@ -473,7 +476,7 @@ class TestSubsetter(unittest.TestCase):
         self.assertNotEqual(in_nc.attrs['history'], out_nc.attrs['history'])
 
         # Assert that last line of history was created by this service
-        assert 'podaac-subsetter' in out_nc.attrs['history'].split('\n')[-1]
+        assert SERVICE_NAME in out_nc.attrs['history'].split('\n')[-1]
 
         # Assert that the old history is still in the subsetted granule
         assert in_nc.attrs['history'] in out_nc.attrs['history']
@@ -484,10 +487,13 @@ class TestSubsetter(unittest.TestCase):
         not exist. All test granules contain this header already, so
         for this test the header will be removed manually from a granule.
         """
-        output_file = "{}_{}".format(self._testMethodName, self.test_files[0])
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
 
         # Remove the 'history' metadata from the granule
-        in_nc = xr.open_dataset(join(self.test_data_dir, self.test_files[0]))
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
         del in_nc.attrs['history']
         in_nc.to_netcdf(join(self.subset_output_dir, 'int_{}'.format(output_file)), 'w')
 
@@ -503,7 +509,7 @@ class TestSubsetter(unittest.TestCase):
         assert in_nc.attrs.get('history') is None
 
         # Assert that the history was created by this service
-        assert 'podaac-subsetter' in out_nc.attrs['history']
+        assert SERVICE_NAME in out_nc.attrs['history']
 
         # Assert that the history created by this service is the only
         # line present in the history.
@@ -585,9 +591,9 @@ class TestSubsetter(unittest.TestCase):
         """
         file = 'MODIS_T-JPL-L2P-v2014.0.nc'
         ds = xr.open_dataset(join(self.test_data_dir, file),
-                                    decode_times=False,
-                                    decode_coords=False,
-                                    mask_and_scale=False)
+                             decode_times=False,
+                             decode_coords=False,
+                             mask_and_scale=False)
 
         # Manually remove var which will cause error when attempting
         # to subset.
@@ -865,22 +871,25 @@ class TestSubsetter(unittest.TestCase):
         Tests that the json history metadata header is appended to when it
         already exists. First we create a fake json_history header for input file.
         """
-        output_file = "{}_{}".format(self._testMethodName, self.test_files[0])
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
         input_file_subset = join(self.subset_output_dir, "int_{}".format(output_file))
 
-        fake_history =[
-          {
-            "date_time":"2021-05-10T14:30:24.553263",
-            "derived_from": basename(input_file_subset),
-            "program":"podaac-subsetter",
-            "version": importlib_metadata.distribution("podaac-subsetter").version,
-            "parameters":"bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True",
-            "program_ref":"https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD",
-            "$schema":"https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-          }
+        fake_history = [
+            {
+                "date_time": "2021-05-10T14:30:24.553263",
+                "derived_from": basename(input_file_subset),
+                "program": SERVICE_NAME,
+                "version": importlib_metadata.distribution(SERVICE_NAME).version,
+                "parameters": "bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True",
+                "program_ref": "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD",
+                "$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+            }
         ]
 
-        in_nc = xr.open_dataset(join(self.test_data_dir, self.test_files[0]))
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
         in_nc.attrs['history_json'] = json.dumps(fake_history)
         in_nc.to_netcdf(join(self.subset_output_dir, 'int_{}'.format(output_file)), 'w')
 
@@ -900,23 +909,27 @@ class TestSubsetter(unittest.TestCase):
 
         for history in history_json:
             assert "date_time" in history
-            assert history.get('program') == 'podaac-subsetter'
+            assert history.get('program') == SERVICE_NAME
             assert history.get('derived_from') == basename(input_file_subset)
-            assert history.get('version') == importlib_metadata.distribution("podaac-subsetter").version
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
             assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
-            assert history.get('program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
-            assert history.get('$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-
+            assert history.get(
+                'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
+            assert history.get(
+                '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
 
     def test_json_history_metadata_create(self):
         """
         Tests that the json history metadata header is created when it does
         not exist. All test granules does not contain this header.
         """
-        output_file = "{}_{}".format(self._testMethodName, self.test_files[0])
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
 
         # Remove the 'history' metadata from the granule
-        in_nc = xr.open_dataset(join(self.test_data_dir, self.test_files[0]))
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
         in_nc.to_netcdf(join(self.subset_output_dir, 'int_{}'.format(output_file)), 'w')
 
         input_file_subset = join(self.subset_output_dir, "int_{}".format(output_file))
@@ -936,23 +949,27 @@ class TestSubsetter(unittest.TestCase):
 
         for history in history_json:
             assert "date_time" in history
-            assert history.get('program') == 'podaac-subsetter'
+            assert history.get('program') == SERVICE_NAME
             assert history.get('derived_from') == basename(input_file_subset)
-            assert history.get('version') == importlib_metadata.distribution("podaac-subsetter").version
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
             assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
-            assert history.get('program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
-            assert history.get('$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-
+            assert history.get(
+                'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
+            assert history.get(
+                '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
 
     def test_json_history_metadata_create_origin_source(self):
         """
         Tests that the json history metadata header is created when it does
         not exist. All test granules does not contain this header.
         """
-        output_file = "{}_{}".format(self._testMethodName, self.test_files[0])
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
 
         # Remove the 'history' metadata from the granule
-        in_nc = xr.open_dataset(join(self.test_data_dir, self.test_files[0]))
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
         in_nc.to_netcdf(join(self.subset_output_dir, 'int_{}'.format(output_file)), 'w')
 
         input_file_subset = join(self.subset_output_dir, "int_{}".format(output_file))
@@ -973,13 +990,14 @@ class TestSubsetter(unittest.TestCase):
 
         for history in history_json:
             assert "date_time" in history
-            assert history.get('program') == 'podaac-subsetter'
+            assert history.get('program') == SERVICE_NAME
             assert history.get('derived_from') == "fake_original_file.nc"
-            assert history.get('version') == importlib_metadata.distribution("podaac-subsetter").version
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
             assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
-            assert history.get('program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
-            assert history.get('$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-
+            assert history.get(
+                'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
+            assert history.get(
+                '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
 
     def test_temporal_subset_ascat(self):
         """
@@ -1103,7 +1121,6 @@ class TestSubsetter(unittest.TestCase):
             max_time=max_time
         )
 
-
         # Check that all times are within the given bounds. Open
         # dataset using 'decode_times=True' for auto-conversions to
         # datetime
@@ -1193,7 +1210,6 @@ class TestSubsetter(unittest.TestCase):
             min_time=min_time,
             max_time=max_time
         )
-
 
         # Check that all times are within the given bounds. Open
         # dataset using 'decode_times=True' for auto-conversions to

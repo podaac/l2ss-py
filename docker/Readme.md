@@ -2,28 +2,25 @@
 
 This directory contains the `Dockerfile` used to build the Docker image capable of running the L2 Subsetter service.
 
-It includes a number of helper scripts to be run by the CI/CD pipeline but can also be run locally to build the image.
-
 ## Building
 
-There are two ways to build the L2 Subsetter Service, from the PO.DAAC 
-Artifactory or from a local poetry build. 
+The docker image is setup to install the l2ss-py project into userspace using pip. It will look
+in both PyPi and TestPyPi indexes unless building from a local wheel file.
 
-### Building from Artifactory
+In order to build the image the following build arguments are needed
 
-Use the `build-docker.sh` script to build the docker image. There are two required arguments that must
-be set:
+- `SOURCE` : The value of this build arg will be used in the `pip install` command to install the l2ss-py package 
+- `DIST_PATH` (optional): The value of this build arg should be the path (relative to the context) to the directory containing a locally built wheel file 
 
-1. service-name: The name of the service being built (from pyproject.toml)
-2. service-version: The version of the service being built
+### Building from PyPi or TestPyPi
 
-This script will then call Docker build which will in turn retrieve the given version of the service from Artifactory
-and install it into the Docker image. The docker tag of the built image will be returned from the script.
+If the version of the l2ss-py package has already been uploaded to PyPi, all that is needed is to supply
+the `SOURCE` build argument with the package specification.  
 
 Example:
 
 ```shell script
-./docker/build-docker.sh -n podaac-subsetter -v 0.2.0
+docker build -f docker/Dockerfile --build-arg SOURCE="l2ss-py[harmony]==1.1.0-alpha.9" .
 ```
 
 ### Building from local code
@@ -35,39 +32,24 @@ poetry build
 ```
 
 That will create a folder `dist/` and a wheel file that is named with the version of the software that was built. 
-Similar to building from Artifactory, the `buld-docker.sh` script can be used to build the docker image from the
-local wheel file. In this case there are still two required arguments that must be set:
 
-1. service-name: The name of the service being built (from pyproject.toml)
-2. service-version: The version of the service being built (also from pyproject.toml)
-
-In order to use the local wheel file, call the `build-docker.sh` script with the optional argument `--local`. This
-will cause the docker image to use the local wheel file instead of downloading the software from Artifactory. 
-The docker tag of the built image will be returned from the script.
+In order to use the local wheel file, the `DIST_PATH` build arg must be provided to the `docker build` command
+and the `SOURCE` build arg should be set to the path to the wheel file.
 
 Example:
 
 ```shell script
-./docker/build-docker.sh -n podaac-subsetter -v 0.3.0a3 --local
+docker build -f docker/Dockerfile --build-arg SOURCE="dist/l2ss_py-1.1.0a1-py3-none-any.whl[harmony]" --build-arg DIST_PATH="dist/" .
 ```
 
 ## Running
 
-The Docker image can be run directly using the `docker run` command.
+If given no arguments, running the docker image will invoke the [Harmony service](https://github.com/nasa/harmony-service-lib-py) CLI.  
+This requires the `[harmony]` extra is installed when installing the `l2ss-py` package from pip (as shown in the examples above).
 
-## Pushing to ECR
+Alternatively, the image can be run using `l2ss-py` as the command which will run the `l2ss-py` CLI and does not require the 
+`[harmony]` extra package to be installed. Example:
 
-The `push-docker-ecr.sh` script can be used to push a docker image to AWS ECR. There are two required arguments:
-
-1. tf-venue: The target venue for uploading (sit, uat, or ops).
-2. docker-tag: The docker tage of the image being pushed
-
-The easiest way to use the `push-docker-ecr.sh` script is to first call `build-docker.sh` and save the output to the
-`docker_tag` environment variable. Then call `push-docker-ecr.sh`.
-
-Example:
-
-```shell script
-export docker_tag=$(./docker/build-docker.sh -n podaac-subsetter -v 0.2.0)
-./docker/push-docker-ecr.sh -v sit -t $docker_tag
+```
+docker run <docker image> l2ss-py -h
 ```

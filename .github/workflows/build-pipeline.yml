@@ -1,0 +1,211 @@
+# This is the main build pipeline that verifies and publishes the software
+name: Build
+# Controls when the workflow will run
+on:
+  # Triggers the workflow on push events
+  push:
+    branches: [ develop, release/**, main, feature/** ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # First job in the workflow installs and verifies the software
+  build:
+    name: Build, Test, Verify, Publish
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.8
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2.0.0
+        with:
+          poetry-version: 1.1.8
+      - name: Get version
+        id: get-version
+        run: |
+          echo "::set-output name=current_version::$(poetry version | awk '{print $2}')"
+          echo "pyproject_name=$(poetry version | awk '{print $1}')" >> $GITHUB_ENV
+      - name: Bump pre-alpha version
+        # If triggered by push to a feature branch
+        if: ${{ startsWith(github.ref, 'refs/heads/feature/') }}
+        run: |
+          new_ver="${{ steps.get-version.outputs.current_version }}+$(git rev-parse --short ${GITHUB_SHA})"
+          poetry version $new_ver
+          echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
+      - name: Bump alpha version
+        # If triggered by push to the develop branch
+        if: ${{ github.ref == 'refs/heads/develop' }}
+        run: |
+          poetry version prerelease
+          echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
+          echo "extra_tag=sit" >> $GITHUB_ENV
+      - name: Bump rc version
+        # If triggered by push to a release branch
+        if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
+        env:
+          # True if the version already has a 'rc' pre-release identifier
+          BUMP_RC: ${{ contains(steps.get-version.outputs.current_version, 'rc') }}
+        run: |
+          if [ "$BUMP_RC" = true ]; then
+            poetry version prerelease
+          else
+            poetry version ${GITHUB_REF#refs/heads/release/}-rc.1
+          fi
+          echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
+          echo "extra_tag=uat" >> $GITHUB_ENV
+      - name: Release version
+        # If triggered by push to the main branch
+        if: ${{ startsWith(github.ref, 'refs/heads/main') }}
+        env:
+          CURRENT_VERSION: ${{ steps.get-version.outputs.current_version }}
+        # Remove -rc.* from end of version string
+        # The ${string%%substring} syntax below deletes the longest match of $substring from back of $string.
+        run: |
+          poetry version ${CURRENT_VERSION%%-rc.*}
+          echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
+          echo "extra_tag=ops" >> $GITHUB_ENV
+      - name: Install l2ss-py
+        run: poetry install -E harmony
+      - name: Lint
+        run: |
+          poetry run pylint podaac
+          poetry run flake8 podaac
+      - name: Test and coverage
+        run: |
+          poetry run pytest --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.projectKey=${{ github.repository_owner }}_l2ss-py
+            -Dsonar.python.coverage.reportPaths=build/reports/coverage.xml
+            -Dsonar.sources=podaac/
+            -Dsonar.tests=tests/
+            -Dsonar.projectName=l2ss-py
+            -Dsonar.projectVersion=${{ env.software_version }}
+            -Dsonar.python.version=3.7,3.8,3.9
+      - name: Run Snyk on Python
+        uses: snyk/actions/python-3.8@master
+        continue-on-error: true # To make sure that SARIF upload gets called
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: >
+            --severity-threshold=high
+            --sarif-file-output=python.sarif
+      - name: Commit Version Bump
+        # If building develop, a release branch, or main then we commit the version bump back to the repo
+        if: |
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
+        run: |
+          git config --global user.name 'l2ss-py bot'
+          git config --global user.email 'l2ss-py@noreply.github.com'
+          git commit -am "/version ${{ env.software_version }}"
+          git push
+      - name: Push Tag
+        uses: actions-ecosystem/action-push-tag@v1
+        if: |
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
+        with:
+          tag: ${{ env.software_version }}
+          message: "Version ${{ env.software_version }}"
+      - name: Build Docs
+        run: |
+          poetry run sphinx-build -b html ./docs docs/_build/
+      - name: Publish Docs
+        uses: JamesIves/github-pages-deploy-action@4.1.5
+        with:
+          branch: gh-pages # The branch the action should deploy to.
+          folder: docs/_build/ # The folder the action should deploy.
+          target-folder: ${{ env.software_version }}
+      - name: Build Python Artifact
+        run: |
+          poetry build
+      - uses: actions/upload-artifact@v2
+        with:
+          name: python-artifact
+          path: dist/*
+      - name: Publish to test.pypi.org
+        if: |
+          github.ref == 'refs/heads/develop' ||
+          startsWith(github.ref, 'refs/heads/release')
+        env:
+          POETRY_PYPI_TOKEN_TESTPYPI: ${{secrets.POETRY_PYPI_TOKEN_TESTPYPI}}
+        run: |
+          poetry config repositories.testpypi https://test.pypi.org/legacy/
+          poetry publish -r testpypi
+      - name: Publish to pypi.org
+        if: ${{ github.ref == 'refs/heads/main' }}
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{secrets.POETRY_PYPI_TOKEN_PYPI}}
+        run: |
+          poetry publish
+      - name: Log in to the Container registry
+        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        uses: docker/login-action@v1
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Extract metadata (tags, labels) for Docker
+        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        id: meta
+        uses: docker/metadata-action@v3
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.software_version }}
+            type=raw,value=${{ env.extra_tag }}
+      - name: Wait for package
+        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        run: |
+          pip install tenacity
+          ${GITHUB_WORKSPACE}/.github/workflows/wait-for-pypi.py ${{env.pyproject_name}}[harmony]==${{ env.software_version }}
+      - name: Build and push Docker image
+        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            SOURCE=${{env.pyproject_name}}[harmony]==${{ env.software_version }}
+          push: true
+          pull: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Run Snyk on Docker Image
+        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        # Snyk can be used to break the build when it detects vulnerabilities.
+        # In this case we want to upload the issues to GitHub Code Scanning
+        continue-on-error: true
+        uses: snyk/actions/docker@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }}
+          args: >
+            --severity-threshold=high
+            --file=./docker/Dockerfile
+            --sarif-file-output=docker.sarif
+      - name: Upload result to GitHub Code Scanning
+        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: ./
