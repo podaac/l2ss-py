@@ -38,6 +38,7 @@ import pytest
 import importlib_metadata
 
 from podaac.subsetter import subset
+from podaac.subsetter.subset import SERVICE_NAME
 
 
 class TestSubsetter(unittest.TestCase):
@@ -473,7 +474,7 @@ class TestSubsetter(unittest.TestCase):
         self.assertNotEqual(in_nc.attrs['history'], out_nc.attrs['history'])
 
         # Assert that last line of history was created by this service
-        assert 'podaac-subsetter' in out_nc.attrs['history'].split('\n')[-1]
+        assert SERVICE_NAME in out_nc.attrs['history'].split('\n')[-1]
 
         # Assert that the old history is still in the subsetted granule
         assert in_nc.attrs['history'] in out_nc.attrs['history']
@@ -503,7 +504,7 @@ class TestSubsetter(unittest.TestCase):
         assert in_nc.attrs.get('history') is None
 
         # Assert that the history was created by this service
-        assert 'podaac-subsetter' in out_nc.attrs['history']
+        assert SERVICE_NAME in out_nc.attrs['history']
 
         # Assert that the history created by this service is the only
         # line present in the history.
@@ -872,8 +873,8 @@ class TestSubsetter(unittest.TestCase):
           {
             "date_time":"2021-05-10T14:30:24.553263",
             "derived_from": basename(input_file_subset),
-            "program":"podaac-subsetter",
-            "version": importlib_metadata.distribution("podaac-subsetter").version,
+            "program":SERVICE_NAME,
+            "version": importlib_metadata.distribution(SERVICE_NAME).version,
             "parameters":"bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True",
             "program_ref":"https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD",
             "$schema":"https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
@@ -900,9 +901,9 @@ class TestSubsetter(unittest.TestCase):
 
         for history in history_json:
             assert "date_time" in history
-            assert history.get('program') == 'podaac-subsetter'
+            assert history.get('program') == SERVICE_NAME
             assert history.get('derived_from') == basename(input_file_subset)
-            assert history.get('version') == importlib_metadata.distribution("podaac-subsetter").version
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
             assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
             assert history.get('program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
             assert history.get('$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
@@ -936,9 +937,9 @@ class TestSubsetter(unittest.TestCase):
 
         for history in history_json:
             assert "date_time" in history
-            assert history.get('program') == 'podaac-subsetter'
+            assert history.get('program') == SERVICE_NAME
             assert history.get('derived_from') == basename(input_file_subset)
-            assert history.get('version') == importlib_metadata.distribution("podaac-subsetter").version
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
             assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
             assert history.get('program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
             assert history.get('$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
@@ -973,9 +974,9 @@ class TestSubsetter(unittest.TestCase):
 
         for history in history_json:
             assert "date_time" in history
-            assert history.get('program') == 'podaac-subsetter'
+            assert history.get('program') == SERVICE_NAME
             assert history.get('derived_from') == "fake_original_file.nc"
-            assert history.get('version') == importlib_metadata.distribution("podaac-subsetter").version
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
             assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
             assert history.get('program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
             assert history.get('$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"

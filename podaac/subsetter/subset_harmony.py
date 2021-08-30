@@ -30,6 +30,7 @@ from harmony import BaseHarmonyAdapter
 from harmony.util import download, stage, generate_output_filename, bbox_to_geometry
 
 from podaac.subsetter import subset
+from podaac.subsetter.subset import SERVICE_NAME
 
 DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
 
@@ -220,7 +221,7 @@ def main(config=None):
     None
 
     """
-    parser = argparse.ArgumentParser(prog='podaac-subsetter',
+    parser = argparse.ArgumentParser(prog=SERVICE_NAME,
                                      description='Run the l2_subsetter service')
     harmony.setup_cli(parser)
     args = parser.parse_args()

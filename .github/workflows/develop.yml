@@ -31,30 +31,85 @@ jobs:
         uses: abatilo/actions-poetry@v2.0.0
         with:
           poetry-version: 1.1.8
+      - name: Get version
+        id: get-version
+        run: echo "::set-output name=current_version::$(poetry version | awk '{print $2}')"
+      - name: Bump pre-alpha version
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          new_ver="${{ steps.get-version.outputs.current_version }}+$(git rev-parse --short ${GITHUB_SHA})"
+          poetry version $new_ver
+          echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
       - name: Bump alpha version
-        run: poetry version prerelease
-      - name: Install l2ss-py
-        run: poetry install -E harmony
-      - name: Lint
+        if: ${{ github.event_name != 'pull_request' }}
         run: |
-          poetry run pylint podaac
-          poetry run flake8 podaac
-      - name: Test and coverage
+          poetry version prerelease
+          echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
+      - name: Echo new version
+        run: echo ${{ env.software_version }}
+      - name: Commit Version Bump
         run: |
-          poetry env list --full-path
-          poetry run pip freeze
-          poetry run pytest --cov=podaac/ --cov-report=xml -m "not aws and not integration" tests/
-      - name: SonarCloud Scan
-        uses: sonarsource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+          git config --global user.name 'l2sspy bot'
+          git config --global user.email 'l2sspy@noreply.github.com'
+          git commit -am "/version ${{ env.software_version }}"
+          git push
+      - uses: actions-ecosystem/action-push-tag@v1
+        if: ${{ env.software_version != null }}
+        with:
+          tag: ${{ env.software_version }}
+          message: "Version ${{ env.software_version }}"
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+#      - name: Install l2ss-py
+#        run: poetry install -E harmony
+#      - name: Lint
+#        run: |
+#          poetry run pylint podaac
+#          poetry run flake8 podaac
+#      - name: Test and coverage
+#        run: |
+#          poetry run pytest --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
+#      - name: Upload pytest test results
+#        # Always run this step to publish test results even if there are test failures
+#        if: ${{ always() }}
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: test-results
+#          path: build/reports/pytest.xml
+#      - name: SonarCloud Scan
+#        uses: sonarsource/sonarcloud-github-action@master
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+#        with:
+#          args: >
+#            -Dsonar.organization=frankinspace
+#            -Dsonar.projectKey=frankinspace_l2ss-py
+#            -Dsonar.python.coverage.reportPaths=build/reports/coverage.xml
+#            -Dsonar.sources=podaac/
+#            -Dsonar.tests=tests/
+#            -Dsonar.projectName=l2ss-py
+#            -Dsonar.projectVersion=${{ env.software_version }}
+#            -Dsonar.python.version=3.7,3.8,3.9
+#      - name: Run Snyk to check for dependency vulnerabilities
+#        uses: snyk/actions/python-3.8@master
+#        continue-on-error: true # To make sure that SARIF upload gets called
+#        env:
+#          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+#        with:
+#          args: >
+#            --severity-threshold=high
+#            --fail-on=all
+#            --sarif-file-output=snyk.sarif
+#      - name: Upload result to GitHub Code Scanning
+#        uses: github/codeql-action/upload-sarif@v1
+#        with:
+#          sarif_file: snyk.sarif
+#      # Runs a single command using the runners shell
+#      - name: Run a one-line script
+#        run: echo Hello, world!
+#
+#      # Runs a set of commands using the runners shell
+#      - name: Run a multi-line script
+#        run: |
+#          echo Add other actions to build,
+#          echo test, and deploy your project.

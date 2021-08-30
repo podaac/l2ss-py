@@ -23,7 +23,7 @@ and install it into the Docker image. The docker tag of the built image will be 
 Example:
 
 ```shell script
-./docker/build-docker.sh -n podaac-subsetter -v 0.2.0
+./docker/build-docker.sh -n l2ss-py -v 0.2.0
 ```
 
 ### Building from local code
@@ -48,7 +48,7 @@ The docker tag of the built image will be returned from the script.
 Example:
 
 ```shell script
-./docker/build-docker.sh -n podaac-subsetter -v 0.3.0a3 --local
+./docker/build-docker.sh -n l2ss-py -v 0.3.0a3 --local
 ```
 
 ## Running
@@ -68,6 +68,6 @@ The easiest way to use the `push-docker-ecr.sh` script is to first call `build-d
 Example:
 
 ```shell script
-export docker_tag=$(./docker/build-docker.sh -n podaac-subsetter -v 0.2.0)
+export docker_tag=$(./docker/build-docker.sh -n l2ss-py -v 0.2.0)
 ./docker/push-docker-ecr.sh -v sit -t $docker_tag
 ```
