@@ -131,8 +131,12 @@ jobs:
           git config --global user.email 'l2ss-py@noreply.github.com'
           git commit -am "/version ${{ env.software_version }}"
           git push
-      - uses: actions-ecosystem/action-push-tag@v1
-        if: ${{ env.software_version != null }}
+      - name: Push Tag
+        uses: actions-ecosystem/action-push-tag@v1
+        if: |
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
         with:
           tag: ${{ env.software_version }}
           message: "Version ${{ env.software_version }}"
