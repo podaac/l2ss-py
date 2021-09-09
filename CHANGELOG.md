@@ -6,11 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- PODAAC-3620: Added a script for running l2ss-py locally without Harmony
+- PODAAC-3620: Updated README with details about how to test l2ss-py
 ### Changed 
 - Moved to GitHub.com!
 ### Deprecated 
 ### Removed 
 ### Fixed 
+- PODAAC-3657: Appropriate Harmony base URL is used in UMM-S entry based on venue
 ### Security
 
 ## [0.16.0]

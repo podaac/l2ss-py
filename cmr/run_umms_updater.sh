@@ -22,7 +22,14 @@ set +x
 cmr_user=$(aws ssm get-parameter --profile "ngap-service-${tf_venue}" --with-decryption --name "urs_user" --output text --query Parameter.Value)
 cmr_pass=$(aws ssm get-parameter --profile "ngap-service-${tf_venue}" --with-decryption --name "urs_password" --output text --query Parameter.Value)
 
+# Replace version placeholder with actual version
 jq --arg a $l2ss_version '.Version = $a' $file > cmr/cmr.json
+
+# Replace Harmony URL placeholder with Harmony URL based on venue
+if [[ $tf_venue == "sit" || $tf_venue == "uat" ]]; then
+  jq --arg a "https://harmony.uat.earthdata.nasa.gov" '.URL.URLValue = $a' cmr/cmr.json > cmr/cmr.json.tmp && mv cmr/cmr.json.tmp cmr/cmr.json
+fi
+
 umms_updater -d -f cmr/cmr.json -a cmr/${tf_venue}_associations.txt -p POCLOUD -e ${tf_venue} -cu "$cmr_user" -cp "$cmr_pass"
 
 set -x
