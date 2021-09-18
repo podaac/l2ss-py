@@ -38,6 +38,7 @@ from podaac.subsetter import xarray_enhancements as xre
 
 
 GROUP_DELIM = '__'
+SERVICE_NAME = 'l2ss-py'
 
 
 def apply_scale_offset(scale, offset, value):
@@ -176,7 +177,6 @@ def set_json_history(dataset, cut, file_to_subset, bbox=None, shapefile=None,
 
     """
 
-    service = 'podaac-subsetter'
     params = f'cut={cut}'
     if bbox is not None:
         params = f'bbox={bbox.tolist()} {params}'
@@ -195,8 +195,8 @@ def set_json_history(dataset, cut, file_to_subset, bbox=None, shapefile=None,
     new_history_json = {
         "date_time": datetime.datetime.now(tz=datetime.timezone.utc).isoformat(),
         "derived_from": derived_from,
-        "program": service,
-        "version": importlib_metadata.distribution(service).version,
+        "program": SERVICE_NAME,
+        "version": importlib_metadata.distribution(SERVICE_NAME).version,
         "parameters": params,
         "program_ref": "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD",
         "$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
@@ -228,8 +228,7 @@ def set_version_history(dataset, cut, bbox=None, shapefile=None):
 
     """
 
-    service = 'podaac-subsetter'
-    version = importlib_metadata.distribution(service).version
+    version = importlib_metadata.distribution(SERVICE_NAME).version
     history = dataset.attrs.get('history', "")
     timestamp = datetime.datetime.utcnow()
     params = f'cut={cut}'
@@ -239,7 +238,7 @@ def set_version_history(dataset, cut, bbox=None, shapefile=None):
         params = f'shapefile={shapefile} {params}'
 
     history += "\n{timestamp} {service} v{version} ({params})".format(timestamp=timestamp,
-                                                                      service=service,
+                                                                      service=SERVICE_NAME,
                                                                       version=version,
                                                                       params=params)
     dataset.attrs['history'] = history.strip()
@@ -461,9 +460,9 @@ def get_time_variable_name(dataset, lat_var):
     """
     Try to determine the name of the 'time' variable. This is done as
     follows:
-        - The variable name contains 'time'
-        - The variable dimensions match the dimensions of the given
-        lat var
+
+    - The variable name contains 'time'
+    - The variable dimensions match the dimensions of the given lat var
 
     Parameters
     ----------

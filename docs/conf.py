@@ -13,6 +13,9 @@
 import os
 import sys
 
+import importlib_metadata
+import sphinx_rtd_theme
+
 sys.path.insert(0, os.path.abspath('..'))
 sys.path.insert(0, os.path.abspath(os.path.join(os.pardir, 'scripts')))
 
@@ -28,9 +31,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.pardir, 'scripts')))
 
 # -- Project information -----------------------------------------------------
 
-project = "service-l2-subsetter"
-author = "PO.DAAC"
-version = "0.0.1"
+distribution_name = 'l2ss-py'
+project = importlib_metadata.distribution(distribution_name).metadata['Name']
+author = importlib_metadata.distribution(distribution_name).metadata['Author']
+version = importlib_metadata.distribution(distribution_name).version
+release = version
 
 # -- General configuration ---------------------------------------------------
 
@@ -41,7 +46,9 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx_rtd_theme',
+    'm2r2'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -64,7 +71,7 @@ exclude_patterns = []
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'classic'
+html_theme = 'sphinx_rtd_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
