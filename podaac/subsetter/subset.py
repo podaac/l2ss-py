@@ -237,10 +237,7 @@ def set_version_history(dataset, cut, bbox=None, shapefile=None):
     elif shapefile is not None:
         params = f'shapefile={shapefile} {params}'
 
-    history += "\n{timestamp} {service} v{version} ({params})".format(timestamp=timestamp,
-                                                                      service=SERVICE_NAME,
-                                                                      version=version,
-                                                                      params=params)
+    history += f"\n{timestamp} {SERVICE_NAME} v{version} ({params})"
     dataset.attrs['history'] = history.strip()
 
 

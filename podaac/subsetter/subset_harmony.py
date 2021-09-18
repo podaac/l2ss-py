@@ -203,7 +203,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
         -------
         Command output
         """
-        self.logger.info("%s %s", args[0], " ".join(["'{}'".format(arg) for arg in args[1:]]))
+        self.logger.info("%s %s", args[0], " ".join(["'{}'".format(arg) for arg in args[1:]]))  # pylint: disable=C0209
         result_str = subprocess.check_output(args).decode("utf-8")
         return result_str.split("\n")
 
