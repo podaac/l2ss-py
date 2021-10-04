@@ -11,7 +11,7 @@ Harmony service for subsetting L2 data. l2ss-py supports:
 - Temporal subsetting
 - Variable subsetting
 
-If you would like to contribute to l2ss-py, refer to the [contribution document](../CONTRIBUTING.md#reviewing).
+If you would like to contribute to l2ss-py, refer to the [contribution document](CONTRIBUTING.md).
 
 
 ## How to test l2ss-py locally
