@@ -111,7 +111,8 @@ class TestSubsetter(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         # Remove the temporary directories used to house subset data
-        shutil.rmtree(cls.subset_output_dir)
+        # shutil.rmtree(cls.subset_output_dir)
+        pass
 
     def test_subset_variables(self):
         """
@@ -1230,3 +1231,59 @@ class TestSubsetter(unittest.TestCase):
         # All dates should be within the given temporal bounds.
         assert (out_ds.time.values >= start_delta_dt).all()
         assert (out_ds.time.values <= end_delta_dt).all()
+
+    def test_temporal_variable_subset_contents(self):
+        """
+        Test that both a temporal and variable subset can be executed
+        on a granule, and that all of the data within that granule is
+        subsetted as expected.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2015-07-02T09:00:00'
+        max_time = '2015-07-02T10:00:00'
+        variables = [
+            'wind_speed',
+            'wind_dir'
+        ]
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time,
+            variables=variables
+        )
+
+        in_ds = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_times=False,
+                                 decode_coords=False)
+
+        # Check that 'time' types match
+        assert in_ds.time.dtype == out_ds.time.dtype
+
+        in_ds.close()
+        out_ds.close()
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_coords=False)
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        # All dates should be within the given temporal bounds.
+        assert (out_ds.time >= pd.to_datetime(start_dt)).all()
+        assert (out_ds.time <= pd.to_datetime(end_dt)).all()
+
+        # Only coordinate variables and variables requested in variable
+        # subset should be present.
+        assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
