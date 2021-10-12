@@ -546,20 +546,26 @@ class TestSubsetter(unittest.TestCase):
             lat_var_names, lon_var_names = subset.get_coord_variable_names(in_ds)
             lat_var_name = lat_var_names[0]
             lon_var_name = lon_var_names[0]
+            time_var_name = subset.get_time_variable_name(in_ds, in_ds[lat_var_name])
 
             included_variables.append(lat_var_name)
             included_variables.append(lon_var_name)
+            included_variables.append(time_var_name)
+            included_variables.extend(in_ds.coords.keys())
 
             if lat_var_name in excluded_variables:
                 excluded_variables.remove(lat_var_name)
             if lon_var_name in excluded_variables:
                 excluded_variables.remove(lon_var_name)
+            if time_var_name in excluded_variables:
+                excluded_variables.remove(time_var_name)
 
             out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
                                      decode_times=False,
                                      decode_coords=False)
 
-            out_vars = [out_var[0] for out_var in out_ds.data_vars.items()]
+            out_vars = [out_var for out_var in out_ds.data_vars.keys()]
+            out_vars.extend(out_ds.coords.keys())
 
             assert set(out_vars) == set(included_variables)
             assert set(out_vars).isdisjoint(excluded_variables)
