@@ -111,8 +111,7 @@ class TestSubsetter(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         # Remove the temporary directories used to house subset data
-        # shutil.rmtree(cls.subset_output_dir)
-        pass
+        shutil.rmtree(cls.subset_output_dir)
 
     def test_subset_variables(self):
         """
@@ -1232,7 +1231,7 @@ class TestSubsetter(unittest.TestCase):
         assert (out_ds.time.values >= start_delta_dt).all()
         assert (out_ds.time.values <= end_delta_dt).all()
 
-    def test_temporal_variable_subset_contents(self):
+    def test_temporal_variable_subset(self):
         """
         Test that both a temporal and variable subset can be executed
         on a granule, and that all of the data within that granule is
