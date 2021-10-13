@@ -1031,9 +1031,13 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
             variables = [variable.upper() for variable in variables]
-            vars_to_drop = [var_name for var_name, var in dataset.data_vars.items() if
-                            var_name.upper() not in variables and var_name not in lat_var_names and
-                            var_name not in lon_var_names]
+            vars_to_drop = [
+                var_name for var_name, var in dataset.data_vars.items()
+                if var_name.upper() not in variables
+                and var_name not in lat_var_names
+                and var_name not in lon_var_names
+                and var_name not in time_var_names
+            ]
             dataset = dataset.drop_vars(vars_to_drop)
 
         if bbox is not None:

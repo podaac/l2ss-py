@@ -546,20 +546,26 @@ class TestSubsetter(unittest.TestCase):
             lat_var_names, lon_var_names = subset.get_coord_variable_names(in_ds)
             lat_var_name = lat_var_names[0]
             lon_var_name = lon_var_names[0]
+            time_var_name = subset.get_time_variable_name(in_ds, in_ds[lat_var_name])
 
             included_variables.append(lat_var_name)
             included_variables.append(lon_var_name)
+            included_variables.append(time_var_name)
+            included_variables.extend(in_ds.coords.keys())
 
             if lat_var_name in excluded_variables:
                 excluded_variables.remove(lat_var_name)
             if lon_var_name in excluded_variables:
                 excluded_variables.remove(lon_var_name)
+            if time_var_name in excluded_variables:
+                excluded_variables.remove(time_var_name)
 
             out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
                                      decode_times=False,
                                      decode_coords=False)
 
-            out_vars = [out_var[0] for out_var in out_ds.data_vars.items()]
+            out_vars = [out_var for out_var in out_ds.data_vars.keys()]
+            out_vars.extend(out_ds.coords.keys())
 
             assert set(out_vars) == set(included_variables)
             assert set(out_vars).isdisjoint(excluded_variables)
@@ -1230,3 +1236,59 @@ class TestSubsetter(unittest.TestCase):
         # All dates should be within the given temporal bounds.
         assert (out_ds.time.values >= start_delta_dt).all()
         assert (out_ds.time.values <= end_delta_dt).all()
+
+    def test_temporal_variable_subset(self):
+        """
+        Test that both a temporal and variable subset can be executed
+        on a granule, and that all of the data within that granule is
+        subsetted as expected.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2015-07-02T09:00:00'
+        max_time = '2015-07-02T10:00:00'
+        variables = [
+            'wind_speed',
+            'wind_dir'
+        ]
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time,
+            variables=variables
+        )
+
+        in_ds = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_times=False,
+                                 decode_coords=False)
+
+        # Check that 'time' types match
+        assert in_ds.time.dtype == out_ds.time.dtype
+
+        in_ds.close()
+        out_ds.close()
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_coords=False)
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        # All dates should be within the given temporal bounds.
+        assert (out_ds.time >= pd.to_datetime(start_dt)).all()
+        assert (out_ds.time <= pd.to_datetime(end_dt)).all()
+
+        # Only coordinate variables and variables requested in variable
+        # subset should be present.
+        assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
