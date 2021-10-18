@@ -486,10 +486,10 @@ def get_time_variable_name(dataset, lat_var):
         return time_vars[0]
 
     for var_name in list(dataset.dims.keys()):
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.dims:
+        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.dims:
+        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     raise ValueError('Unable to determine time variable')
 
