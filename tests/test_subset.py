@@ -1191,6 +1191,29 @@ class TestSubsetter(unittest.TestCase):
 
             assert subset_file_size < original_file_size
 
+    def test_get_time_squeeze(self):
+        
+
+        file = '/tropomi/S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = nc.Dataset(self.test_data_dir+file, mode='r')
+        has_groups = bool(nc_dataset.groups)
+        if has_groups:
+            nc_dataset = subset.transform_grouped_dataset(nc_dataset, self.test_data_dir+file)
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
+            time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
+            lat_dims = dataset[lat_var_name].squeeze().dims
+            time_var_name = dataset[time_var_name].squeeze().dims
+            assert (lat_dims == time_var_name)
+
     def test_temporal_merged_topex(self):
         """
         Test that a temporal subset results in a granule that only
