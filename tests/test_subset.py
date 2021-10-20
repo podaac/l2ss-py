@@ -1192,8 +1192,9 @@ class TestSubsetter(unittest.TestCase):
             assert subset_file_size < original_file_size
 
     def test_get_time_squeeze(self):
-        
-
+        """test builtin squeeze method on the lat and time variables so 
+        when the two have the same shape with a time and delta time in
+        the tropomi product granuales the get_time_variable_name returns delta time as well"""
         file = '/tropomi/S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
         args = {
                 'decode_coords': False,
