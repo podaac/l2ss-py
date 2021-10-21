@@ -6,11 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- GESDISC: Added .squeeze on lat in get_time_var metho
 ### Changed 
 ### Deprecated 
 ### Removed 
 ### Fixed 
-- Fixed bug where temporal and variable subsetting resulted in failure
+- Fixed bug where time variable wasnt found
 ### Security
 
 ## [1.0.0]
