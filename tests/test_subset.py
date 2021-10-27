@@ -1191,20 +1191,59 @@ class TestSubsetter(unittest.TestCase):
 
             assert subset_file_size < original_file_size
 
-    def test_get_time_squeeze(self):
-        """test builtin squeeze method on the lat and time variables so 
-        when the two have the same shape with a time and delta time in
-        the tropomi product granuales the get_time_variable_name returns delta time as well"""
-        file = '/tropomi/S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+    def test_root_groop(self):
+        """test that a '__' is added to variables in the root group"""
+        ipath = '/home/nlensse1/Desktop/PyDev/PI21.4.2/l2ss-py/tests/data/SNDR/'
+        fname = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc'
+        if os.path.exists(fname):
+            os.system('rm '+fname)
+        os.system('cp /home/nlensse1/Downloads/SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc '+ipath+'.')
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = nc.Dataset(self.test_data_dir+file, mode='r')
+        nc_dataset = nc.Dataset(self.test_data_dir+'/SNDR/'+fname, mode='r')
         has_groups = bool(nc_dataset.groups)
         if has_groups:
-            nc_dataset = subset.transform_grouped_dataset(nc_dataset, self.test_data_dir+file)
+            nc_dataset = subset.transform_grouped_dataset(nc_dataset, self.test_data_dir+'/SNDR/'+fname)
+        var_list = list(nc_dataset.variables)
+        assert (var_list[0][0:2] == '__')
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            group_lst = []
+            for var_name in dataset.variables.keys(): #need logic if there is data in the top level not in a group
+                if len(var_name.split('__')) > 2:
+                    group_lst.append(var_name.split('__')[:-1])
+                elif len(var_name.split('__')) == 2:
+                    group_lst.append(['',''])
+                groups = set(
+                    '/'.join(var) for var in group_lst
+                )
+            expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
+        assert (groups == expected_group)
+
+    def test_get_time_squeeze(self):
+        """test builtin squeeze method on the lat and time variables so 
+        when the two have the same shape with a time and delta time in
+        the tropomi product granuales the get_time_variable_name returns delta time as well"""
+        ipath = '/home/nlensse1/Desktop/PyDev/PI21.4.2/l2ss-py/tests/data/tropomi/'
+        fname = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        if os.path.exists(fname):
+            os.system('rm '+ipath+fname)
+        os.system('cp /home/nlensse1/Downloads/S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4 '+ipath+'.')
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = nc.Dataset(self.test_data_dir+'/tropomi/'+fname, mode='r')
+        has_groups = bool(nc_dataset.groups)
+        if has_groups:
+            nc_dataset = subset.transform_grouped_dataset(nc_dataset, self.test_data_dir+'/tropomi/'+fname)
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1316,3 +1355,5 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
+
+        
