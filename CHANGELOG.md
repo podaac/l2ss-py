@@ -6,12 +6,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
-- GESDISC: Added .squeeze on lat in get_time_var metho
+- GESDISC: Added .squeeze on lat in get_time_var
+	method. Added GROUP_DELIM to the root
+	group variables
 ### Changed 
+	recombine_groups method needs to have '/' as
+	a group
 ### Deprecated 
-### Removed 
-### Fixed 
-- Fixed bug where time variable wasnt found
+### Removed
+	groups = set('/'.join(var_name.split(GROUP_DELIM)[:-1]
+### Fixed
+- Issues 10 and 15 are addressed and fixed.
+- Fixed bug where time variable wasnt found. Groups now include
+	the '/' level group
 ### Security
 
 ## [1.0.0]

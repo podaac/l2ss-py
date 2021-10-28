@@ -1192,58 +1192,51 @@ class TestSubsetter(unittest.TestCase):
             assert subset_file_size < original_file_size
 
     def test_root_groop(self):
-        """test that a '__' is added to variables in the root group"""
-        ipath = '/home/nlensse1/Desktop/PyDev/PI21.4.2/l2ss-py/tests/data/SNDR/'
-        fname = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc'
-        if os.path.exists(fname):
-            os.system('rm '+fname)
-        os.system('cp /home/nlensse1/Downloads/SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc '+ipath+'.')
+        """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
+
+        sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
+                        os.path.join(self.subset_output_dir, sndr_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
+
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = nc.Dataset(self.test_data_dir+'/SNDR/'+fname, mode='r')
-        has_groups = bool(nc_dataset.groups)
-        if has_groups:
-            nc_dataset = subset.transform_grouped_dataset(nc_dataset, self.test_data_dir+'/SNDR/'+fname)
-        var_list = list(nc_dataset.variables)
-        assert (var_list[0][0:2] == '__')
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
         ) as dataset:
+            var_list = list(dataset.variables)
+            assert (var_list[0][0:2] == subset.GROUP_DELIM)
             group_lst = []
             for var_name in dataset.variables.keys(): #need logic if there is data in the top level not in a group
-                if len(var_name.split('__')) > 2:
-                    group_lst.append(var_name.split('__')[:-1])
-                elif len(var_name.split('__')) == 2:
-                    group_lst.append(['',''])
-                groups = set(
-                    '/'.join(var) for var in group_lst
-                )
+                group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
+            group_lst = ['/' if group=='' else group for group in group_lst]
+            groups = set(group_lst)
             expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
-        assert (groups == expected_group)
+            assert (groups == expected_group)
 
     def test_get_time_squeeze(self):
         """test builtin squeeze method on the lat and time variables so 
         when the two have the same shape with a time and delta time in
         the tropomi product granuales the get_time_variable_name returns delta time as well"""
-        ipath = '/home/nlensse1/Desktop/PyDev/PI21.4.2/l2ss-py/tests/data/tropomi/'
-        fname = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
-        if os.path.exists(fname):
-            os.system('rm '+ipath+fname)
-        os.system('cp /home/nlensse1/Downloads/S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4 '+ipath+'.')
+
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
 
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = nc.Dataset(self.test_data_dir+'/tropomi/'+fname, mode='r')
-        has_groups = bool(nc_dataset.groups)
-        if has_groups:
-            nc_dataset = subset.transform_grouped_dataset(nc_dataset, self.test_data_dir+'/tropomi/'+fname)
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
