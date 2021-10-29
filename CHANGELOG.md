@@ -10,11 +10,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	method. Added GROUP_DELIM to the root
 	group variables
 ### Changed 
-	recombine_groups method needs to have '/' as
-	a group
+	recombine_groups method needs gather all groups with all variables
+	including the root '/' group. nc_dataset is run through a loop to change
+	the variable names by adding a '__' to the front right before the walk method is called.
+        Groups list appends root level variables where the var_name.split returns a
+	['','Variable']. Groups list is changed so theses entries become ['',''] so that
+        there is a '/' group when variables are present.
 ### Deprecated 
 ### Removed
-	groups = set('/'.join(var_name.split(GROUP_DELIM)[:-1]
+	groups = set('/'.join(var_name.split(GROUP_DELIM)[:-1] line was removed.
+	Logic above assumes that all variables will be in a group
+	'/GROUP/Varible' when split becomes ['','GROUP','Variable'], the
+	last element is dropped and the two are joined to be '/GROUP'.
+	SNDR has variables in the root group so without adding a
+	GROUP_DELIM to the front of the root variable the var_name 'Varible'
+	becomes a blank list with split function applied.
 ### Fixed
 - Issues 10 and 15 are addressed and fixed.
 - Fixed bug where time variable wasnt found. Groups now include
