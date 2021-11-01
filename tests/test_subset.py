@@ -1191,7 +1191,7 @@ class TestSubsetter(unittest.TestCase):
 
             assert subset_file_size < original_file_size
 
-    def test_root_groop(self):
+    def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
 
         sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc'
