@@ -1244,8 +1244,8 @@ class TestSubsetter(unittest.TestCase):
             lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
             time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
             lat_dims = dataset[lat_var_name].squeeze().dims
-            time_var_name = dataset[time_var_name].squeeze().dims
-            assert (lat_dims == time_var_name)
+            time_dims = dataset[time_var_name].squeeze().dims
+            assert (lat_dims == time_dims)
 
     def test_temporal_merged_topex(self):
         """
