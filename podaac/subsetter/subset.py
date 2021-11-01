@@ -903,9 +903,9 @@ def recombine_grouped_datasets(datasets, output_file):
 
     for dataset in datasets:
         group_lst = []
-        for var_name in dataset.variables.keys(): #need logic if there is data in the top level not in a group
+        for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
             group_lst.append('/'.join(var_name.split(GROUP_DELIM)[:-1]))
-        group_lst = ['/' if group=='' else group for group in group_lst]
+        group_lst = ['/' if group == '' else group for group in group_lst]
         groups = set(group_lst)
         for group in groups:
             base_dataset.createGroup(group)
