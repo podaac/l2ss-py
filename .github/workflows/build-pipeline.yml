@@ -127,18 +127,18 @@ jobs:
           tag: ${{ env.software_version }}
           message: "Version ${{ env.software_version }}"
       - name: Publish UMM-S with new version
-          uses: podaac/cmr-umm-updater@0.1.1
-          if: |
-            github.ref == 'refs/heads/main'    ||
-            startsWith(github.ref, 'refs/heads/release')
-          with:
-            umm-s-json: 'cmr/l2ss_cmr_umm_s.json'
-            provider: 'POCLOUD'
-            env: ${{ env.venue }}
-            version: ${{ env.software_version }}
-          env:
-            cmr_user: ${{secrets.CMR_USER}}
-            cmr_pass: ${{secrets.CMR_PASS}}
+        uses: podaac/cmr-umm-updater@0.1.1
+        if: |
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
+        with:
+          umm-s-json: 'cmr/l2ss_cmr_umm_s.json'
+          provider: 'POCLOUD'
+          env: ${{ env.venue }}
+          version: ${{ env.software_version }}
+        env:
+          cmr_user: ${{secrets.CMR_USER}}
+          cmr_pass: ${{secrets.CMR_PASS}}
       - name: Build Docs
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
