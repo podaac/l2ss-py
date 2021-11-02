@@ -546,20 +546,26 @@ class TestSubsetter(unittest.TestCase):
             lat_var_names, lon_var_names = subset.get_coord_variable_names(in_ds)
             lat_var_name = lat_var_names[0]
             lon_var_name = lon_var_names[0]
+            time_var_name = subset.get_time_variable_name(in_ds, in_ds[lat_var_name])
 
             included_variables.append(lat_var_name)
             included_variables.append(lon_var_name)
+            included_variables.append(time_var_name)
+            included_variables.extend(in_ds.coords.keys())
 
             if lat_var_name in excluded_variables:
                 excluded_variables.remove(lat_var_name)
             if lon_var_name in excluded_variables:
                 excluded_variables.remove(lon_var_name)
+            if time_var_name in excluded_variables:
+                excluded_variables.remove(time_var_name)
 
             out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
                                      decode_times=False,
                                      decode_coords=False)
 
-            out_vars = [out_var[0] for out_var in out_ds.data_vars.items()]
+            out_vars = [out_var for out_var in out_ds.data_vars.keys()]
+            out_vars.extend(out_ds.coords.keys())
 
             assert set(out_vars) == set(included_variables)
             assert set(out_vars).isdisjoint(excluded_variables)
@@ -1185,6 +1191,62 @@ class TestSubsetter(unittest.TestCase):
 
             assert subset_file_size < original_file_size
 
+    def test_root_group(self):
+        """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
+
+        sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
+                        os.path.join(self.subset_output_dir, sndr_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            var_list = list(dataset.variables)
+            assert (var_list[0][0:2] == subset.GROUP_DELIM)
+            group_lst = []
+            for var_name in dataset.variables.keys(): #need logic if there is data in the top level not in a group
+                group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
+            group_lst = ['/' if group=='' else group for group in group_lst]
+            groups = set(group_lst)
+            expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
+            assert (groups == expected_group)
+
+    def test_get_time_squeeze(self):
+        """test builtin squeeze method on the lat and time variables so 
+        when the two have the same shape with a time and delta time in
+        the tropomi product granuales the get_time_variable_name returns delta time as well"""
+
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
+            time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
+            lat_dims = dataset[lat_var_name].squeeze().dims
+            time_dims = dataset[time_var_name].squeeze().dims
+            assert (lat_dims == time_dims)
+
     def test_temporal_merged_topex(self):
         """
         Test that a temporal subset results in a granule that only
@@ -1230,3 +1292,61 @@ class TestSubsetter(unittest.TestCase):
         # All dates should be within the given temporal bounds.
         assert (out_ds.time.values >= start_delta_dt).all()
         assert (out_ds.time.values <= end_delta_dt).all()
+
+    def test_temporal_variable_subset(self):
+        """
+        Test that both a temporal and variable subset can be executed
+        on a granule, and that all of the data within that granule is
+        subsetted as expected.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2015-07-02T09:00:00'
+        max_time = '2015-07-02T10:00:00'
+        variables = [
+            'wind_speed',
+            'wind_dir'
+        ]
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time,
+            variables=variables
+        )
+
+        in_ds = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_times=False,
+                                 decode_coords=False)
+
+        # Check that 'time' types match
+        assert in_ds.time.dtype == out_ds.time.dtype
+
+        in_ds.close()
+        out_ds.close()
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_coords=False)
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        # All dates should be within the given temporal bounds.
+        assert (out_ds.time >= pd.to_datetime(start_dt)).all()
+        assert (out_ds.time <= pd.to_datetime(end_dt)).all()
+
+        # Only coordinate variables and variables requested in variable
+        # subset should be present.
+        assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
+
+        

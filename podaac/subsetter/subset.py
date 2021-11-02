@@ -486,10 +486,10 @@ def get_time_variable_name(dataset, lat_var):
         return time_vars[0]
 
     for var_name in list(dataset.dims.keys()):
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.dims:
+        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.dims:
+        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     raise ValueError('Unable to determine time variable')
 
@@ -865,6 +865,11 @@ def transform_grouped_dataset(nc_dataset, file_to_subset):
         for group_name in group_names:
             del group_node[group_name]
 
+    for var_name in list(nc_dataset.variables.keys()):
+        new_var_name = f'{GROUP_DELIM}{var_name}'
+        nc_dataset.variables[new_var_name] = nc_dataset.variables[var_name]
+        del nc_dataset.variables[var_name]
+
     walk(nc_dataset.groups, '')
 
     # Update the dimensions of the dataset in the root group
@@ -897,9 +902,11 @@ def recombine_grouped_datasets(datasets, output_file):
     base_dataset = nc.Dataset(output_file, mode='w')
 
     for dataset in datasets:
-        groups = set(
-            '/'.join(var_name.split(GROUP_DELIM)[:-1]) for var_name in dataset.variables.keys()
-        )
+        group_lst = []
+        for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
+            group_lst.append('/'.join(var_name.split(GROUP_DELIM)[:-1]))
+        group_lst = ['/' if group == '' else group for group in group_lst]
+        groups = set(group_lst)
         for group in groups:
             base_dataset.createGroup(group)
 
@@ -1031,9 +1038,13 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
             variables = [variable.upper() for variable in variables]
-            vars_to_drop = [var_name for var_name, var in dataset.data_vars.items() if
-                            var_name.upper() not in variables and var_name not in lat_var_names and
-                            var_name not in lon_var_names]
+            vars_to_drop = [
+                var_name for var_name, var in dataset.data_vars.items()
+                if var_name.upper() not in variables
+                and var_name not in lat_var_names
+                and var_name not in lon_var_names
+                and var_name not in time_var_names
+            ]
             dataset = dataset.drop_vars(vars_to_drop)
 
         if bbox is not None:

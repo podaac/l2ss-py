@@ -47,7 +47,7 @@ jobs:
         run: |
           poetry version prerelease
           echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
-          echo "extra_tag=sit" >> $GITHUB_ENV
+          echo "venue=sit" >> $GITHUB_ENV
       - name: Bump rc version
         # If triggered by push to a release branch
         if: ${{ startsWith(github.ref, 'refs/heads/release/') }}
@@ -61,7 +61,7 @@ jobs:
             poetry version ${GITHUB_REF#refs/heads/release/}-rc.1
           fi
           echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
-          echo "extra_tag=uat" >> $GITHUB_ENV
+          echo "venue=uat" >> $GITHUB_ENV
       - name: Release version
         # If triggered by push to the main branch
         if: ${{ startsWith(github.ref, 'refs/heads/main') }}
@@ -72,7 +72,7 @@ jobs:
         run: |
           poetry version ${CURRENT_VERSION%%-rc.*}
           echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
-          echo "extra_tag=ops" >> $GITHUB_ENV
+          echo "venue=ops" >> $GITHUB_ENV
       - name: Install l2ss-py
         run: poetry install -E harmony
       - name: Lint
@@ -126,6 +126,19 @@ jobs:
         with:
           tag: ${{ env.software_version }}
           message: "Version ${{ env.software_version }}"
+      - name: Publish UMM-S with new version
+        uses: podaac/cmr-umm-updater@0.1.1
+        if: |
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
+        with:
+          umm-s-json: 'cmr/l2ss_cmr_umm_s.json'
+          provider: 'POCLOUD'
+          env: ${{ env.venue }}
+          version: ${{ env.software_version }}
+        env:
+          cmr_user: ${{secrets.CMR_USER}}
+          cmr_pass: ${{secrets.CMR_PASS}}
       - name: Build Docs
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
@@ -172,7 +185,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             type=semver,pattern={{version}},value=${{ env.software_version }}
-            type=raw,value=${{ env.extra_tag }}
+            type=raw,value=${{ env.venue }}
       - name: Wait for package
         if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
         run: |
