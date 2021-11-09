@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issues/20] (https://github.com/podaac/l2ss-py/issues/20): Added .squeeze on cond.values, remove time dimension in indexers
+### Changed 
+### Deprecated 
+### Removed
+### Fixed
+- Fixed bug where temporal and spatial dimensions were not returning properly
+### Security
+
+## [Unreleased]
+### Added
 - [issues/11](https://github.com/podaac/l2ss-py/issues/11): Added .squeeze on lat in get_time_var method. Added GROUP_DELIM to the root group variables.
 ### Changed 
 - [issues/15](https://github.com/podaac/l2ss-py/issues/15): Changed the way groups are handled so that variables at the root of a file are not ignored. Groups now include the '/' level group
