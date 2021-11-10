@@ -1198,7 +1198,6 @@ class TestSubsetter(unittest.TestCase):
                         os.path.join(self.subset_output_dir, sndr_file_name))
 
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file_name))
-        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
 
         args = {
                 'decode_coords': False,
@@ -1207,7 +1206,6 @@ class TestSubsetter(unittest.TestCase):
             }
 
         nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
 
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
@@ -1233,7 +1231,6 @@ class TestSubsetter(unittest.TestCase):
                         os.path.join(self.subset_output_dir, tropomi_file_name))
 
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
-        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
 
         args = {
                 'decode_coords': False,
@@ -1242,7 +1239,6 @@ class TestSubsetter(unittest.TestCase):
             }
 
         nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
 
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
@@ -1269,6 +1265,7 @@ class TestSubsetter(unittest.TestCase):
                 'decode_times': False
             }
         nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
+
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
