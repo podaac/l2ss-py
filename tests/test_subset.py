@@ -1197,22 +1197,18 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
                         os.path.join(self.subset_output_dir, sndr_file_name))
 
-<<<<<<< HEAD
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file_name))
-=======
         nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
->>>>>>> pb/develop
 
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-<<<<<<< HEAD
+
         nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
-=======
         nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
->>>>>>> pb/develop
+
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1236,22 +1232,18 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
                         os.path.join(self.subset_output_dir, tropomi_file_name))
 
-<<<<<<< HEAD
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
-=======
         nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
->>>>>>> pb/develop
 
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-<<<<<<< HEAD
+
         nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
-=======
         nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
->>>>>>> pb/develop
+
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1262,7 +1254,6 @@ class TestSubsetter(unittest.TestCase):
             time_dims = dataset[time_var_name].squeeze().dims
             assert (lat_dims == time_dims)
 
-<<<<<<< HEAD
     def test_get_indexers_nd(self):
         """test that the time coordinate is not included in the indexers. Also test that the dimensions are the same for
            a global box subset"""
@@ -1298,8 +1289,6 @@ class TestSubsetter(unittest.TestCase):
             assert (('time' not in indexers.keys()) == True) #time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
-=======
->>>>>>> pb/develop
     def test_temporal_merged_topex(self):
         """
         Test that a temporal subset results in a granule that only
