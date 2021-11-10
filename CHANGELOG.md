@@ -4,13 +4,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.1.0]
 ### Added
+<<<<<<< HEAD
 - [issues/20] (https://github.com/podaac/l2ss-py/issues/20): Added .squeeze on cond.values, remove time dimension in indexers
+=======
+- [issues/11](https://github.com/podaac/l2ss-py/issues/11): Added .squeeze on lat in get_time_var method. Added GROUP_DELIM to the root group variables.
+- [issues/17](https://github.com/podaac/l2ss-py/issues/17): Integrated with cmr-umm-updater
+>>>>>>> pb/develop
 ### Changed 
+- [issues/15](https://github.com/podaac/l2ss-py/issues/15): Changed the way groups are handled so that variables at the root of a file are not ignored. Groups now include the '/' level group
 ### Deprecated 
 ### Removed
 ### Fixed
+<<<<<<< HEAD
 - Fixed bug where temporal and spatial dimensions were not returning properly
 ### Security
 
@@ -22,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+=======
+>>>>>>> pb/develop
 - Fixed bug where temporal and variable subsetting resulted in failure
 ### Security
 
