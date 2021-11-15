@@ -726,7 +726,6 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
-
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -736,7 +735,8 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
             (group_dataset[lat_var_name] >= lat_bounds[0]) &
             (group_dataset[lat_var_name] <= lat_bounds[1]) &
             temporal_cond,
-            cut
+            cut,
+            time_var_name
         )
         datasets.append(group_dataset)
 

@@ -49,7 +49,7 @@ def get_indexers_from_1d(cond):
     return indexers
 
 
-def get_indexers_from_nd(cond, cut):
+def get_indexers_from_nd(cond, cut, time_var_name):
     """
     Get indexers from a dataset with more than 1 dimensions.
 
@@ -80,7 +80,7 @@ def get_indexers_from_nd(cond, cut):
     if not np.any(rows) | np.any(cols):
         logging.info("No data within the given bounding box.")
 
-    cond_list = [dim for dim in cond.dims if "time" not in dim ]
+    cond_list = [dim for dim in cond.dims if dim.split('__')[-1] not in time_var_name]
     indexers = {
         cond_list[0]: np.where(rows)[0],
         cond_list[1]: np.where(cols)[0]
@@ -134,7 +134,7 @@ def cast_type(var, var_type):
     return var.astype(var_type)
 
 
-def where(dataset, cond, cut):
+def where(dataset, cond, cut, time_var_name):
     """
     Return a dataset which meets the given condition.
 
@@ -165,7 +165,7 @@ def where(dataset, cond, cut):
     if cond.values.ndim == 1:
         indexers = get_indexers_from_1d(cond)
     else:
-        indexers = get_indexers_from_nd(cond, cut)
+        indexers = get_indexers_from_nd(cond, cut, time_var_name)
     # If any of the indexer dimensions are empty, return an empty dataset
     if not all(len(value) > 0 for value in indexers.values()):
         return copy_empty_dataset(dataset)

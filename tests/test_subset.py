@@ -1267,6 +1267,7 @@ class TestSubsetter(unittest.TestCase):
         ) as dataset:
             lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
             lon_var_name = subset.get_coord_variable_names(dataset)[1][0]
+            time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
             oper = operator.and_
 
             cond = oper(
@@ -1274,11 +1275,11 @@ class TestSubsetter(unittest.TestCase):
                 (dataset[lon_var_name] <= 180)
                 ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
 
-            indexers = xre.get_indexers_from_nd(cond, True)
+            indexers = xre.get_indexers_from_nd(cond, True, time_var_name)
             indexed_cond = cond.isel(**indexers)
             indexed_ds = dataset.isel(**indexers)
             new_dataset = indexed_ds.where(indexed_cond)
-            assert (('time' not in indexers.keys()) == True) #time can't be in the index
+            assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
     def test_temporal_merged_topex(self):
