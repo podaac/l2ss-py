@@ -743,7 +743,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
     return datasets
 
 
-def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
+def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, time_var_names):
     """
     Subset an xarray Dataset using a shapefile
 
@@ -798,7 +798,7 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
 
     in_shape_vec = np.vectorize(in_shape)
     boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name])
-    return xre.where(dataset, boolean_mask, cut)
+    return xre.where(dataset, boolean_mask, cut, time_var_names)
 
 
 def transform_grouped_dataset(nc_dataset, file_to_subset):
@@ -1060,7 +1060,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             )
         elif shapefile:
             datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
+                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, time_var_names)
             ]
         else:
             raise ValueError('Either bbox or shapefile must be provided')
