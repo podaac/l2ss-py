@@ -1275,10 +1275,11 @@ class TestSubsetter(unittest.TestCase):
                 (dataset[lon_var_name] <= 180)
                 ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
 
-            indexers = xre.get_indexers_from_nd(cond, True, time_var_name)
+            indexers = xre.get_indexers_from_nd(cond, True)
             indexed_cond = cond.isel(**indexers)
             indexed_ds = dataset.isel(**indexers)
             new_dataset = indexed_ds.where(indexed_cond)
+
             assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
