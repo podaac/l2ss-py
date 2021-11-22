@@ -918,8 +918,8 @@ def recombine_grouped_datasets(datasets, output_file):
         for var_name in list(dataset.variables.keys()):
             new_var_name = var_name.split(GROUP_DELIM)[-1]
             var_group = get_nested_group(base_dataset, var_name)
-            var_dims = list(var_group.dimensions.keys())
             variable = dataset.variables[var_name]
+            var_dims = [x.split('__')[-1] for x in dataset.variables[var_name].dims]
             if not var_dims:
                 var_group_parent = var_group
                 # This group doesn't contain dimensions. Look at parent group to find dimensions.
