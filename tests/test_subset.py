@@ -38,6 +38,7 @@ from shapely.geometry import Point
 
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
+from podaac.subsetter import xarray_enhancements as xre
 
 
 class TestSubsetter(unittest.TestCase):
@@ -366,7 +367,6 @@ class TestSubsetter(unittest.TestCase):
         """
         Run the L2 subsetter and compare the result to the equivelant
         legacy (Java) subsetter result.
-
         Parameters
         ----------
         java_files : list of strings
@@ -685,7 +685,6 @@ class TestSubsetter(unittest.TestCase):
     def test_get_spatial_bounds(self):
         """
         Test that the get_spatial_bounds function works as expected.
-
         The get_spatial_bounds function should return lat/lon min/max
         which is masked and scaled for both variables. The values
         should also be adjusted for -180,180/-90,90 coordinate types
@@ -1198,14 +1197,14 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
                         os.path.join(self.subset_output_dir, sndr_file_name))
 
-        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file_name))
 
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1229,14 +1228,14 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
                         os.path.join(self.subset_output_dir, tropomi_file_name))
 
-        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
 
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1246,6 +1245,43 @@ class TestSubsetter(unittest.TestCase):
             lat_dims = dataset[lat_var_name].squeeze().dims
             time_dims = dataset[time_var_name].squeeze().dims
             assert (lat_dims == time_dims)
+
+    def test_get_indexers_nd(self):
+        """test that the time coordinate is not included in the indexers. Also test that the dimensions are the same for
+           a global box subset"""
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
+            lon_var_name = subset.get_coord_variable_names(dataset)[1][0]
+            time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
+            oper = operator.and_
+
+            cond = oper(
+                (dataset[lon_var_name] >= -180),
+                (dataset[lon_var_name] <= 180)
+                ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
+
+            indexers = xre.get_indexers_from_nd(cond, True)
+            indexed_cond = cond.isel(**indexers)
+            indexed_ds = dataset.isel(**indexers)
+            new_dataset = indexed_ds.where(indexed_cond)
+
+            assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
+            assert (new_dataset.dims == dataset.dims)
 
     def test_temporal_merged_topex(self):
         """
