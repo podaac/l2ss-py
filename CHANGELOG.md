@@ -4,6 +4,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+### Changed 
+- Var_dims in recombine_groups method. 
+### Deprecated 
+### Removed
+- var_dims = list(var_group.dimensions.keys())
+### Fixed
+- var_dims = [x.split('__')[-1] for x in dataset.variables[var_name].dims]
+- [issues/20](https://github.com/podaac/l2ss-py/issues/10): Variable dimensions are assumed to be the same across all variables in a group in recombine_group_dataset method. When variables are written out, shape must match. 
+### Security
+
+## [Unreleased]
+### Added
+### Changed 
+- Updated dependency versions
+### Deprecated 
+### Removed
+### Fixed
+- [issues/20](https://github.com/podaac/l2ss-py/issues/20): Fixed bug where spatial indexing was including extra dimensions causing output file to drastically increase in size
+### Security
+
 ## [1.1.0]
 ### Added
 - [issues/11](https://github.com/podaac/l2ss-py/issues/11): Added .squeeze on lat in get_time_var method. Added GROUP_DELIM to the root group variables.
