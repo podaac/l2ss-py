@@ -15,10 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issues/10](https://github.com/podaac/l2ss-py/issues/10): Variable dimensions are assumed to be the same across all variables in a group in recombine_group_dataset method. When variables are written out, shape must match. 
 ### Security
 
-## [Unreleased]
+## [1.2.0]
 ### Added
 ### Changed 
-=======
 - Updated dependency versions
 ### Deprecated 
 ### Removed
