@@ -10,10 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Var_dims in recombine_groups method. 
 ### Deprecated 
 ### Removed
-- var_dims = list(var_group.dimensions.keys())
 ### Fixed
 - var_dims = [x.split('__')[-1] for x in dataset.variables[var_name].dims]
-- [issues/20](https://github.com/podaac/l2ss-py/issues/10): Variable dimensions are assumed to be the same across all variables in a group in recombine_group_dataset method. When variables are written out, shape must match. 
+- [issues/10](https://github.com/podaac/l2ss-py/issues/10): Variable dimensions are assumed to be the same across all variables in a group in recombine_group_dataset method. When variables are written out, shape must match. 
 ### Security
 
 ## [Unreleased]
