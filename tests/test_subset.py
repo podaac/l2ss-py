@@ -1335,6 +1335,22 @@ class TestSubsetter(unittest.TestCase):
                         var_group_parent = var_group_parent.parent
                         var_dims = list(var_group_parent.dimensions.keys())
 
+                if np.issubdtype(
+                      dataset.variables[var_name].dtype, np.dtype(np.datetime64)
+                ) or np.issubdtype(
+                      dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
+                ):
+                    # Use xarray datetime encoder
+                    cf_dt_coder = xr.coding.times.CFDatetimeCoder()
+                    encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
+                    variable = encoded_var
+                print (new_var_name)
+                if variable.dtype == object:
+                    var_group.createVariable(new_var_name,'S1', var_dims)
+                    assert (bool(var_group.variables[new_var_name]))
+                else:
+                    pass
+
 
     def test_variable_dims_matched_tropomi(self):
         """Code must match the dimensions for each variable rather than assume all dimensions in a group are the same"""
