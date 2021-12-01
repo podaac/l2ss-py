@@ -14,7 +14,6 @@
 ==============
 test_subset.py
 ==============
-
 Test the subsetter functionality.
 """
 import json
@@ -46,7 +45,6 @@ class TestSubsetter(unittest.TestCase):
     Unit tests for the L2 subsetter. These tests are all related to the
     subsetting functionality itself, and should provide coverage on the
     following files:
-
     - podaac.subsetter.subset.py
     - podaac.subsetter.xarray_enhancements.py
     """
@@ -1283,6 +1281,61 @@ class TestSubsetter(unittest.TestCase):
             assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
+    def test_variable_type_string_oco2(self):
+        """Code must match the dimensions for each variable rather than assume all dimensions in a group are the same"""
+
+        oco2_file_name = 'oco2_LtCO2_190201_B10206Ar_200729175909s.nc4'
+        output_file_name = 'oco2_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
+                        os.path.join(self.subset_output_dir, oco2_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, oco2_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, oco2_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+
+            def get_nested_group(dataset, group_path):
+                nested_group = dataset
+                for group in group_path.strip(subset.GROUP_DELIM).split(subset.GROUP_DELIM)[:-1]:
+                    nested_group = nested_group.groups[group]
+                return nested_group
+
+            base_dataset = nc.Dataset(os.path.join(self.subset_output_dir, output_file_name), mode='w')
+            group_lst = []
+            for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
+                group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
+                group_lst = ['/' if group == '' else group for group in group_lst]
+                groups = set(group_lst)
+                for group in groups:
+                    base_dataset.createGroup(group)
+
+            for dim_name in list(dataset.dims.keys()):
+                new_dim_name = dim_name.split(subset.GROUP_DELIM)[-1]
+                dim_group = get_nested_group(base_dataset, dim_name)
+                dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
+
+            # Rename variables
+            for var_name in list(dataset.variables.keys()):
+                new_var_name = var_name.split(subset.GROUP_DELIM)[-1]
+                var_group = get_nested_group(base_dataset, var_name)
+                variable = dataset.variables[var_name]
+                var_dims = [x.split('__')[-1] for x in dataset.variables[var_name].dims]
+                if not var_dims:
+                    var_group_parent = var_group
+                    # This group doesn't contain dimensions. Look at parent group to find dimensions.
+                    while not var_dims:
+                        var_group_parent = var_group_parent.parent
+                        var_dims = list(var_group_parent.dimensions.keys())
+
+
     def test_variable_dims_matched_tropomi(self):
         """Code must match the dimensions for each variable rather than assume all dimensions in a group are the same"""
 
@@ -1308,7 +1361,7 @@ class TestSubsetter(unittest.TestCase):
                 nested_group = dataset
                 for group in group_path.strip(subset.GROUP_DELIM).split(subset.GROUP_DELIM)[:-1]:
                     nested_group = nested_group.groups[group]
-                    return nested_group
+                return nested_group
 
             base_dataset = nc.Dataset(os.path.join(self.subset_output_dir, output_file_name), mode='w')
 
@@ -1459,5 +1512,6 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
+
 
         

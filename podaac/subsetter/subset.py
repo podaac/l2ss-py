@@ -936,8 +936,10 @@ def recombine_grouped_datasets(datasets, output_file):
                 cf_dt_coder = xr.coding.times.CFDatetimeCoder()
                 encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
                 variable = encoded_var
-
-            var_group.createVariable(new_var_name, variable.dtype, var_dims)
+            if variable.dtype == object:
+                var_group.createVariable(new_var_name, 'S1', var_dims)
+            else:
+                var_group.createVariable(new_var_name, variable.dtype, var_dims)
 
             # Copy attributes
             var_attrs = variable.attrs
