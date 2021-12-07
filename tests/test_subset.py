@@ -1301,79 +1301,44 @@ class TestSubsetter(unittest.TestCase):
         assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
 
     def test_variable_dims_matched_tropomi(self):
-        """Code must match the dimensions for each variable rather than assume all dimensions in a group are the same"""
+        """
+        Code must match the dimensions for each variable rather than
+        assume all dimensions in a group are the same
+        """
 
         tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
         output_file_name = 'tropomi_test_out.nc'
         shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
                         os.path.join(self.subset_output_dir, tropomi_file_name))
 
-        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
+        in_nc = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
 
-        args = {
-                'decode_coords': False,
-                'mask_and_scale': False,
-                'decode_times': False
+        # Get variable dimensions from input dataset
+        in_var_dims = {
+            var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            for var_name, var in in_nc.groups['PRODUCT'].variables.items()
+        }
+
+        # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
+        in_var_dims.update(
+            {
+                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                for var_name, var in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
-        with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
-        ) as dataset:
+        )
 
-            def get_nested_group(dataset, group_path):
-                nested_group = dataset
-                for group in group_path.strip(subset.GROUP_DELIM).split(subset.GROUP_DELIM)[:-1]:
-                    nested_group = nested_group.groups[group]
-                return nested_group
+        out_nc = subset.transform_grouped_dataset(
+            in_nc, os.path.join(self.subset_output_dir, tropomi_file_name)
+        )
 
-            base_dataset = nc.Dataset(os.path.join(self.subset_output_dir, output_file_name), mode='w')
+        # Get variable dimensions from output dataset
+        out_var_dims = {
+            var_name.split(subset.GROUP_DELIM)[-1]: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            for var_name, var in out_nc.variables.items()
+        }
 
-            group_lst = []
-            for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
-                group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
-                group_lst = ['/' if group == '' else group for group in group_lst]
-                groups = set(group_lst)
-                for group in groups:
-                    base_dataset.createGroup(group)
+        self.assertDictEqual(in_var_dims, out_var_dims)
 
-            for dim_name in list(dataset.dims.keys()):
-                new_dim_name = dim_name.split(subset.GROUP_DELIM)[-1]
-                dim_group = get_nested_group(base_dataset, dim_name)
-                dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
-
-            # Rename variables
-            for var_name in list(dataset.variables.keys()):
-                new_var_name = var_name.split(subset.GROUP_DELIM)[-1]
-                var_group = get_nested_group(base_dataset, var_name)
-                variable = dataset.variables[var_name]
-                var_dims = [x.split('__')[-1] for x in dataset.variables[var_name].dims]
-                if not var_dims:
-                    var_group_parent = var_group
-                    # This group doesn't contain dimensions. Look at parent group to find dimensions.
-                    while not var_dims:
-                        var_group_parent = var_group_parent.parent
-                        var_dims = list(var_group_parent.dimensions.keys())
-
-                if np.issubdtype(
-                      dataset.variables[var_name].dtype, np.dtype(np.datetime64)
-                ) or np.issubdtype(
-                      dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
-                ):
-                    # Use xarray datetime encoder
-                    cf_dt_coder = xr.coding.times.CFDatetimeCoder()
-                    encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
-                    variable = encoded_var
-
-                var_group.createVariable(new_var_name, variable.dtype, var_dims)
-
-                # Copy attributes
-                var_attrs = variable.attrs
-                var_group.variables[new_var_name].setncatts(var_attrs)
-
-                # Copy data
-                var_group.variables[new_var_name].set_auto_maskandscale(False)
-                assert (var_group.variables[new_var_name].shape == variable.data.shape)
 
     def test_temporal_merged_topex(self):
         """
