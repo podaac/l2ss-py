@@ -877,7 +877,7 @@ def transform_grouped_dataset(nc_dataset, file_to_subset):
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets, output_file): # pylint: disable=too-many-branches
+def recombine_grouped_datasets(datasets, output_file):  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
