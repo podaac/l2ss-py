@@ -14,7 +14,6 @@
 ==============
 test_subset.py
 ==============
-
 Test the subsetter functionality.
 """
 import json
@@ -46,7 +45,6 @@ class TestSubsetter(unittest.TestCase):
     Unit tests for the L2 subsetter. These tests are all related to the
     subsetting functionality itself, and should provide coverage on the
     following files:
-
     - podaac.subsetter.subset.py
     - podaac.subsetter.xarray_enhancements.py
     """
@@ -1283,6 +1281,25 @@ class TestSubsetter(unittest.TestCase):
             assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
+    def test_variable_type_string_oco2(self):
+        """Code passes a ceating a variable that is type object in oco2 file"""
+
+        oco2_file_name = 'oco2_LtCO2_190201_B10206Ar_200729175909s.nc4'
+        output_file_name = 'oco2_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
+                        os.path.join(self.subset_output_dir, oco2_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, 'OCO2',oco2_file_name),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+
+        in_nc = xr.open_dataset(join(self.test_data_dir, 'OCO2',oco2_file_name))
+        out_nc = xr.open_dataset(join(self.subset_output_dir, output_file_name))
+        assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
+
     def test_variable_dims_matched_tropomi(self):
         """Code must match the dimensions for each variable rather than assume all dimensions in a group are the same"""
 
@@ -1308,7 +1325,7 @@ class TestSubsetter(unittest.TestCase):
                 nested_group = dataset
                 for group in group_path.strip(subset.GROUP_DELIM).split(subset.GROUP_DELIM)[:-1]:
                     nested_group = nested_group.groups[group]
-                    return nested_group
+                return nested_group
 
             base_dataset = nc.Dataset(os.path.join(self.subset_output_dir, output_file_name), mode='w')
 
@@ -1459,5 +1476,4 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
-
         

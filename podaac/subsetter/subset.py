@@ -877,7 +877,7 @@ def transform_grouped_dataset(nc_dataset, file_to_subset):
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets, output_file):
+def recombine_grouped_datasets(datasets, output_file):  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
@@ -937,7 +937,10 @@ def recombine_grouped_datasets(datasets, output_file):
                 encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
                 variable = encoded_var
 
-            var_group.createVariable(new_var_name, variable.dtype, var_dims)
+            if variable.dtype == object:
+                var_group.createVariable(new_var_name, 'S1', var_dims)
+            else:
+                var_group.createVariable(new_var_name, variable.dtype, var_dims)
 
             # Copy attributes
             var_attrs = variable.attrs
