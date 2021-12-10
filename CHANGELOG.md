@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issues/32](https://github.com/podaac/l2ss-py/issues/32): Fixed bug when given variables to subset that have a '/' character in the variable name, they would not appear in the output.
 - [issues/20](https://github.com/podaac/l2ss-py/issues/20): Fixed bug where spatial indexing was including extra dimensions causing output file to drastically increase in size
 - [issues/10](https://github.com/podaac/l2ss-py/issues/10): Fixed bug where variable dimensions are assumed to be the same across all variables in a group in recombine_group_dataset method. When variables are written out, shape must match.
 - [issues/28](https://github.com/podaac/l2ss-py/issues/28): Fixed bug where variable dtype would be type object, the code would raise exception. Fix adds logic to handle type object 
