@@ -805,6 +805,30 @@ class TestSubsetter(unittest.TestCase):
             in_shape_vec = np.vectorize(in_shape)
             in_shape_vec(result_dataset.lon, result_dataset.lat)
 
+    def test_variable_subset_oco2(self):
+        """
+        variable subsets for groups and root group using a '/'
+        """
+
+        oco2_file_name = 'oco2_LtCO2_190201_B10206Ar_200729175909s.nc4'
+        output_file_name = 'oco2_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
+                        os.path.join(self.subset_output_dir, oco2_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+        variables = ['/xco2','/xco2_quality_flag','/Retrieval/water_height','/sounding_id']
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, 'OCO2',oco2_file_name),
+            bbox=bbox,
+            variables=variables,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+        
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
+        var_listout = list(out_nc.groups['Retrieval'].variables.keys())
+        assert ('water_height' in var_listout)
+        #assert (in_nc.variables['xco2_quality_flag'] == out_nc.variables['xco2_quality_flag'])
+        #assert (in_nc.groups['Retrieval'].variables)
+
     def test_transform_grouped_dataset(self):
         """
         Test that the transformation function results in a correctly

@@ -1015,6 +1015,9 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     if has_groups:
         nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
 
+    if variables:
+        variables = [x.replace('/', '__') for x in variables]
+
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
