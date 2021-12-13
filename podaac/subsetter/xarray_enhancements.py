@@ -65,10 +65,10 @@ def get_indexers_from_nd(cond, cut):
     dict
         Indexer dictionary for the provided condition.
     """
-    rows = np.any(cond.values, axis=1)
 
+    rows = np.any(cond.values.squeeze(), axis=1)
     if cut:
-        cols = np.any(cond.values, axis=0)
+        cols = np.any(cond.values.squeeze(), axis=0)
     else:
         cols = np.ones(len(cond.values[0]))
 
@@ -80,9 +80,15 @@ def get_indexers_from_nd(cond, cut):
     if not np.any(rows) | np.any(cols):
         logging.info("No data within the given bounding box.")
 
+    cond_shape_list = list(cond.shape)
+    cond_list = list(cond.dims)
+    output = [idx for idx, element in enumerate(cond_shape_list) if cond_shape_list[idx] == 1]
+    for i in output:
+        cond_list.pop(i)
+
     indexers = {
-        cond.dims[0]: np.where(rows)[0],
-        cond.dims[1]: np.where(cols)[0]
+        cond_list[0]: np.where(rows)[0],
+        cond_list[1]: np.where(cols)[0]
     }
 
     return indexers
@@ -166,7 +172,6 @@ def where(dataset, cond, cut):
         indexers = get_indexers_from_1d(cond)
     else:
         indexers = get_indexers_from_nd(cond, cut)
-
     # If any of the indexer dimensions are empty, return an empty dataset
     if not all(len(value) > 0 for value in indexers.values()):
         return copy_empty_dataset(dataset)

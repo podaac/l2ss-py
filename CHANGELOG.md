@@ -4,6 +4,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+### Changed 
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+## [1.2.0]
+### Added
+### Changed 
+- Updated dependency versions
+### Deprecated 
+### Removed
+### Fixed
+- [issues/32](https://github.com/podaac/l2ss-py/issues/32): Fixed bug when given variables to subset that have a '/' character in the variable name, they would not appear in the output.
+- [issues/20](https://github.com/podaac/l2ss-py/issues/20): Fixed bug where spatial indexing was including extra dimensions causing output file to drastically increase in size
+- [issues/10](https://github.com/podaac/l2ss-py/issues/10): Fixed bug where variable dimensions are assumed to be the same across all variables in a group in recombine_group_dataset method. When variables are written out, shape must match.
+- [issues/28](https://github.com/podaac/l2ss-py/issues/28): Fixed bug where variable dtype would be type object, the code would raise exception. Fix adds logic to handle type object 
+### Security
+
 ## [1.1.0]
 ### Added
 - [issues/11](https://github.com/podaac/l2ss-py/issues/11): Added .squeeze on lat in get_time_var method. Added GROUP_DELIM to the root group variables.

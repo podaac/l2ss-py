@@ -27,15 +27,14 @@ import os
 import geopandas as gpd
 import importlib_metadata
 import julian
-import numpy as np
-import xarray as xr
 import netCDF4 as nc
+import numpy as np
 import pandas as pd
+import xarray as xr
 from shapely.geometry import Point
 from shapely.ops import transform
 
 from podaac.subsetter import xarray_enhancements as xre
-
 
 GROUP_DELIM = '__'
 SERVICE_NAME = 'l2ss-py'
@@ -599,7 +598,7 @@ def datetime_from_mjd(dataset, time_var_name):
     time_var = dataset[time_var_name]
     if 'long_name' in time_var.attrs:
         mdj_string = time_var.attrs['long_name']
-        mjd = mdj_string[mdj_string.find("(")+1:mdj_string.find(")")].split("= ")[1]
+        mjd = mdj_string[mdj_string.find("(") + 1:mdj_string.find(")")].split("= ")[1]
         try:
             mjd_float = float(mjd)
         except ValueError:
@@ -726,7 +725,6 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
-
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -878,7 +876,7 @@ def transform_grouped_dataset(nc_dataset, file_to_subset):
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets, output_file):
+def recombine_grouped_datasets(datasets, output_file):  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
@@ -893,12 +891,6 @@ def recombine_grouped_datasets(datasets, output_file):
         Name of the output file to write the resulting NetCDF file to.
     """
 
-    def get_nested_group(dataset, group_path):
-        nested_group = dataset
-        for group in group_path.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1]:
-            nested_group = nested_group.groups[group]
-        return nested_group
-
     base_dataset = nc.Dataset(output_file, mode='w')
 
     for dataset in datasets:
@@ -912,41 +904,11 @@ def recombine_grouped_datasets(datasets, output_file):
 
         for dim_name in list(dataset.dims.keys()):
             new_dim_name = dim_name.split(GROUP_DELIM)[-1]
-            dim_group = get_nested_group(base_dataset, dim_name)
+            dim_group = _get_nested_group(base_dataset, dim_name)
             dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
 
         # Rename variables
-        for var_name in list(dataset.variables.keys()):
-            new_var_name = var_name.split(GROUP_DELIM)[-1]
-            var_group = get_nested_group(base_dataset, var_name)
-            var_dims = list(var_group.dimensions.keys())
-            variable = dataset.variables[var_name]
-            if not var_dims:
-                var_group_parent = var_group
-                # This group doesn't contain dimensions. Look at parent group to find dimensions.
-                while not var_dims:
-                    var_group_parent = var_group_parent.parent
-                    var_dims = list(var_group_parent.dimensions.keys())
-
-            if np.issubdtype(
-                    dataset.variables[var_name].dtype, np.dtype(np.datetime64)
-            ) or np.issubdtype(
-                dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
-            ):
-                # Use xarray datetime encoder
-                cf_dt_coder = xr.coding.times.CFDatetimeCoder()
-                encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
-                variable = encoded_var
-
-            var_group.createVariable(new_var_name, variable.dtype, var_dims)
-
-            # Copy attributes
-            var_attrs = variable.attrs
-            var_group.variables[new_var_name].setncatts(var_attrs)
-
-            # Copy data
-            var_group.variables[new_var_name].set_auto_maskandscale(False)
-            var_group.variables[new_var_name][:] = variable.data
+        _rename_variables(dataset, base_dataset)
 
     # Remove group vars from base dataset
     for var_name in list(base_dataset.variables.keys()):
@@ -962,6 +924,50 @@ def recombine_grouped_datasets(datasets, output_file):
     base_dataset.setncatts(datasets[0].attrs)
     # Write and close
     base_dataset.close()
+
+
+def _get_nested_group(dataset, group_path):
+    nested_group = dataset
+    for group in group_path.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1]:
+        nested_group = nested_group.groups[group]
+    return nested_group
+
+
+def _rename_variables(dataset, base_dataset):
+    for var_name in list(dataset.variables.keys()):
+        new_var_name = var_name.split(GROUP_DELIM)[-1]
+        var_group = _get_nested_group(base_dataset, var_name)
+        variable = dataset.variables[var_name]
+        var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
+        if not var_dims:
+            var_group_parent = var_group
+            # This group doesn't contain dimensions. Look at parent group to find dimensions.
+            while not var_dims:
+                var_group_parent = var_group_parent.parent
+                var_dims = list(var_group_parent.dimensions.keys())
+
+        if np.issubdtype(
+                dataset.variables[var_name].dtype, np.dtype(np.datetime64)
+        ) or np.issubdtype(
+            dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
+        ):
+            # Use xarray datetime encoder
+            cf_dt_coder = xr.coding.times.CFDatetimeCoder()
+            encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
+            variable = encoded_var
+
+        if variable.dtype == object:
+            var_group.createVariable(new_var_name, 'S1', var_dims)
+        else:
+            var_group.createVariable(new_var_name, variable.dtype, var_dims)
+
+        # Copy attributes
+        var_attrs = variable.attrs
+        var_group.variables[new_var_name].setncatts(var_attrs)
+
+        # Copy data
+        var_group.variables[new_var_name].set_auto_maskandscale(False)
+        var_group.variables[new_var_name][:] = variable.data
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
@@ -1008,6 +1014,9 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     # If dataset has groups, transform to work with xarray
     if has_groups:
         nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
+
+    if variables:
+        variables = [x.replace('/', GROUP_DELIM) for x in variables]
 
     args = {
         'decode_coords': False,

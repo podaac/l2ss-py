@@ -14,7 +14,6 @@
 ==============
 test_subset.py
 ==============
-
 Test the subsetter functionality.
 """
 import json
@@ -38,6 +37,7 @@ from shapely.geometry import Point
 
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
+from podaac.subsetter import xarray_enhancements as xre
 
 
 class TestSubsetter(unittest.TestCase):
@@ -45,7 +45,6 @@ class TestSubsetter(unittest.TestCase):
     Unit tests for the L2 subsetter. These tests are all related to the
     subsetting functionality itself, and should provide coverage on the
     following files:
-
     - podaac.subsetter.subset.py
     - podaac.subsetter.xarray_enhancements.py
     """
@@ -366,7 +365,6 @@ class TestSubsetter(unittest.TestCase):
         """
         Run the L2 subsetter and compare the result to the equivelant
         legacy (Java) subsetter result.
-
         Parameters
         ----------
         java_files : list of strings
@@ -685,7 +683,6 @@ class TestSubsetter(unittest.TestCase):
     def test_get_spatial_bounds(self):
         """
         Test that the get_spatial_bounds function works as expected.
-
         The get_spatial_bounds function should return lat/lon min/max
         which is masked and scaled for both variables. The values
         should also be adjusted for -180,180/-90,90 coordinate types
@@ -807,6 +804,30 @@ class TestSubsetter(unittest.TestCase):
 
             in_shape_vec = np.vectorize(in_shape)
             in_shape_vec(result_dataset.lon, result_dataset.lat)
+
+    def test_variable_subset_oco2(self):
+        """
+        variable subsets for groups and root group using a '/'
+        """
+
+        oco2_file_name = 'oco2_LtCO2_190201_B10206Ar_200729175909s.nc4'
+        output_file_name = 'oco2_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
+                        os.path.join(self.subset_output_dir, oco2_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+        variables = ['/xco2','/xco2_quality_flag','/Retrieval/water_height','/sounding_id']
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, 'OCO2',oco2_file_name),
+            bbox=bbox,
+            variables=variables,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+        
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
+        var_listout = list(out_nc.groups['Retrieval'].variables.keys())
+        assert ('water_height' in var_listout)
+        #assert (in_nc.variables['xco2_quality_flag'] == out_nc.variables['xco2_quality_flag'])
+        #assert (in_nc.groups['Retrieval'].variables)
 
     def test_transform_grouped_dataset(self):
         """
@@ -1198,14 +1219,14 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
                         os.path.join(self.subset_output_dir, sndr_file_name))
 
-        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file_name))
 
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'SNDR', sndr_file_name))
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1229,14 +1250,14 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
                         os.path.join(self.subset_output_dir, tropomi_file_name))
 
-        nc_dataset = nc.Dataset(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
 
         args = {
                 'decode_coords': False,
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name))
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1246,6 +1267,102 @@ class TestSubsetter(unittest.TestCase):
             lat_dims = dataset[lat_var_name].squeeze().dims
             time_dims = dataset[time_var_name].squeeze().dims
             assert (lat_dims == time_dims)
+
+    def test_get_indexers_nd(self):
+        """test that the time coordinate is not included in the indexers. Also test that the dimensions are the same for
+           a global box subset"""
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
+            lon_var_name = subset.get_coord_variable_names(dataset)[1][0]
+            time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
+            oper = operator.and_
+
+            cond = oper(
+                (dataset[lon_var_name] >= -180),
+                (dataset[lon_var_name] <= 180)
+                ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
+
+            indexers = xre.get_indexers_from_nd(cond, True)
+            indexed_cond = cond.isel(**indexers)
+            indexed_ds = dataset.isel(**indexers)
+            new_dataset = indexed_ds.where(indexed_cond)
+
+            assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
+            assert (new_dataset.dims == dataset.dims)
+
+    def test_variable_type_string_oco2(self):
+        """Code passes a ceating a variable that is type object in oco2 file"""
+
+        oco2_file_name = 'oco2_LtCO2_190201_B10206Ar_200729175909s.nc4'
+        output_file_name = 'oco2_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
+                        os.path.join(self.subset_output_dir, oco2_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, 'OCO2',oco2_file_name),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+
+        in_nc = xr.open_dataset(join(self.test_data_dir, 'OCO2',oco2_file_name))
+        out_nc = xr.open_dataset(join(self.subset_output_dir, output_file_name))
+        assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
+
+    def test_variable_dims_matched_tropomi(self):
+        """
+        Code must match the dimensions for each variable rather than
+        assume all dimensions in a group are the same
+        """
+
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        output_file_name = 'tropomi_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        in_nc = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        # Get variable dimensions from input dataset
+        in_var_dims = {
+            var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            for var_name, var in in_nc.groups['PRODUCT'].variables.items()
+        }
+
+        # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
+        in_var_dims.update(
+            {
+                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                for var_name, var in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
+            }
+        )
+
+        out_nc = subset.transform_grouped_dataset(
+            in_nc, os.path.join(self.subset_output_dir, tropomi_file_name)
+        )
+
+        # Get variable dimensions from output dataset
+        out_var_dims = {
+            var_name.split(subset.GROUP_DELIM)[-1]: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            for var_name, var in out_nc.variables.items()
+        }
+
+        self.assertDictEqual(in_var_dims, out_var_dims)
+
 
     def test_temporal_merged_topex(self):
         """
@@ -1348,5 +1465,4 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
-
         
