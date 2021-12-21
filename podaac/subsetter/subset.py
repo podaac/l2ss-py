@@ -672,7 +672,7 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
     return temporal_cond
 
 
-def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox=None, cut=True,
+def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, variables=None, bbox=None, cut=True,
                      min_time=None, max_time=None):
     """
     Subset an xarray Dataset using a spatial bounding box.
@@ -709,34 +709,71 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
         oper = operator.or_
 
     datasets = []
-    for lat_var_name, lon_var_name, time_var_name in zip(
-            lat_var_names, lon_var_names, time_var_names
-    ):
-        if GROUP_DELIM in lat_var_name:
-            var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
-            group_vars = [
-                var for var in dataset.data_vars.keys()
-                if var.startswith(f'{GROUP_DELIM}{var_prefix}')
-            ]
-        else:
-            group_vars = list(dataset.keys())
+    if variables:
+        for lat_var_name, lon_var_name, time_var_name, variable in zip(
+            lat_var_names, lon_var_names, time_var_names, variables
+        ):
+            if GROUP_DELIM in lat_var_name:
+                var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
+                group_vars = [
+                    var for var in dataset.data_vars.keys()
+                    if var.startswith(f'{GROUP_DELIM}{var_prefix}')
+                ]
+                group_vars.extend([
+                    var for var in dataset.data_vars.keys()
+                    if var in variables and var not in group_vars
+                ])
+            else:
+                group_vars = list(dataset.keys())
 
-        group_dataset = dataset[group_vars]
+            group_dataset = dataset[group_vars]
 
-        # Calculate temporal conditions
-        temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
-        group_dataset = xre.where(
-            group_dataset,
-            oper(
-                (group_dataset[lon_var_name] >= lon_bounds[0]),
-                (group_dataset[lon_var_name] <= lon_bounds[1])
-            ) &
-            (group_dataset[lat_var_name] >= lat_bounds[0]) &
-            (group_dataset[lat_var_name] <= lat_bounds[1]) &
-            temporal_cond,
-            cut
-        )
-        datasets.append(group_dataset)
+            # Calculate temporal conditions
+            temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+            group_dataset = xre.where(
+                group_dataset,
+                oper(
+                    (group_dataset[lon_var_name] >= lon_bounds[0]),
+                    (group_dataset[lon_var_name] <= lon_bounds[1])
+                ) &
+                (group_dataset[lat_var_name] >= lat_bounds[0]) &
+                (group_dataset[lat_var_name] <= lat_bounds[1]) &
+                temporal_cond,
+                cut
+            )
+            datasets.append(group_dataset)
+                
+    else:
+        for lat_var_name, lon_var_name, time_var_name in zip(
+            lat_var_names, lon_var_names, time_var_names,
+                
+        ):
+            if GROUP_DELIM in lat_var_name:
+                var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
+                group_vars = [
+                    var for var in dataset.data_vars.keys()
+                    if var.startswith(f'{GROUP_DELIM}{var_prefix}')
+                ]
+
+            else:
+                group_vars = list(dataset.keys())
+
+            group_dataset = dataset[group_vars]
+
+            # Calculate temporal conditions
+            temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+            group_dataset = xre.where(
+                group_dataset,
+                oper(
+                    (group_dataset[lon_var_name] >= lon_bounds[0]),
+                    (group_dataset[lon_var_name] <= lon_bounds[1])
+                ) &
+                (group_dataset[lat_var_name] >= lat_bounds[0]) &
+                (group_dataset[lat_var_name] <= lat_bounds[1]) &
+                temporal_cond,
+                cut
+            )
+            datasets.append(group_dataset)
 
     return datasets
 
@@ -1046,10 +1083,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
-            variables = [variable.upper() for variable in variables]
+            variables_upper = [variable.upper() for variable in variables]
             vars_to_drop = [
                 var_name for var_name, var in dataset.data_vars.items()
-                if var_name.upper() not in variables
+                if var_name.upper() not in variables_upper
                 and var_name not in lat_var_names
                 and var_name not in lon_var_names
                 and var_name not in time_var_names
@@ -1062,6 +1099,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 lat_var_names=lat_var_names,
                 lon_var_names=lon_var_names,
                 time_var_names=time_var_names,
+                variables=variables,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,
