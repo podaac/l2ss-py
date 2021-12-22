@@ -853,6 +853,30 @@ class TestSubsetter(unittest.TestCase):
         assert ('SIF_Relative_SDev_757nm' in var_listout)
         assert ('temperature_skin' in var_listout)
 
+    def test_variable_subset_s6(self):
+        """
+        multiple variable subset of variables in different groups in oco3
+        """
+
+        s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        output_file_name = 's6_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
+                        os.path.join(self.subset_output_dir, s6_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+        variables = ['/data_01/ku/range_ocean_mle3_rms', '/data_20/ku/range_ocean']
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, 'sentinel_6',s6_file_name),
+            bbox=bbox,
+            variables=variables,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+        
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
+        var_listout =list(out_nc.groups['data_01'].groups['ku'].variables.keys())
+        var_listout.extend(list(out_nc.groups['data_20'].groups['ku'].variables.keys()))
+        assert ('range_ocean_mle3_rms' in var_listout)
+        assert ('range_ocean' in var_listout)
+
 
     def test_transform_grouped_dataset(self):
         """
