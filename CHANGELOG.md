@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed 
+- [issues/36](https://github.com/podaac/l2ss-py/issues/36): Empty datasets will now maintain attributes, variables, and dimensions where each variable contains a single data point where the value is masked.
 ### Deprecated 
 ### Removed
 ### Fixed
