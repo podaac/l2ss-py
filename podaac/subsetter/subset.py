@@ -672,7 +672,7 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
     return temporal_cond
 
 
-def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox=None, cut=True,
+def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, variables=None, bbox=None, cut=True,
                      min_time=None, max_time=None):
     """
     Subset an xarray Dataset using a spatial bounding box.
@@ -708,9 +708,10 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
 
+    lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
     datasets = []
     for lat_var_name, lon_var_name, time_var_name in zip(
-            lat_var_names, lon_var_names, time_var_names
+        lat_var_names, lon_var_names, time_var_names
     ):
         if GROUP_DELIM in lat_var_name:
             var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
@@ -718,6 +719,12 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
                 var for var in dataset.data_vars.keys()
                 if var.startswith(f'{GROUP_DELIM}{var_prefix}')
             ]
+            if variables:
+                group_vars.extend([
+                    var for var in dataset.data_vars.keys()
+                    if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
+                ])
+
         else:
             group_vars = list(dataset.keys())
 
@@ -1046,10 +1053,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
-            variables = [variable.upper() for variable in variables]
+            variables_upper = [variable.upper() for variable in variables]
             vars_to_drop = [
                 var_name for var_name, var in dataset.data_vars.items()
-                if var_name.upper() not in variables
+                if var_name.upper() not in variables_upper
                 and var_name not in lat_var_names
                 and var_name not in lon_var_names
                 and var_name not in time_var_names
@@ -1062,6 +1069,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 lat_var_names=lat_var_names,
                 lon_var_names=lon_var_names,
                 time_var_names=time_var_names,
+                variables=variables,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,

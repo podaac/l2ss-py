@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issues/34](https://github.com/podaac/l2ss-py/issues/34): Fixed bug that did not allow variable subsetting in OCO3 files. Fix includes adding the variable list in subset_bbox method 
 ### Security
 
 ## [1.2.0]
