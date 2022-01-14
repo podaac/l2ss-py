@@ -319,7 +319,7 @@ class TestSubsetter(unittest.TestCase):
 
             # Ensure all variables are present but empty.
             for variable_name, variable in empty_dataset.data_vars.items():
-                assert not variable.data
+                assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
 
             assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
 

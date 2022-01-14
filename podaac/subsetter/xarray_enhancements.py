@@ -121,7 +121,7 @@ def copy_empty_dataset(dataset):
 
     # Create a copy of the dataset filled with the empty data. Then select the first index along each
     # dimension and return the result
-    return dataset.copy(data=empty_data).isel({dim: 0 for dim in dataset.dims})
+    return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
 
 
 def cast_type(var, var_type):
