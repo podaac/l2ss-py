@@ -25,6 +25,7 @@ import operator
 import os
 
 import geopandas as gpd
+import collections
 import importlib_metadata
 import julian
 import netCDF4 as nc
@@ -35,6 +36,7 @@ from shapely.geometry import Point
 from shapely.ops import transform
 
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import dimension_cleanup as dc
 
 GROUP_DELIM = '__'
 SERVICE_NAME = 'l2ss-py'
@@ -1021,6 +1023,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     # If dataset has groups, transform to work with xarray
     if has_groups:
         nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
+        nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]

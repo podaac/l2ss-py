@@ -853,25 +853,25 @@ class TestSubsetter(unittest.TestCase):
         assert ('SIF_Relative_SDev_757nm' in var_listout)
         assert ('temperature_skin' in var_listout)
 
-    def test_variable_subset_s6(self):
+    def test_variable_subset_s6(self):        
         """
         multiple variable subset of variables in different groups in oco3
         """
-
+        
         s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
-        output_file_name = 's6_test_out.nc'
+        s6_output_file_name = 'SS_S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
         shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
                         os.path.join(self.subset_output_dir, s6_file_name))
         bbox = np.array(((-180,180),(-90.0,90)))
         variables = ['/data_01/ku/range_ocean_mle3_rms', '/data_20/ku/range_ocean']
         subset.subset(
-            file_to_subset=join(self.test_data_dir, 'sentinel_6',s6_file_name),
+            file_to_subset=join(self.subset_output_dir, s6_file_name),
             bbox=bbox,
             variables=variables,
-            output_file=join(self.subset_output_dir, output_file_name),
+            output_file=join(self.subset_output_dir, s6_output_file_name),
         )
         
-        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
+        out_nc = nc.Dataset(join(self.subset_output_dir, s6_output_file_name))
         var_listout =list(out_nc.groups['data_01'].groups['ku'].variables.keys())
         var_listout.extend(list(out_nc.groups['data_20'].groups['ku'].variables.keys()))
         assert ('range_ocean_mle3_rms' in var_listout)
@@ -921,7 +921,7 @@ class TestSubsetter(unittest.TestCase):
         the given spatial bounds.
         """
         s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
-        s6_output_file_name = 'SS_S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        output_file = "{}_{}".format(self._testMethodName, s6_file_name)
         # Copy S6 file to temp dir
         shutil.copyfile(
             os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
@@ -931,9 +931,9 @@ class TestSubsetter(unittest.TestCase):
         # Make sure it runs without errors
         bbox = np.array(((150, 180), (-90, -50)))
         bounds = subset.subset(
-            file_to_subset=os.path.join(self.subset_output_dir, s6_file_name),
+            file_to_subset=os.path.join(self.subset_output_dir,s6_file_name),
             bbox=bbox,
-            output_file=os.path.join(self.subset_output_dir, s6_output_file_name)
+            output_file=os.path.join(self.subset_output_dir, output_file)
         )
 
         # Check that bounds are within requested bbox
@@ -1212,6 +1212,28 @@ class TestSubsetter(unittest.TestCase):
         # All dates should be within the given temporal bounds.
         assert (out_ds.time >= pd.to_datetime(start_dt)).all()
         assert (out_ds.time <= pd.to_datetime(end_dt)).all()
+
+    def test_duplicate_dims_sndr(self):
+
+        SNDR_dir = join(self.test_data_dir, 'SNDR')
+        sndr_files = [f for f in listdir(SNDR_dir)
+                          if isfile(join(SNDR_dir, f)) and f.endswith(".nc")]
+
+        bbox = np.array(((-180, 90), (-90, 90)))
+        for file in sndr_files:
+            output_file = "{}_{}".format(self._testMethodName, file)
+            shutil.copyfile(
+                os.path.join(SNDR_dir, file),
+                os.path.join(self.subset_output_dir, file)
+            )
+            box_test = subset.subset(
+                file_to_subset=join(self.subset_output_dir, file),
+                bbox=bbox,
+                output_file=join(self.subset_output_dir, output_file),
+            )
+            #check if the box_test is 
+            assert len(box_test)==2
+
 
     def test_get_time_variable_name(self):
         for test_file in self.test_files:
