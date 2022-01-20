@@ -20,6 +20,7 @@ for this specific use-case.
 """
 
 import logging
+
 import numpy as np
 import xarray as xr
 
@@ -112,13 +113,15 @@ def copy_empty_dataset(dataset):
     xarray.Dataset
         The new dataset which has no data.
     """
-    empty_dataset = xr.Dataset()
-    for variable_name, variable in dataset.data_vars.items():
-        empty_dataset[variable_name] = []
-        empty_dataset[variable_name].attrs = variable.attrs
-    # Copy global metadata
-    empty_dataset.attrs = dataset.attrs
-    return empty_dataset
+    # Create a dict object where each key is a variable in the dataset and the value is an
+    # array initialized to the fill value for that variable or NaN if there is no fill value
+    # attribute for the variable
+    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan)) for k, v in
+                  dataset.items()}
+
+    # Create a copy of the dataset filled with the empty data. Then select the first index along each
+    # dimension and return the result
+    return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
 
 
 def cast_type(var, var_type):
