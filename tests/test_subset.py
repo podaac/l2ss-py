@@ -304,6 +304,12 @@ class TestSubsetter(unittest.TestCase):
                 bbox=bbox,
                 output_file=join(self.subset_output_dir, output_file)
             )
+            test_input_dataset = xr.open_dataset(
+                join(self.test_data_dir, file),
+                decode_times=False,
+                decode_coords=False,
+                mask_and_scale=False
+            )
             empty_dataset = xr.open_dataset(
                 join(self.subset_output_dir, output_file),
                 decode_times=False,
@@ -313,7 +319,10 @@ class TestSubsetter(unittest.TestCase):
 
             # Ensure all variables are present but empty.
             for variable_name, variable in empty_dataset.data_vars.items():
-                assert not variable.data
+                assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
+
+            assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
+
 
     def test_bbox_conversion(self):
         """
