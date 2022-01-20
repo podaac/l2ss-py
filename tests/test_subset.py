@@ -1223,7 +1223,10 @@ class TestSubsetter(unittest.TestCase):
         assert (out_ds.time <= pd.to_datetime(end_dt)).all()
 
     def test_duplicate_dims_sndr(self):
-
+        """
+        Check if SNDR Climcaps files run successfully even though
+        these files have variables with duplicate dimensions
+        """
         SNDR_dir = join(self.test_data_dir, 'SNDR')
         sndr_files = [f for f in listdir(SNDR_dir)
                           if isfile(join(SNDR_dir, f)) and f.endswith(".nc")]

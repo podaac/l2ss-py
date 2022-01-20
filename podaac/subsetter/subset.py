@@ -25,7 +25,6 @@ import operator
 import os
 
 import geopandas as gpd
-import collections
 import importlib_metadata
 import julian
 import netCDF4 as nc
