@@ -848,7 +848,7 @@ class TestSubsetter(unittest.TestCase):
         bbox = np.array(((-180,180),(-90.0,90)))
         variables = ['/Science/IGBP_index', '/Offset/SIF_Relative_SDev_757nm','/Meteo/temperature_skin']
         subset.subset(
-            file_to_subset=join(self.test_data_dir, 'OCO3/OCO3_L2_LITE_SIF.EarlyR',oco3_file_name),
+            file_to_subset=join(self.subset_output_dir, oco3_file_name),
             bbox=bbox,
             variables=variables,
             output_file=join(self.subset_output_dir, output_file_name),
@@ -874,7 +874,7 @@ class TestSubsetter(unittest.TestCase):
         bbox = np.array(((-180,180),(-90.0,90)))
         variables = ['/data_01/ku/range_ocean_mle3_rms', '/data_20/ku/range_ocean']
         subset.subset(
-            file_to_subset=join(self.test_data_dir, 'sentinel_6',s6_file_name),
+            file_to_subset=join(self.subset_output_dir, s6_file_name),
             bbox=bbox,
             variables=variables,
             output_file=join(self.subset_output_dir, output_file_name),
