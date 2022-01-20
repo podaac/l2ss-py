@@ -1294,7 +1294,6 @@ class TestSubsetter(unittest.TestCase):
             # check if the box_test is 
             assert len(box_test)==2
 
-
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
 
