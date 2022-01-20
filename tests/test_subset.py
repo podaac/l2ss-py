@@ -1547,5 +1547,3 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
-
-        
