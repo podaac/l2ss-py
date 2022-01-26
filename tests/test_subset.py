@@ -1524,3 +1524,21 @@ class TestSubsetter(unittest.TestCase):
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
         
+
+    def test_classify_time_type(self):
+        time_type_map = {
+            'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc': subset.TimeType.STANDARD,
+            'MODIS_A-JPL-L2P-v2014.0.nc': subset.TimeType.OFFSET,
+            'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc': subset.TimeType.LINES,
+        }
+
+        for file_name, expected_time_type in time_type_map.items():
+            with xr.open_dataset(
+                join(self.test_data_dir, file_name),
+                decode_coords=False
+            ) as ds:
+                lat_var_name = subset.get_coord_variable_names(ds)[0][0]
+                time_var_name = subset.get_time_variable_name(ds, ds[lat_var_name])
+
+                time_type = subset.classify_time_type(ds, time_var_name, lat_var_name)
+                assert time_type == expected_time_type

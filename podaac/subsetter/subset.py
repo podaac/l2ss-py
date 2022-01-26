@@ -23,6 +23,7 @@ import functools
 import json
 import operator
 import os
+from enum import Enum, auto
 
 import geopandas as gpd
 import importlib_metadata
@@ -490,6 +491,9 @@ def get_time_variable_name(dataset, lat_var):
     for var_name in list(dataset.data_vars.keys()):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
+    for var_name in list(dataset.data_vars.keys()):
+        if 'time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+            return var_name
     raise ValueError('Unable to determine time variable')
 
 
@@ -607,6 +611,63 @@ def datetime_from_mjd(dataset, time_var_name):
         return mjd_datetime
 
     return None
+
+
+class TimeType(Enum):
+    """
+    Enum representing xr.Dataset time type. Time types are as follows:
+
+    1. STANDARD
+       - There is only one time variable, and the
+       values represents the time
+    2. OFFSET
+       - There are two time variables; one that
+       represents the epoch variable and one that represents the offset
+       from that epoch
+    3. LINES
+       - Each time variable value represents the time value for all
+       points in a swath scan line
+    """
+    STANDARD = auto()
+    OFFSET = auto()
+    LINES = auto()
+
+
+def classify_time_type(dataset, time_var_name, lat_var_name):
+    """
+    Given a dataset, determine what type of time variable is present.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Dataset that contains time variable that needs to be classified
+    time_var_name : str
+        The name of the time variable that needs to be classified
+    lat_var_name : str
+        The name of the lat variable in this dataset. This is needed to
+        compare dimensions for the 'LINES' TimeType.
+
+    Returns
+    -------
+    TimeType
+        The type of time_var_name in the provided xr.Dataset
+
+    Raises
+    ------
+    ValueError
+        If the time variable cannot be classified, this error is raised
+    """
+    time_var = dataset[time_var_name]
+    lat_var = dataset[lat_var_name]
+    if (time_var.dims != lat_var.dims
+            and len(time_var.dims) == 1
+            and time_var.dims[0] in lat_var.dims):
+        return TimeType.LINES
+    if np.issubdtype(time_var.dtype, np.dtype(np.datetime64)):
+        return TimeType.STANDARD
+    if np.issubdtype(time_var.dtype, np.dtype(np.timedelta64)):
+        return TimeType.OFFSET
+    raise ValueError('Could not classify time type')
 
 
 def build_temporal_cond(min_time, max_time, dataset, time_var_name):
