@@ -485,7 +485,10 @@ def get_time_variable_name(dataset, lat_var):
         # per lat var)
         return time_vars[0]
 
-    for var_name in list(dataset.dims.keys()):
+    # Filter variables with 'time' in the name to avoid extra work
+    time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
+
+    for var_name in time_vars:
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
