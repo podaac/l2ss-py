@@ -187,7 +187,6 @@ def where(dataset, cond, cut):
             indexers.keys() - var.dims) > 0 for _, var in dataset.variables.items()]
     )
 
-
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
     new_dataset = indexed_ds.where(indexed_cond)
