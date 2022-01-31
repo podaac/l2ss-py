@@ -1175,6 +1175,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 for var in dataset.data_vars:
                     if var not in encoding:
                         encoding[var] = compression
+                    if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
+                        dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
                 dataset.load().to_netcdf(output_file, 'w', encoding=encoding)
 
