@@ -230,7 +230,6 @@ def where(dataset, cond, cut):
 
         else:
             # Manually replace nans with FillValue
-            # variable.data[np.isnan(variable.data)] = variable.attrs.get("_FillValue")
             # If variable represents time, cast _FillValue to datetime
             fill_value = new_dataset[variable_name].attrs.get('_FillValue')
 
