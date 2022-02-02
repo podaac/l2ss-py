@@ -1280,6 +1280,30 @@ class TestSubsetter(unittest.TestCase):
 
             assert subset_file_size < original_file_size
 
+    def test_duplicate_dims_sndr(self):
+        """
+        Check if SNDR Climcaps files run successfully even though
+        these files have variables with duplicate dimensions
+        """
+        SNDR_dir = join(self.test_data_dir, 'SNDR')
+        sndr_files = [f for f in listdir(SNDR_dir)
+                          if isfile(join(SNDR_dir, f)) and f.endswith(".nc")]
+
+        bbox = np.array(((-180, 90), (-90, 90)))
+        for file in sndr_files:
+            output_file = "{}_{}".format(self._testMethodName, file)
+            shutil.copyfile(
+                os.path.join(SNDR_dir, file),
+                os.path.join(self.subset_output_dir, file)
+            )
+            box_test = subset.subset(
+                file_to_subset=join(self.subset_output_dir, file),
+                bbox=bbox,
+                output_file=join(self.subset_output_dir, output_file),
+            )
+            # check if the box_test is
+            assert len(box_test)==2
+
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
 
