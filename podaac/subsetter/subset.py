@@ -572,7 +572,8 @@ def translate_timestamp(str_timestamp):
         '%Y-%m-%dT%H:%M:%SZ',
         '%Y-%m-%dT%H:%M:%S%Z',
         '%Y-%m-%dT%H:%M:%S.%fZ',
-        '%Y-%m-%dT%H:%M:%S.%f%Z'
+        '%Y-%m-%dT%H:%M:%S.%f%Z',
+        '%Y-%m-%d %H:%M:%S',
     ]
 
     for timestamp_format in allowed_ts_formats:
@@ -969,13 +970,16 @@ def _rename_variables(dataset, base_dataset):
             encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
             variable = encoded_var
 
+        var_attrs = variable.attrs
+        fill_value = var_attrs.get('_FillValue')
+        var_attrs.pop('_FillValue', None)
+
         if variable.dtype == object:
-            var_group.createVariable(new_var_name, 'S1', var_dims)
+            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
         else:
-            var_group.createVariable(new_var_name, variable.dtype, var_dims)
+            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
 
         # Copy attributes
-        var_attrs = variable.attrs
         var_group.variables[new_var_name].setncatts(var_attrs)
 
         # Copy data
