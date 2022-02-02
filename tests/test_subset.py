@@ -243,6 +243,10 @@ class TestSubsetter(unittest.TestCase):
                             slice_list.append(slice(0, 1))
                     vals = np.squeeze(vals[tuple(slice_list)])
 
+                # Skip for byte type.
+                if vals.dtype == 'S1':
+                    continue
+
                 # In this mask, False == NaN and True = valid
                 var_mask = np.invert(np.ma.masked_invalid(vals).mask)
                 fill_mask = np.invert(np.ma.masked_values(vals, fill_value).mask)
@@ -250,9 +254,10 @@ class TestSubsetter(unittest.TestCase):
                 var_mask = np.bitwise_and(var_mask, fill_mask)
 
                 if var_mask.shape != spatial_mask.shape:
-                    # This may be a case where the time represents lines.
-                    if 'time' in var_name:
-                        continue
+                    # This may be a case where the time represents lines,
+                    # or some other case where the variable doesn't share
+                    # a shape with the coordinate variables.
+                    continue
 
                 # Step 3: Combine the spatial and var mask with 'or'
                 combined_mask = np.ma.mask_or(var_mask, spatial_mask)
