@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - [issues/27](https://github.com/podaac/l2ss-py/issues/27): Xarray is unable to handle variables with duplicate dimensions. Module dimension_cleanup.py added to handle variables that may have duplicate dimensions. Method remove_duplicate_dims() creates a new dimension identical dimension to the dimensions originally duplicated so the dimension does not need to be duplicated and can have the same shape and values.
+- [issues/24](https://github.com/podaac/l2ss-py/issues/24): Added support for time as lines
 ### Changed 
 - [issues/36](https://github.com/podaac/l2ss-py/issues/36): Empty datasets will now maintain attributes, variables, and dimensions where each variable contains a single data point where the value is masked.
 ### Deprecated 
