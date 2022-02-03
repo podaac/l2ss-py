@@ -198,7 +198,8 @@ def where(dataset, cond, cut):
 
         indexed_var = indexed_ds[variable_name]
 
-        if partial_dim_in_in_vars and dataset[variable_name].dims and (indexers.keys() - dataset[variable_name].dims):
+        if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
+                indexers.keys()).intersection(dataset[variable_name].dims):
             missing_dim = (indexers.keys() - dataset[variable_name].dims).pop()  # Assume only 1
             var_indexers = {
                 dim_name: dim_value for dim_name, dim_value in indexers.items()
