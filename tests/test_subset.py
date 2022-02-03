@@ -216,7 +216,7 @@ class TestSubsetter(unittest.TestCase):
 
             # Step 2: Get mask of values which are NaN or "_FillValue in
             # each variable.
-            for _, var in out_ds.data_vars.items():
+            for var_name, var in out_ds.data_vars.items():
                 # remove dimension of '1' if necessary
                 vals = np.squeeze(var.values)
 
@@ -243,11 +243,21 @@ class TestSubsetter(unittest.TestCase):
                             slice_list.append(slice(0, 1))
                     vals = np.squeeze(vals[tuple(slice_list)])
 
+                # Skip for byte type.
+                if vals.dtype == 'S1':
+                    continue
+
                 # In this mask, False == NaN and True = valid
                 var_mask = np.invert(np.ma.masked_invalid(vals).mask)
                 fill_mask = np.invert(np.ma.masked_values(vals, fill_value).mask)
 
                 var_mask = np.bitwise_and(var_mask, fill_mask)
+
+                if var_mask.shape != spatial_mask.shape:
+                    # This may be a case where the time represents lines,
+                    # or some other case where the variable doesn't share
+                    # a shape with the coordinate variables.
+                    continue
 
                 # Step 3: Combine the spatial and var mask with 'or'
                 combined_mask = np.ma.mask_or(var_mask, spatial_mask)
@@ -528,7 +538,7 @@ class TestSubsetter(unittest.TestCase):
         operation are present in the resulting subsetted data file,
         and that the variables which are specified are not present.
         """
-        bbox = np.array(((-180, 90), (-90, 90)))
+        bbox = np.array(((-180, 180), (-90, 90)))
         for file in self.test_files:
             output_file = "{}_{}".format(self._testMethodName, file)
 
@@ -1291,7 +1301,7 @@ class TestSubsetter(unittest.TestCase):
                 bbox=bbox,
                 output_file=join(self.subset_output_dir, output_file),
             )
-            # check if the box_test is 
+            # check if the box_test is
             assert len(box_test)==2
 
     def test_root_group(self):
@@ -1547,3 +1557,26 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
+
+    def test_temporal_subset_lines(self):
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2012-11-11T23:59:10'
+        max_time = '2012-11-12T00:20:10'
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_times=False,
+            decode_coords=False
+        )
+
+        assert ds.time.dims != ds.latitude.dims

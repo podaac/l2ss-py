@@ -179,6 +179,14 @@ def where(dataset, cond, cut):
     if not all(len(value) > 0 for value in indexers.values()):
         return copy_empty_dataset(dataset)
 
+    # This will be true if any variables in the dataset have a partial
+    # overlap with the coordinate dims. If so, the cond should be
+    # applied per-variable rather than to the entire dataset.
+    partial_dim_in_in_vars = np.any(
+        [len(set(indexers.keys()).intersection(var.dims)) > 0 and len(
+            indexers.keys() - var.dims) > 0 for _, var in dataset.variables.items()]
+    )
+
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
     new_dataset = indexed_ds.where(indexed_cond)
@@ -187,6 +195,20 @@ def where(dataset, cond, cut):
     for variable_name, variable in new_dataset.data_vars.items():
         original_type = indexed_ds[variable_name].dtype
         new_type = variable.dtype
+
+        indexed_var = indexed_ds[variable_name]
+
+        if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
+                indexers.keys()).intersection(dataset[variable_name].dims):
+            missing_dim = (indexers.keys() - dataset[variable_name].dims).pop()  # Assume only 1
+            var_indexers = {
+                dim_name: dim_value for dim_name, dim_value in indexers.items()
+                if dim_name in dataset[variable_name].dims
+            }
+            var_cond = cond.sel({missing_dim: 1}).isel(**var_indexers)
+            indexed_var = dataset[variable_name].isel(**var_indexers)
+            new_dataset[variable_name] = indexed_var.where(var_cond)
+            variable = new_dataset[variable_name]
 
         # Check if variable has no _FillValue. If so, use original data
         if '_FillValue' not in variable.attrs:
@@ -200,24 +222,24 @@ def where(dataset, cond, cut):
             # variable has more than one dimension, copy the entire
             # variable over, otherwise use a NaN mask to copy over the
             # relevant values.
-            if len(variable.shape) > 1:
-                new_dataset[variable_name] = indexed_ds[variable_name]
-            else:
-                nan_mask = np.isnan(variable.data)
-                if nan_mask.any():
-                    variable.data[nan_mask] = indexed_ds[variable_name][nan_mask]
+            new_dataset[variable_name] = indexed_var
 
-            new_dataset[variable_name].attrs = indexed_ds[variable_name].attrs
-            variable.attrs = indexed_ds[variable_name].attrs
+            new_dataset[variable_name].attrs = indexed_var.attrs
+            variable.attrs = indexed_var.attrs
             new_dataset[variable_name].encoding['_FillValue'] = None
             variable.encoding['_FillValue'] = None
 
         else:
             # Manually replace nans with FillValue
-            variable.data[np.isnan(variable.data)] = variable.attrs.get("_FillValue")
+            # If variable represents time, cast _FillValue to datetime
+            fill_value = new_dataset[variable_name].attrs.get('_FillValue')
+
+            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
+                fill_value = np.datetime64('nat')
+            new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
 
             if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
+                new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
                                                             str(original_type), dask='allowed',
                                                             keep_attrs=True)
 
