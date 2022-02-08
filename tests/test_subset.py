@@ -1502,6 +1502,34 @@ class TestSubsetter(unittest.TestCase):
         assert (out_ds.time.values >= start_delta_dt).all()
         assert (out_ds.time.values <= end_delta_dt).all()
 
+    def test_temporal__subset_tropomi_ch4(self):
+        """
+        Test that temporal subsettting works for Tropomi CH4 collection
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        tropomi_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
+        output_file = "{}_{}".format(self._testMethodName, tropomi_file)
+        min_time = '2019-03-19T09:00:00'
+        max_time = '2019-03-19T12:00:00'
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file),
+                        os.path.join(self.subset_output_dir, tropomi_file))
+
+        subset.subset(
+            file_to_subset=join(self.subset_output_dir, tropomi_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time,
+        )
+        in_ds = nc.Dataset(join(self.subset_output_dir, tropomi_file),
+                                mode='r')
+        out_ds = nc.Dataset(join(self.subset_output_dir, output_file),
+                                mode='r')
+
+        # Check that 'time' types match
+        assert out_ds.groups['PRODUCT'].variables['delta_time'].dtype == in_ds.groups['PRODUCT'].variables['delta_time'].dtype
+
     def test_temporal_variable_subset(self):
         """
         Test that both a temporal and variable subset can be executed

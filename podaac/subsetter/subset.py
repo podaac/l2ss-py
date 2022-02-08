@@ -525,6 +525,13 @@ def get_time_epoch_var(dataset, time_var_name):
         epoch_var_name = time_var.attrs['comment'].split('plus')[0].strip()
     elif 'time' in dataset.variables.keys() and time_var_name != 'time':
         epoch_var_name = 'time'
+    elif any('time' in s for s in list(dataset.variables.keys())) and time_var_name != 'time':
+        for i in list(dataset.variables.keys()):
+            group_list = i.split('__')
+            if group_list[-1] == 'time':
+                epoch_var_name = i
+                break
+        return epoch_var_name
     else:
         raise ValueError('Unable to determine time variables')
 
@@ -977,6 +984,8 @@ def _rename_variables(dataset, base_dataset):
 
         if variable.dtype == object:
             var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
+        elif variable.dtype == 'timedelta64[ns]':
+            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value)
         else:
             var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
 
