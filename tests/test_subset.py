@@ -216,7 +216,7 @@ class TestSubsetter(unittest.TestCase):
 
             # Step 2: Get mask of values which are NaN or "_FillValue in
             # each variable.
-            for _, var in out_ds.data_vars.items():
+            for var_name, var in out_ds.data_vars.items():
                 # remove dimension of '1' if necessary
                 vals = np.squeeze(var.values)
 
@@ -243,11 +243,21 @@ class TestSubsetter(unittest.TestCase):
                             slice_list.append(slice(0, 1))
                     vals = np.squeeze(vals[tuple(slice_list)])
 
+                # Skip for byte type.
+                if vals.dtype == 'S1':
+                    continue
+
                 # In this mask, False == NaN and True = valid
                 var_mask = np.invert(np.ma.masked_invalid(vals).mask)
                 fill_mask = np.invert(np.ma.masked_values(vals, fill_value).mask)
 
                 var_mask = np.bitwise_and(var_mask, fill_mask)
+
+                if var_mask.shape != spatial_mask.shape:
+                    # This may be a case where the time represents lines,
+                    # or some other case where the variable doesn't share
+                    # a shape with the coordinate variables.
+                    continue
 
                 # Step 3: Combine the spatial and var mask with 'or'
                 combined_mask = np.ma.mask_or(var_mask, spatial_mask)
@@ -304,6 +314,12 @@ class TestSubsetter(unittest.TestCase):
                 bbox=bbox,
                 output_file=join(self.subset_output_dir, output_file)
             )
+            test_input_dataset = xr.open_dataset(
+                join(self.test_data_dir, file),
+                decode_times=False,
+                decode_coords=False,
+                mask_and_scale=False
+            )
             empty_dataset = xr.open_dataset(
                 join(self.subset_output_dir, output_file),
                 decode_times=False,
@@ -313,7 +329,10 @@ class TestSubsetter(unittest.TestCase):
 
             # Ensure all variables are present but empty.
             for variable_name, variable in empty_dataset.data_vars.items():
-                assert not variable.data
+                assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
+
+            assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
+
 
     def test_bbox_conversion(self):
         """
@@ -519,7 +538,7 @@ class TestSubsetter(unittest.TestCase):
         operation are present in the resulting subsetted data file,
         and that the variables which are specified are not present.
         """
-        bbox = np.array(((-180, 90), (-90, 90)))
+        bbox = np.array(((-180, 180), (-90, 90)))
         for file in self.test_files:
             output_file = "{}_{}".format(self._testMethodName, file)
 
@@ -826,8 +845,57 @@ class TestSubsetter(unittest.TestCase):
         out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
         var_listout = list(out_nc.groups['Retrieval'].variables.keys())
         assert ('water_height' in var_listout)
-        #assert (in_nc.variables['xco2_quality_flag'] == out_nc.variables['xco2_quality_flag'])
-        #assert (in_nc.groups['Retrieval'].variables)
+
+    def test_variable_subset_oco3(self):
+        """
+        multiple variable subset of variables in different groups in oco3
+        """
+
+        oco3_file_name = 'oco3_LtSIF_200226_B10206r_200709053505s.nc4'
+        output_file_name = 'oco3_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO3/OCO3_L2_LITE_SIF.EarlyR', oco3_file_name),
+                        os.path.join(self.subset_output_dir, oco3_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+        variables = ['/Science/IGBP_index', '/Offset/SIF_Relative_SDev_757nm','/Meteo/temperature_skin']
+        subset.subset(
+            file_to_subset=join(self.subset_output_dir, oco3_file_name),
+            bbox=bbox,
+            variables=variables,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+        
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
+        var_listout =list(out_nc.groups['Science'].variables.keys())
+        var_listout.extend(list(out_nc.groups['Offset'].variables.keys()))
+        var_listout.extend(list(out_nc.groups['Meteo'].variables.keys()))
+        assert ('IGBP_index' in var_listout)
+        assert ('SIF_Relative_SDev_757nm' in var_listout)
+        assert ('temperature_skin' in var_listout)
+
+    def test_variable_subset_s6(self):
+        """
+        multiple variable subset of variables in different groups in oco3
+        """
+
+        s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        output_file_name = 's6_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
+                        os.path.join(self.subset_output_dir, s6_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+        variables = ['/data_01/ku/range_ocean_mle3_rms', '/data_20/ku/range_ocean']
+        subset.subset(
+            file_to_subset=join(self.subset_output_dir, s6_file_name),
+            bbox=bbox,
+            variables=variables,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+        
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
+        var_listout =list(out_nc.groups['data_01'].groups['ku'].variables.keys())
+        var_listout.extend(list(out_nc.groups['data_20'].groups['ku'].variables.keys()))
+        assert ('range_ocean_mle3_rms' in var_listout)
+        assert ('range_ocean' in var_listout)
+
 
     def test_transform_grouped_dataset(self):
         """
@@ -1212,6 +1280,30 @@ class TestSubsetter(unittest.TestCase):
 
             assert subset_file_size < original_file_size
 
+    def test_duplicate_dims_sndr(self):
+        """
+        Check if SNDR Climcaps files run successfully even though
+        these files have variables with duplicate dimensions
+        """
+        SNDR_dir = join(self.test_data_dir, 'SNDR')
+        sndr_files = [f for f in listdir(SNDR_dir)
+                          if isfile(join(SNDR_dir, f)) and f.endswith(".nc")]
+
+        bbox = np.array(((-180, 90), (-90, 90)))
+        for file in sndr_files:
+            output_file = "{}_{}".format(self._testMethodName, file)
+            shutil.copyfile(
+                os.path.join(SNDR_dir, file),
+                os.path.join(self.subset_output_dir, file)
+            )
+            box_test = subset.subset(
+                file_to_subset=join(self.subset_output_dir, file),
+                bbox=bbox,
+                output_file=join(self.subset_output_dir, output_file),
+            )
+            # check if the box_test is
+            assert len(box_test)==2
+
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
 
@@ -1465,4 +1557,26 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
-        
+
+    def test_temporal_subset_lines(self):
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2012-11-11T23:59:10'
+        max_time = '2012-11-12T00:20:10'
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_times=False,
+            decode_coords=False
+        )
+
+        assert ds.time.dims != ds.latitude.dims

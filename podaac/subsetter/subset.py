@@ -35,6 +35,7 @@ from shapely.geometry import Point
 from shapely.ops import transform
 
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import dimension_cleanup as dc
 
 GROUP_DELIM = '__'
 SERVICE_NAME = 'l2ss-py'
@@ -484,11 +485,17 @@ def get_time_variable_name(dataset, lat_var):
         # per lat var)
         return time_vars[0]
 
-    for var_name in list(dataset.dims.keys()):
+    # Filter variables with 'time' in the name to avoid extra work
+    time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
+
+    for var_name in time_vars:
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
+            return var_name
+    for var_name in list(dataset.data_vars.keys()):
+        if 'time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
     raise ValueError('Unable to determine time variable')
 
@@ -566,7 +573,8 @@ def translate_timestamp(str_timestamp):
         '%Y-%m-%dT%H:%M:%SZ',
         '%Y-%m-%dT%H:%M:%S%Z',
         '%Y-%m-%dT%H:%M:%S.%fZ',
-        '%Y-%m-%dT%H:%M:%S.%f%Z'
+        '%Y-%m-%dT%H:%M:%S.%f%Z',
+        '%Y-%m-%d %H:%M:%S',
     ]
 
     for timestamp_format in allowed_ts_formats:
@@ -672,7 +680,7 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
     return temporal_cond
 
 
-def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox=None, cut=True,
+def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, variables=None, bbox=None, cut=True,
                      min_time=None, max_time=None):
     """
     Subset an xarray Dataset using a spatial bounding box.
@@ -708,9 +716,10 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
 
+    lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
     datasets = []
     for lat_var_name, lon_var_name, time_var_name in zip(
-            lat_var_names, lon_var_names, time_var_names
+        lat_var_names, lon_var_names, time_var_names
     ):
         if GROUP_DELIM in lat_var_name:
             var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
@@ -718,6 +727,12 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, bbox
                 var for var in dataset.data_vars.keys()
                 if var.startswith(f'{GROUP_DELIM}{var_prefix}')
             ]
+            if variables:
+                group_vars.extend([
+                    var for var in dataset.data_vars.keys()
+                    if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
+                ])
+
         else:
             group_vars = list(dataset.keys())
 
@@ -956,13 +971,16 @@ def _rename_variables(dataset, base_dataset):
             encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
             variable = encoded_var
 
+        var_attrs = variable.attrs
+        fill_value = var_attrs.get('_FillValue')
+        var_attrs.pop('_FillValue', None)
+
         if variable.dtype == object:
-            var_group.createVariable(new_var_name, 'S1', var_dims)
+            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
         else:
-            var_group.createVariable(new_var_name, variable.dtype, var_dims)
+            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
 
         # Copy attributes
-        var_attrs = variable.attrs
         var_group.variables[new_var_name].setncatts(var_attrs)
 
         # Copy data
@@ -1015,6 +1033,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     if has_groups:
         nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
 
+    nc_dataset = dc.remove_duplicate_dims(nc_dataset)
+
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
 
@@ -1046,10 +1066,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
-            variables = [variable.upper() for variable in variables]
+            variables_upper = [variable.upper() for variable in variables]
             vars_to_drop = [
                 var_name for var_name, var in dataset.data_vars.items()
-                if var_name.upper() not in variables
+                if var_name.upper() not in variables_upper
                 and var_name not in lat_var_names
                 and var_name not in lon_var_names
                 and var_name not in time_var_names
@@ -1062,6 +1082,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 lat_var_names=lat_var_names,
                 lon_var_names=lon_var_names,
                 time_var_names=time_var_names,
+                variables=variables,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,
@@ -1103,6 +1124,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 for var in dataset.data_vars:
                     if var not in encoding:
                         encoding[var] = compression
+                    if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
+                        dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
                 dataset.load().to_netcdf(output_file, 'w', encoding=encoding)
 
