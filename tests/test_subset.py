@@ -1502,33 +1502,45 @@ class TestSubsetter(unittest.TestCase):
         assert (out_ds.time.values >= start_delta_dt).all()
         assert (out_ds.time.values <= end_delta_dt).all()
 
-    def test_temporal__subset_tropomi_ch4(self):
+    def test_get_time_epoch_var(self):
         """
-        Test that temporal subsettting works for Tropomi CH4 collection
+        Test that get_time_epoch_var method returns the 'time' variable for the tropomi CH4 granule"
         """
         bbox = np.array(((-180, 180), (-90, 90)))
         tropomi_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
-        output_file = "{}_{}".format(self._testMethodName, tropomi_file)
-        min_time = '2019-03-19T09:00:00'
-        max_time = '2019-03-19T12:00:00'
 
         shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file),
                         os.path.join(self.subset_output_dir, tropomi_file))
 
-        subset.subset(
-            file_to_subset=join(self.subset_output_dir, tropomi_file),
-            bbox=bbox,
-            output_file=join(self.subset_output_dir, output_file),
-            min_time=min_time,
-            max_time=max_time,
-        )
-        in_ds = nc.Dataset(join(self.subset_output_dir, tropomi_file),
-                                mode='r')
-        out_ds = nc.Dataset(join(self.subset_output_dir, output_file),
-                                mode='r')
 
-        # Check that 'time' types match
-        assert out_ds.groups['PRODUCT'].variables['delta_time'].dtype == in_ds.groups['PRODUCT'].variables['delta_time'].dtype
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file), mode='r')
+
+        has_groups = bool(nc_dataset.groups)
+
+        # If dataset has groups, transform to work with xarray
+        if has_groups:
+            nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+
+            lat_var_names, lon_var_names = subset.get_coord_variable_names(dataset)
+            time_var_names = [
+                subset.get_time_variable_name(
+                    dataset, dataset[lat_var_name]
+                ) for lat_var_name in lat_var_names
+            ]
+            epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
+            
+            assert epoch_time_var.split('__')[-1] == 'time'
 
     def test_temporal_variable_subset(self):
         """
