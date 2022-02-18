@@ -1580,3 +1580,23 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert ds.time.dims != ds.latitude.dims
+
+    def test_grouped_empty_subset(self):
+        """
+        Test that an empty subset of a grouped dataset returns 'None'
+        spatial bounds.
+        """
+        bbox = np.array(((-10, 10), (-10, 10)))
+        file = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', file),
+                        os.path.join(self.subset_output_dir, file))
+
+        spatial_bounds = subset.subset(
+            file_to_subset=join(self.subset_output_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file)
+        )
+
+        assert spatial_bounds is None

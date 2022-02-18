@@ -1131,6 +1131,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
 
         if has_groups:
             recombine_grouped_datasets(datasets, output_file)
+            # Check if the spatial bounds are all 'None'. This means the
+            # subset result is empty.
+            if any(bound is None for bound in spatial_bounds):
+                return None
             return np.array([[
                 min(lon[0][0][0] for lon in zip(spatial_bounds)),
                 max(lon[0][0][1] for lon in zip(spatial_bounds))
