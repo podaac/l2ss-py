@@ -527,7 +527,7 @@ def get_time_epoch_var(dataset, time_var_name):
         epoch_var_name = 'time'
     elif any('time' in s for s in list(dataset.variables.keys())) and time_var_name != 'time':
         for i in list(dataset.variables.keys()):
-            group_list = i.split('__')
+            group_list = i.split(GROUP_DELIM)
             if group_list[-1] == 'time':
                 epoch_var_name = i
                 break
