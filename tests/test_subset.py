@@ -1515,11 +1515,7 @@ class TestSubsetter(unittest.TestCase):
 
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file), mode='r')
 
-        has_groups = bool(nc_dataset.groups)
-
-        # If dataset has groups, transform to work with xarray
-        if has_groups:
-            nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
 
         args = {
             'decode_coords': False,
