@@ -1434,7 +1434,14 @@ class TestSubsetter(unittest.TestCase):
             var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
             for var_name, var in in_nc.groups['PRODUCT'].variables.items()
         }
-
+        
+        # Get variables from METADATA group
+        in_var_dims.update(
+            {
+                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                for var_name, var in in_nc.groups['METADATA'].groups['QA_STATISTICS'].variables.items()
+            }
+        )
         # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
         in_var_dims.update(
             {
@@ -1501,6 +1508,42 @@ class TestSubsetter(unittest.TestCase):
         # All dates should be within the given temporal bounds.
         assert (out_ds.time.values >= start_delta_dt).all()
         assert (out_ds.time.values <= end_delta_dt).all()
+
+    def test_get_time_epoch_var(self):
+        """
+        Test that get_time_epoch_var method returns the 'time' variable for the tropomi CH4 granule"
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        tropomi_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file),
+                        os.path.join(self.subset_output_dir, tropomi_file))
+
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file), mode='r')
+
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+
+            lat_var_names, lon_var_names = subset.get_coord_variable_names(dataset)
+            time_var_names = [
+                subset.get_time_variable_name(
+                    dataset, dataset[lat_var_name]
+                ) for lat_var_name in lat_var_names
+            ]
+            epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
+            
+            assert epoch_time_var.split('__')[-1] == 'time'
 
     def test_temporal_variable_subset(self):
         """
