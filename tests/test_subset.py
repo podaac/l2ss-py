@@ -1434,7 +1434,14 @@ class TestSubsetter(unittest.TestCase):
             var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
             for var_name, var in in_nc.groups['PRODUCT'].variables.items()
         }
-
+        
+        # Get variables from METADATA group
+        in_var_dims.update(
+            {
+                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                for var_name, var in in_nc.groups['METADATA'].groups['QA_STATISTICS'].variables.items()
+            }
+        )
         # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
         in_var_dims.update(
             {
