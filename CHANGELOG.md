@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - [issues/50](https://github.com/podaac/l2ss-py/issues/50): Spatial bounds are computed correctly for grouped empty subset operations
 ### Changed 
+- Upgraded `cmr-umm-updater` to 0.2.0
 ### Deprecated 
 ### Removed
 ### Fixed
