@@ -17,16 +17,16 @@ import collections
 
 def remove_duplicate_dims(nc_dataset):
     """
-    Xarray cannot read netCDF4 datasets with duplicate dimensions.
-    Fucntion goes through a dataset to catch any variables with duplicate dimensions.
+    xarray cannot read netCDF4 datasets with duplicate dimensions.
+    Function goes through a dataset to catch any variables with duplicate dimensions.
     creates an exact copy of the dimension duplicated with a new name. Variable
     is reset with new dimensions without duplicates. Old variable deleted, new variable's name
-    is changed to the originial name.
+    is changed to the original name.
     """
     dup_vars = {}
     for var_name, var in nc_dataset.variables.items():
         dim_list = list(var.dimensions)
-        if len(set(dim_list)) != len(dim_list):  # get true if var.dimesions has a duplicate
+        if len(set(dim_list)) != len(dim_list):  # get true if var.dimensions has a duplicate
             dup_vars[var_name] = var  # populate dictionary with variables with vars with dup dims
     for dup_var_name, dup_var in dup_vars.items():
         dim_list = list(dup_var.dimensions)  # list of original dimensions of variable with dup dims
