@@ -934,41 +934,6 @@ class TestSubsetter(unittest.TestCase):
                 group = group[g]
             assert var_name.strip('__').split('__')[-1] in group.variables.keys()
 
-    def test_transform_h5py_dataset(self):
-        """
-        Test that the transformation function results in a correctly
-        formatted dataset for h5py files
-        """
-        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
-        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
-                        os.path.join(self.subset_output_dir, OMI_file_name))
-
-        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name), 'r')
-        nc_ds_transformed = subset.transform_grouped_dataset(
-            nc.Dataset(os.path.join(self.subset_output_dir, s6_file_name), 'r'),
-            os.path.join(self.subset_output_dir, s6_file_name)
-        )
-
-        # The original ds has groups
-        assert nc_ds.groups
-
-        # There should be no groups in the new ds
-        assert not nc_ds_transformed.groups
-
-        # The original ds has no variables in the root group
-        assert not nc_ds.variables
-
-        # The new ds has variables in the root group
-        assert nc_ds_transformed.variables
-
-        # Each var in the new ds should map to a variable in the old ds
-        for var_name, var in nc_ds_transformed.variables.items():
-            path = var_name.strip('__').split('__')
-
-            group = nc_ds[path[0]]
-            for g in path[1:-1]:
-                group = group[g]
-            assert var_name.strip('__').split('__')[-1] in group.variables.keys()
 
     def test_group_subset(self):
         """
