@@ -1298,7 +1298,6 @@ class TestSubsetter(unittest.TestCase):
                 os.path.join(SNDR_dir, file),
                 os.path.join(self.subset_output_dir, file)
             )
-            print (join(self.subset_output_dir, file))
             box_test = subset.subset(
                 file_to_subset=join(self.subset_output_dir, file),
                 bbox=bbox,
@@ -1436,7 +1435,6 @@ class TestSubsetter(unittest.TestCase):
         
         # Go through every level of the file to fill out the remaining objects
         for entry_str in key_lst:
-            #entry_lst.append(entry_str)
             # If object is a group, add it to the loop list
             if (isinstance(h5_ds[entry_str],h5py.Group)):
                 for group_keys in list(h5_ds[entry_str].keys()):
