@@ -1119,7 +1119,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 encoding = {}
                 compression = dict(zlib=True, complevel=5, _FillValue=None)
 
-                if (min_time or max_time) and any(dataset.dims.values()):
+                if (min_time or max_time) and not all(
+                        dim_size == 1 for dim_size in dataset.dims.values()):
                     encoding = {
                         var_name: {
                             'units': nc_dataset.variables[var_name].__dict__['units'],
