@@ -28,6 +28,7 @@ from os.path import dirname, join, realpath, isfile, basename
 import geopandas as gpd
 import importlib_metadata
 import netCDF4 as nc
+import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -933,6 +934,42 @@ class TestSubsetter(unittest.TestCase):
                 group = group[g]
             assert var_name.strip('__').split('__')[-1] in group.variables.keys()
 
+    def test_transform_h5py_dataset(self):
+        """
+        Test that the transformation function results in a correctly
+        formatted dataset for h5py files
+        """
+        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
+                        os.path.join(self.subset_output_dir, OMI_file_name))
+
+        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name), 'r')
+        nc_ds_transformed = subset.transform_grouped_dataset(
+            nc.Dataset(os.path.join(self.subset_output_dir, s6_file_name), 'r'),
+            os.path.join(self.subset_output_dir, s6_file_name)
+        )
+
+        # The original ds has groups
+        assert nc_ds.groups
+
+        # There should be no groups in the new ds
+        assert not nc_ds_transformed.groups
+
+        # The original ds has no variables in the root group
+        assert not nc_ds.variables
+
+        # The new ds has variables in the root group
+        assert nc_ds_transformed.variables
+
+        # Each var in the new ds should map to a variable in the old ds
+        for var_name, var in nc_ds_transformed.variables.items():
+            path = var_name.strip('__').split('__')
+
+            group = nc_ds[path[0]]
+            for g in path[1:-1]:
+                group = group[g]
+            assert var_name.strip('__').split('__')[-1] in group.variables.keys()
+
     def test_group_subset(self):
         """
         Ensure a subset function can be run on a granule that contains
@@ -1296,6 +1333,7 @@ class TestSubsetter(unittest.TestCase):
                 os.path.join(SNDR_dir, file),
                 os.path.join(self.subset_output_dir, file)
             )
+            print (join(self.subset_output_dir, file))
             box_test = subset.subset(
                 file_to_subset=join(self.subset_output_dir, file),
                 bbox=bbox,
@@ -1415,6 +1453,43 @@ class TestSubsetter(unittest.TestCase):
         in_nc = xr.open_dataset(join(self.test_data_dir, 'OCO2',oco2_file_name))
         out_nc = xr.open_dataset(join(self.subset_output_dir, output_file_name))
         assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
+
+    def test_transform_h5py_dataset(self):
+        """
+        Test that the transformation function results in a correctly
+        formatted dataset for h5py files
+        """
+        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
+                        os.path.join(self.subset_output_dir, OMI_file_name))
+
+        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name), 'r')
+
+        entry_lst = []
+        # Get root level objects
+        key_lst = list(h5_ds.keys())
+        
+        # Go through every level of the file to fill out the remaining objects
+        for entry_str in key_lst:
+            #entry_lst.append(entry_str)
+            # If object is a group, add it to the loop list
+            if (isinstance(h5_ds[entry_str],h5py.Group)):
+                for group_keys in list(h5_ds[entry_str].keys()):
+                    if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
+                        entry_lst.append(entry_str + "/" + group_keys)
+                    key_lst.append(entry_str + "/" + group_keys)
+        
+
+        nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+        nc_vars_flattened = list(nc_dataset.variables.keys())
+        for i in range(len(entry_lst)): # go through all the datasets in h5py file
+            input_variable = '__'+entry_lst[i].replace('/', '__')
+            output_variable = nc_vars_flattened[i]
+            assert (input_variable == output_variable)
+
+        nc_dataset.close()
+        h5_ds.close()
+
 
     def test_variable_dims_matched_tropomi(self):
         """
