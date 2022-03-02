@@ -127,7 +127,7 @@ jobs:
           tag: ${{ env.software_version }}
           message: "Version ${{ env.software_version }}"
       - name: Publish UMM-S with new version
-        uses: podaac/cmr-umm-updater@0.2.0
+        uses: podaac/cmr-umm-updater@0.2.1
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
@@ -136,6 +136,7 @@ jobs:
           provider: 'POCLOUD'
           env: ${{ env.venue }}
           version: ${{ env.software_version }}
+          timeout: 60
         env:
           LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
           LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
