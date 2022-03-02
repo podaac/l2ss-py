@@ -322,8 +322,8 @@ def get_coord_variable_names(dataset):
         Tuple of strings, where the first element is the lat coordinate
         name and the second element is the lon coordinate name
     """
-    possible_lat_coord_names = ['lat', 'latitude', 'y']
-    possible_lon_coord_names = ['lon', 'longitude', 'x']
+    possible_lat_coord_names = ['lat', 'latitude', 'y', 'Latitude']
+    possible_lon_coord_names = ['lon', 'longitude', 'x', 'Longitude']
 
     def var_is_coord(var_name, possible_coord_names):
         var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
@@ -498,6 +498,9 @@ def get_time_variable_name(dataset, lat_var):
             return var_name
     for var_name in list(dataset.data_vars.keys()):
         if 'time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+            return var_name
+    for var_name in list(dataset.data_vars.keys()):
+        if 'Time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
     raise ValueError('Unable to determine time variable')
 
@@ -1094,6 +1097,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
     elif file_extension == 'he5':
         nc_dataset = h5file_transform(file_to_subset)
+        has_groups = True
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
