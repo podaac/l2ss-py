@@ -1309,7 +1309,7 @@ class TestSubsetter(unittest.TestCase):
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
 
-        sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc'
+        sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
         shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
                         os.path.join(self.subset_output_dir, sndr_file_name))
 
