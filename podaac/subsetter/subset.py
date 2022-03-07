@@ -932,7 +932,10 @@ def recombine_grouped_datasets(datasets, output_file):  # pylint: disable=too-ma
         for dim_name in list(dataset.dims.keys()):
             new_dim_name = dim_name.split(GROUP_DELIM)[-1]
             dim_group = _get_nested_group(base_dataset, dim_name)
-            dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
+            try:
+                dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
+            except RuntimeError:
+                pass
 
         # Rename variables
         _rename_variables(dataset, base_dataset)
@@ -986,20 +989,22 @@ def _rename_variables(dataset, base_dataset):
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
+        try:
+            if variable.dtype == object:
+                var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
+            elif variable.dtype == 'timedelta64[ns]':
+                var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value)
+            else:
+                var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
 
-        if variable.dtype == object:
-            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
-        elif variable.dtype == 'timedelta64[ns]':
-            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value)
-        else:
-            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
+            # Copy attributes
+            var_group.variables[new_var_name].setncatts(var_attrs)
 
-        # Copy attributes
-        var_group.variables[new_var_name].setncatts(var_attrs)
-
-        # Copy data
-        var_group.variables[new_var_name].set_auto_maskandscale(False)
-        var_group.variables[new_var_name][:] = variable.data
+            # Copy data
+            var_group.variables[new_var_name].set_auto_maskandscale(False)
+            var_group.variables[new_var_name][:] = variable.data
+        except RuntimeError:
+            pass
 
 
 def h5file_transform(finput):
