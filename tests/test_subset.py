@@ -1444,6 +1444,7 @@ class TestSubsetter(unittest.TestCase):
         
 
         nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+
         nc_vars_flattened = list(nc_dataset.variables.keys())
         for i in range(len(entry_lst)): # go through all the datasets in h5py file
             input_variable = '__'+entry_lst[i].replace('/', '__')
@@ -1681,3 +1682,34 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert spatial_bounds is None
+
+    def test_get_time_OMI(self):
+        """
+        Test that code get time variables for OMI .he5 files"
+        """
+        omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', omi_file),
+                        os.path.join(self.subset_output_dir, omi_file))
+
+        nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+
+            lat_var_names, lon_var_names = subset.get_coord_variable_names(dataset)
+            time_var_names = [
+                subset.get_time_variable_name(
+                    dataset, dataset[lat_var_name]
+                ) for lat_var_name in lat_var_names
+            ]
+            assert "Time" in time_var_names[0]
+            assert "Latitude" in lat_var_names[0]
