@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 ### Security
 
+## [1.3.1]
+### Added
+- [issues/50](https://github.com/podaac/l2ss-py/issues/50): Spatial bounds are computed correctly for grouped empty subset operations
+- Added `timeout` option to `cmr-umm-updater`
+### Changed 
+- Upgraded `cmr-umm-updater` to 0.2.1
+### Deprecated 
+### Removed
+### Fixed
+- [issues/48](https://github.com/podaac/l2ss-py/issues/48): get_epoch_time_var was not able to pick up the 'time' variable for the TROPOMI CH4 collection. Extra elif statement was added to get the full time variable returned.
+- [issues/54](https://github.com/podaac/l2ss-py/issues/54): Skip encoding when xr dataset is empty
+### Security
+
 ## [1.3.0]
 ### Added
 - [issues/27](https://github.com/podaac/l2ss-py/issues/27): Xarray is unable to handle variables with duplicate dimensions. Module dimension_cleanup.py added to handle variables that may have duplicate dimensions. Method remove_duplicate_dims() creates a new dimension identical dimension to the dimensions originally duplicated so the dimension does not need to be duplicated and can have the same shape and values.

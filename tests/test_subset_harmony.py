@@ -21,11 +21,22 @@ import numpy as np
 import json
 import os.path
 import sys
+import pytest
+import shutil
+import tempfile
 from unittest.mock import patch, MagicMock
 
 import podaac.subsetter
 from podaac.subsetter.subset_harmony import L2SubsetterService
 from harmony.util import config
+
+
+@pytest.fixture()
+def temp_dir():
+    test_data_dir = os.path.dirname(os.path.realpath(__file__))
+    temp_dir = tempfile.mkdtemp(dir=test_data_dir)
+    yield temp_dir
+    shutil.rmtree(temp_dir)
 
 
 def spy_on(method):
@@ -61,7 +72,7 @@ def spy_on(method):
     return wrapper
 
 
-def test_service_invoke(mock_environ):
+def test_service_invoke(mock_environ, temp_dir):
     test_dir = os.path.dirname(os.path.realpath(__file__))
     input_json = json.load(
         open(os.path.join(test_dir, 'data', 'test_subset_harmony', 'test_service_invoke.input.json')))
@@ -101,12 +112,34 @@ def test_service_invoke(mock_environ):
     # When subset function returns 'None', bbox should not be passed to
     # the Harmony service lib 'async_add_local_file_partial_result'
     # function
+    base_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+    test_granule = os.path.join(
+        test_dir,
+        'data',
+        'sentinel_6',
+        base_file_name
+    )
+
+    shutil.copyfile(
+        test_granule,
+        os.path.join(temp_dir, base_file_name)
+    )
+
+    test_granule_temp = os.path.join(temp_dir, base_file_name)
+
+    input_json['sources'][0]['granules'][0]['url'] = f'file://{test_granule_temp}'
+    input_json['sources'][0]['variables'][0]['name'] = '/data_01/wind_speed_alt'
+    input_json['subset']['bbox'] = [-10, -10, 10, 10]
+
+    test_args = [
+        podaac.subsetter.subset_harmony.__file__,
+        "--harmony-action", "invoke",
+        "--harmony-input", json.dumps(input_json)
+    ]
+
     process_item_spy = spy_on(L2SubsetterService.process_item)
     with patch.object(sys, 'argv', test_args), \
-         patch.object(L2SubsetterService, 'process_item', process_item_spy), \
-         patch('podaac.subsetter.subset.subset') as mock_subsetter:
-
-        mock_subsetter.return_value = None
+         patch.object(L2SubsetterService, 'process_item', process_item_spy):
 
         podaac.subsetter.subset_harmony.main(config(False))
 
@@ -118,5 +151,5 @@ def test_service_invoke(mock_environ):
         assert result.bbox == [-1, -2, 3, 4]
 
         # Uses a filename that indicates no spatial subsetting
-        filename = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316_bathymetry.nc4'
-        assert result.assets['data'].title == filename
+        # filename = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316_bathymetry.nc4'
+        assert 'subsetted' not in result.assets['data'].title

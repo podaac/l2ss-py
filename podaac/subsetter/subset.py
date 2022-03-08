@@ -525,6 +525,13 @@ def get_time_epoch_var(dataset, time_var_name):
         epoch_var_name = time_var.attrs['comment'].split('plus')[0].strip()
     elif 'time' in dataset.variables.keys() and time_var_name != 'time':
         epoch_var_name = 'time'
+    elif any('time' in s for s in list(dataset.variables.keys())) and time_var_name != 'time':
+        for i in list(dataset.variables.keys()):
+            group_list = i.split(GROUP_DELIM)
+            if group_list[-1] == 'time':
+                epoch_var_name = i
+                break
+        return epoch_var_name
     else:
         raise ValueError('Unable to determine time variables')
 
@@ -977,6 +984,8 @@ def _rename_variables(dataset, base_dataset):
 
         if variable.dtype == object:
             var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
+        elif variable.dtype == 'timedelta64[ns]':
+            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value)
         else:
             var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
 
@@ -1110,7 +1119,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 encoding = {}
                 compression = dict(zlib=True, complevel=5, _FillValue=None)
 
-                if (min_time or max_time) and any(dataset.dims.values()):
+                if (min_time or max_time) and not all(
+                        dim_size == 1 for dim_size in dataset.dims.values()):
                     encoding = {
                         var_name: {
                             'units': nc_dataset.variables[var_name].__dict__['units'],
@@ -1131,6 +1141,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
 
         if has_groups:
             recombine_grouped_datasets(datasets, output_file)
+            # Check if the spatial bounds are all 'None'. This means the
+            # subset result is empty.
+            if any(bound is None for bound in spatial_bounds):
+                return None
             return np.array([[
                 min(lon[0][0][0] for lon in zip(spatial_bounds)),
                 max(lon[0][0][1] for lon in zip(spatial_bounds))
