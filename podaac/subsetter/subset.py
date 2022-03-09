@@ -1015,6 +1015,7 @@ def h5file_transform(finput):
     """
     data_new = h5py.File(finput, 'r+')
     del_group_list = list(data_new.keys())
+    has_groups = bool(data_new['/'])
 
     def walk_h5py(data_new, group):
         # flattens h5py file
@@ -1045,7 +1046,7 @@ def h5file_transform(finput):
 
     nc_dataset = nc.Dataset(finputnc, mode='r')
 
-    return nc_dataset
+    return nc_dataset, has_groups
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
@@ -1084,7 +1085,11 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         granule will not be subset temporally on the upper bound.
     """
     file_extension = file_to_subset.split('.')[-1]
-    if file_extension in ('nc4', 'nc'):
+
+    if file_extension == 'he5':
+        nc_dataset, has_groups = h5file_transform(file_to_subset)
+
+    else:
         # Open dataset with netCDF4 first, so we can get group info
         nc_dataset = nc.Dataset(file_to_subset, mode='r')
         has_groups = bool(nc_dataset.groups)
@@ -1092,8 +1097,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         # If dataset has groups, transform to work with xarray
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
-    elif file_extension == 'he5':
-        nc_dataset = h5file_transform(file_to_subset)
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 

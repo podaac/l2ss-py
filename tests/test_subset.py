@@ -1443,7 +1443,7 @@ class TestSubsetter(unittest.TestCase):
                     key_lst.append(entry_str + "/" + group_keys)
         
 
-        nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
         nc_vars_flattened = list(nc_dataset.variables.keys())
         for i in range(len(entry_lst)): # go through all the datasets in h5py file
             input_variable = '__'+entry_lst[i].replace('/', '__')
