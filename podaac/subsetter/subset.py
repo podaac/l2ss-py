@@ -739,11 +739,11 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
                 var for var in dataset.data_vars.keys()
                 if var.startswith(f'{GROUP_DELIM}{var_prefix}')
             ]
-            if variables:
-                group_vars.extend([
-                    var for var in dataset.data_vars.keys()
-                    if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
-                ])
+            #if variables:
+            group_vars.extend([
+                var for var in dataset.data_vars.keys()
+                if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
+            ])
 
         else:
             group_vars = list(dataset.keys())
@@ -989,21 +989,34 @@ def _rename_variables(dataset, base_dataset):
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
+
+        comp_args = {"zlib": True, "complevel": 1}
+        print (variable.dims)
+        print (var_name)
+        print (var_group)
+        #if var_name == '__METADATA__QA_STATISTICS__sulfurdioxide_total_column_histogram':
+        #    var_dims = ['histogram_axis']
+        #else:
+        #    pass
+
         try:
             if variable.dtype == object:
-                var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
+                var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value, **comp_args)
             elif variable.dtype == 'timedelta64[ns]':
-                var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value)
+                var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
             else:
-                var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
+                var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value, **comp_args)
 
             # Copy attributes
             var_group.variables[new_var_name].setncatts(var_attrs)
 
             # Copy data
             var_group.variables[new_var_name].set_auto_maskandscale(False)
+            #print (var_group.variables[new_var_name].shape)
+            #print (variable.data.shape)
             var_group.variables[new_var_name][:] = variable.data
         except RuntimeError:
+            var_group.variables[new_var_name] = variable.data
             pass
 
 
@@ -1148,6 +1161,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             dataset = dataset.drop_vars(vars_to_drop)
 
         if bbox is not None:
+            variables = list(dataset.variables.keys())
             datasets = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
