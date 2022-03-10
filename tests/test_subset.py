@@ -28,6 +28,7 @@ from os.path import dirname, join, realpath, isfile, basename
 import geopandas as gpd
 import importlib_metadata
 import netCDF4 as nc
+import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -933,6 +934,7 @@ class TestSubsetter(unittest.TestCase):
                 group = group[g]
             assert var_name.strip('__').split('__')[-1] in group.variables.keys()
 
+
     def test_group_subset(self):
         """
         Ensure a subset function can be run on a granule that contains
@@ -1416,6 +1418,42 @@ class TestSubsetter(unittest.TestCase):
         out_nc = xr.open_dataset(join(self.subset_output_dir, output_file_name))
         assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
 
+    def test_transform_h5py_dataset(self):
+        """
+        Test that the transformation function results in a correctly
+        formatted dataset for h5py files
+        """
+        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
+                        os.path.join(self.subset_output_dir, OMI_file_name))
+
+        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name), 'r')
+
+        entry_lst = []
+        # Get root level objects
+        key_lst = list(h5_ds.keys())
+        
+        # Go through every level of the file to fill out the remaining objects
+        for entry_str in key_lst:
+            # If object is a group, add it to the loop list
+            if (isinstance(h5_ds[entry_str],h5py.Group)):
+                for group_keys in list(h5_ds[entry_str].keys()):
+                    if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
+                        entry_lst.append(entry_str + "/" + group_keys)
+                    key_lst.append(entry_str + "/" + group_keys)
+        
+
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+        nc_vars_flattened = list(nc_dataset.variables.keys())
+        for i in range(len(entry_lst)): # go through all the datasets in h5py file
+            input_variable = '__'+entry_lst[i].replace('/', '__')
+            output_variable = nc_vars_flattened[i]
+            assert (input_variable == output_variable)
+
+        nc_dataset.close()
+        h5_ds.close()
+
+
     def test_variable_dims_matched_tropomi(self):
         """
         Code must match the dimensions for each variable rather than
@@ -1643,3 +1681,34 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert spatial_bounds is None
+
+    def test_empty_temporal_subset(self):
+        """
+        Test the edge case where a subsetted empty granule
+        (due to bbox) is temporally subset, which causes the encoding
+        step to fail due to size '1' data for each dimension.
+        """
+        #  37.707:38.484
+        bbox = np.array(((37.707, 38.484), (-13.265, -12.812)))
+        file = '20190927000500-JPL-L2P_GHRSST-SSTskin-MODIS_A-D-v02.0-fv01.0.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2019-09-01'
+        max_time = '2019-09-30'
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_coords=False
+        )
+
+        assert all(dim_size == 1 for dim_size in ds.dims.values())
