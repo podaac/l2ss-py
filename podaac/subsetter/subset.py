@@ -752,6 +752,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -763,6 +764,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
             temporal_cond,
             cut
         )
+        #raise Exception
         datasets.append(group_dataset)
 
     return datasets
@@ -991,9 +993,6 @@ def _rename_variables(dataset, base_dataset):
         var_attrs.pop('_FillValue', None)
 
         comp_args = {"zlib": True, "complevel": 1}
-        print (variable.dims)
-        print (var_name)
-        print (var_group)
         #if var_name == '__METADATA__QA_STATISTICS__sulfurdioxide_total_column_histogram':
         #    var_dims = ['histogram_axis']
         #else:
@@ -1135,6 +1134,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
+        #print (dataset['__METADATA__QA_STATISTICS__sulfurdioxide_total_column_histogram'])
 
         lat_var_names, lon_var_names = get_coord_variable_names(dataset)
         time_var_names = [
@@ -1173,6 +1173,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 min_time=min_time,
                 max_time=max_time
             )
+            #raise Exception
         elif shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
@@ -1184,7 +1185,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         for dataset in datasets:
             set_version_history(dataset, cut, bbox, shapefile)
             set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)
-
+            #print (dataset['__METADATA__QA_STATISTICS__sulfurdioxide_total_column_histogram'])
+            #raise Exception
             if has_groups:
                 spatial_bounds.append(get_spatial_bounds(
                     dataset=dataset,
