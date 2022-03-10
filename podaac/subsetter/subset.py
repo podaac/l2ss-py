@@ -1056,6 +1056,56 @@ def h5file_transform(finput):
     return nc_dataset
 
 
+def h5file_transform(finput):
+    """
+    Transform a h5py  Dataset that has groups to an xarray compatible
+    dataset. xarray does not work with groups, so this transformation
+    will flatten the variables in the dataset and use the group path as
+    the new variable name. For example, data_01 > km > sst would become
+    'data_01__km__sst', where GROUP_DELIM is __.
+
+    Returns
+    -------
+    nc.Dataset
+        netCDF4 Dataset that does not contain groups and that has been
+        flattened.
+    """
+    data_new = h5py.File(finput, 'r+')
+    del_group_list = list(data_new.keys())
+    has_groups = bool(data_new['/'])
+
+    def walk_h5py(data_new, group):
+        # flattens h5py file
+        for key, item in data_new[group].items():
+            group_path = f'{group}{key}'
+            if isinstance(item, h5py.Dataset):
+                new_var_name = group_path.replace('/', '__')
+
+                data_new[new_var_name] = data_new[group_path]
+                del data_new[group_path]
+
+            elif isinstance(item, h5py.Group):
+                if len(list(item.keys())) == 0:
+                    new_group_name = group_path.replace('/', '__')
+                    data_new[new_group_name] = data_new[group_path]
+
+                walk_h5py(data_new, data_new[group_path].name+'/')
+
+    walk_h5py(data_new, data_new.name)
+
+    for del_group in del_group_list:
+        del data_new[del_group]
+
+    finputnc = '.'.join(finput.split('.')[:-1])+'.nc'
+
+    data_new.close()  # close the h5py dataset
+    copy(finput, finputnc)  # copy to a nc file
+
+    nc_dataset = nc.Dataset(finputnc, mode='r')
+
+    return nc_dataset, has_groups
+
+
 def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):
     """
@@ -1092,6 +1142,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         granule will not be subset temporally on the upper bound.
     """
     file_extension = file_to_subset.split('.')[-1]
+<<<<<<< HEAD
     if file_extension in ('nc4', 'nc'):
         # Open dataset with netCDF4 first, so we can get group info
         nc_dataset = nc.Dataset(file_to_subset, mode='r')
@@ -1103,6 +1154,20 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     elif file_extension == 'he5':
         nc_dataset = h5file_transform(file_to_subset)
         has_groups = True
+=======
+
+    if file_extension == 'he5':
+        nc_dataset, has_groups = h5file_transform(file_to_subset)
+
+    else:
+        # Open dataset with netCDF4 first, so we can get group info
+        nc_dataset = nc.Dataset(file_to_subset, mode='r')
+        has_groups = bool(nc_dataset.groups)
+
+        # If dataset has groups, transform to work with xarray
+        if has_groups:
+            nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
+>>>>>>> develop
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
@@ -1181,7 +1246,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 encoding = {}
                 compression = dict(zlib=True, complevel=5, _FillValue=None)
 
-                if (min_time or max_time) and any(dataset.dims.values()):
+                if (min_time or max_time) and not all(
+                        dim_size == 1 for dim_size in dataset.dims.values()):
                     encoding = {
                         var_name: {
                             'units': nc_dataset.variables[var_name].__dict__['units'],
