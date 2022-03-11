@@ -847,31 +847,6 @@ class TestSubsetter(unittest.TestCase):
         var_listout = list(out_nc.groups['Retrieval'].variables.keys())
         assert ('water_height' in var_listout)
 
-    def test_variable_subset_oco3(self):
-        """
-        multiple variable subset of variables in different groups in oco3
-        """
-
-        oco3_file_name = 'oco3_LtSIF_200226_B10206r_200709053505s.nc4'
-        output_file_name = 'oco3_test_out.nc'
-        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO3/OCO3_L2_LITE_SIF.EarlyR', oco3_file_name),
-                        os.path.join(self.subset_output_dir, oco3_file_name))
-        bbox = np.array(((-180,180),(-90.0,90)))
-        variables = ['/Science/IGBP_index', '/Offset/SIF_Relative_SDev_757nm','/Meteo/temperature_skin']
-        subset.subset(
-            file_to_subset=join(self.subset_output_dir, oco3_file_name),
-            bbox=bbox,
-            variables=variables,
-            output_file=join(self.subset_output_dir, output_file_name),
-        )
-        
-        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
-        var_listout =list(out_nc.groups['Science'].variables.keys())
-        var_listout.extend(list(out_nc.groups['Offset'].variables.keys()))
-        var_listout.extend(list(out_nc.groups['Meteo'].variables.keys()))
-        assert ('IGBP_index' in var_listout)
-        assert ('SIF_Relative_SDev_757nm' in var_listout)
-        assert ('temperature_skin' in var_listout)
 
     def test_variable_subset_s6(self):
         """
@@ -1441,14 +1416,9 @@ class TestSubsetter(unittest.TestCase):
                     if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
                         entry_lst.append(entry_str + "/" + group_keys)
                     key_lst.append(entry_str + "/" + group_keys)
-        
 
-<<<<<<< HEAD
-        nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
-
-=======
         nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
->>>>>>> develop
+
         nc_vars_flattened = list(nc_dataset.variables.keys())
         for i in range(len(entry_lst)): # go through all the datasets in h5py file
             input_variable = '__'+entry_lst[i].replace('/', '__')
@@ -1687,7 +1657,6 @@ class TestSubsetter(unittest.TestCase):
 
         assert spatial_bounds is None
 
-<<<<<<< HEAD
     def test_get_time_OMI(self):
         """
         Test that code get time variables for OMI .he5 files"
@@ -1697,7 +1666,7 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', omi_file),
                         os.path.join(self.subset_output_dir, omi_file))
 
-        nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
 
         args = {
             'decode_coords': False,
@@ -1718,7 +1687,7 @@ class TestSubsetter(unittest.TestCase):
             ]
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
-=======
+
     def test_empty_temporal_subset(self):
         """
         Test the edge case where a subsetted empty granule
@@ -1749,4 +1718,3 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert all(dim_size == 1 for dim_size in ds.dims.values())
->>>>>>> develop
