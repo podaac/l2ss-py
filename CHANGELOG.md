@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issues/46](https://github.com/podaac/l2ss-py/issues/46). Flattening of h5py file.
 - [issues/39](https://github.com/podaac/l2ss-py/issues/39): Exposed shapefile subsetting capability to Harmony
 ### Changed 
 ### Deprecated 
