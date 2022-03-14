@@ -10,6 +10,7 @@ Harmony service for subsetting L2 data. l2ss-py supports:
 - Spatial subsetting
 - Temporal subsetting
 - Variable subsetting
+- Shapefile subsetting
 
 If you would like to contribute to l2ss-py, refer to the [contribution document](CONTRIBUTING.md).
 
