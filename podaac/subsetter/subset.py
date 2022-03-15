@@ -25,6 +25,7 @@ import operator
 import os
 from shutil import copy
 
+import cf_xarray as cfxr  # noqa pylint: disable=unused-import
 import geopandas as gpd
 import importlib_metadata
 import julian
@@ -322,8 +323,12 @@ def get_coord_variable_names(dataset):
         Tuple of strings, where the first element is the lat coordinate
         name and the second element is the lon coordinate name
     """
-    possible_lat_coord_names = ['lat', 'latitude', 'y']
-    possible_lon_coord_names = ['lon', 'longitude', 'x']
+
+    possible_lat_coord_names = ['lat', 'latitude', 'y'] + dataset.cf.coordinates.get('latitude', []) + dataset.cf.axes.get('Y', [])
+    possible_lon_coord_names = ['lon', 'longitude', 'x'] + dataset.cf.coordinates.get('longitude', []) + dataset.cf.axes.get('X', [])
+
+    possible_lat_coord_names = list(set(possible_lat_coord_names))
+    possible_lon_coord_names = list(set(possible_lon_coord_names))
 
     def var_is_coord(var_name, possible_coord_names):
         var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]

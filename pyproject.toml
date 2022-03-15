@@ -37,6 +37,7 @@ pystac = { version = "^0.5.3", optional = true }
 julian = "^0.14"
 importlib-metadata = "^4.8.1"
 h5py = "^3.6.0"
+cf-xarray = "^0.7.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
