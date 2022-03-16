@@ -1276,6 +1276,7 @@ class TestSubsetter(unittest.TestCase):
             box_test = subset.subset(
                 file_to_subset=join(self.subset_output_dir, file),
                 bbox=bbox,
+                variables = ['/surf_temp'],
                 output_file=join(self.subset_output_dir, output_file),
             )
             # check if the box_test is
