@@ -764,8 +764,12 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
             temporal_cond,
             cut
         )
-        #raise Exception
+
         datasets.append(group_dataset)
+
+    #for var_name, variable in datasets[0].data_vars.items():
+    #    print (var_name)
+    #    print (variable.shape)
 
     return datasets
 
@@ -972,12 +976,42 @@ def _rename_variables(dataset, base_dataset):
         variable = dataset.variables[var_name]
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
         if not var_dims:
-            var_group_parent = var_group
+            var_dims = []
+            #var_group_parent = var_group
             # This group doesn't contain dimensions. Look at parent group to find dimensions.
-            while not var_dims:
-                var_group_parent = var_group_parent.parent
-                var_dims = list(var_group_parent.dimensions.keys())
+            #while not var_dims:
+                #var_group_parent = var_group_parent.parent
+                #if var_group_parent == None:
+                    #var_dims = []
+                #print (var_name)
+                #print (variable.dtype)
+            """var_attrs = variable.attrs
+                fill_value = var_attrs.get('_FillValue')
+                var_attrs.pop('_FillValue', None)
 
+                comp_args = {"zlib": True, "complevel": 1}
+
+                if variable.dtype == object:
+                    var_group.createVariable(new_var_name, 'S1', [], fill_value=fill_value, **comp_args)
+                elif variable.dtype == 'timedelta64[ns]':
+                    var_group.createVariable(new_var_name, 'i4', [], fill_value=fill_value, **comp_args)
+                else:
+                    var_group.createVariable(new_var_name, variable.dtype,[] , fill_value=fill_value, **comp_args)
+                    
+                # Copy attributes
+                var_group.variables[new_var_name].setncatts(var_attrs)
+
+                # Copy data
+                var_group.variables[new_var_name].set_auto_maskandscale(False)
+                var_group.variables[new_var_name] = variable.data """              
+            var_dims = []
+            break
+                #else:
+                    #var_dims = list(var_group_parent.dimensions.keys())
+        #print (var_dims)
+        #if var_dims == []:
+            #continue
+        #else:
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
         ) or np.issubdtype(
@@ -991,32 +1025,22 @@ def _rename_variables(dataset, base_dataset):
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
-
+            
         comp_args = {"zlib": True, "complevel": 1}
-        #if var_name == '__METADATA__QA_STATISTICS__sulfurdioxide_total_column_histogram':
-        #    var_dims = ['histogram_axis']
-        #else:
-        #    pass
 
-        try:
-            if variable.dtype == object:
-                var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value, **comp_args)
-            elif variable.dtype == 'timedelta64[ns]':
-                var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
-            else:
-                var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value, **comp_args)
+        if variable.dtype == object:
+            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value, **comp_args)
+        elif variable.dtype == 'timedelta64[ns]':
+            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
+        else:
+            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value, **comp_args)
 
-            # Copy attributes
-            var_group.variables[new_var_name].setncatts(var_attrs)
+        # Copy attributes
+        var_group.variables[new_var_name].setncatts(var_attrs)
 
-            # Copy data
-            var_group.variables[new_var_name].set_auto_maskandscale(False)
-            #print (var_group.variables[new_var_name].shape)
-            #print (variable.data.shape)
-            var_group.variables[new_var_name][:] = variable.data
-        except RuntimeError:
-            var_group.variables[new_var_name] = variable.data
-            pass
+        # Copy data
+        var_group.variables[new_var_name].set_auto_maskandscale(False)
+        var_group.variables[new_var_name][:] = variable.data
 
 
 def h5file_transform(finput):
@@ -1134,7 +1158,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        #print (dataset['__METADATA__QA_STATISTICS__sulfurdioxide_total_column_histogram'])
 
         lat_var_names, lon_var_names = get_coord_variable_names(dataset)
         time_var_names = [
@@ -1173,7 +1196,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 min_time=min_time,
                 max_time=max_time
             )
-            #raise Exception
+
         elif shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
@@ -1182,11 +1205,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             raise ValueError('Either bbox or shapefile must be provided')
 
         spatial_bounds = []
+
         for dataset in datasets:
             set_version_history(dataset, cut, bbox, shapefile)
             set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)
-            #print (dataset['__METADATA__QA_STATISTICS__sulfurdioxide_total_column_histogram'])
-            #raise Exception
             if has_groups:
                 spatial_bounds.append(get_spatial_bounds(
                     dataset=dataset,

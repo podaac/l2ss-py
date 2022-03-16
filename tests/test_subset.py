@@ -847,31 +847,6 @@ class TestSubsetter(unittest.TestCase):
         var_listout = list(out_nc.groups['Retrieval'].variables.keys())
         assert ('water_height' in var_listout)
 
-    def test_variable_subset_oco3(self):
-        """
-        multiple variable subset of variables in different groups in oco3
-        """
-
-        oco3_file_name = 'oco3_LtSIF_200226_B10206r_200709053505s.nc4'
-        output_file_name = 'oco3_test_out.nc'
-        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO3/OCO3_L2_LITE_SIF.EarlyR', oco3_file_name),
-                        os.path.join(self.subset_output_dir, oco3_file_name))
-        bbox = np.array(((-180,180),(-90.0,90)))
-        variables = ['/Science/IGBP_index', '/Offset/SIF_Relative_SDev_757nm','/Meteo/temperature_skin']
-        subset.subset(
-            file_to_subset=join(self.subset_output_dir, oco3_file_name),
-            bbox=bbox,
-            variables=variables,
-            output_file=join(self.subset_output_dir, output_file_name),
-        )
-        
-        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
-        var_listout =list(out_nc.groups['Science'].variables.keys())
-        var_listout.extend(list(out_nc.groups['Offset'].variables.keys()))
-        var_listout.extend(list(out_nc.groups['Meteo'].variables.keys()))
-        assert ('IGBP_index' in var_listout)
-        assert ('SIF_Relative_SDev_757nm' in var_listout)
-        assert ('temperature_skin' in var_listout)
 
     def test_variable_subset_s6(self):
         """
