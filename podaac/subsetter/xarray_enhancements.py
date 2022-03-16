@@ -1,4 +1,4 @@
-# Copyright 2019, by the California Institute of Technology.
+Copyright 2019, by the California Institute of Technology.
 # ALL RIGHTS RESERVED. United States Government Sponsorship acknowledged.
 # Any commercial use must be negotiated with the Office of Technology
 # Transfer at the California Institute of Technology.
@@ -191,12 +191,28 @@ def where(dataset, cond, cut):
     indexed_ds = dataset.isel(**indexers)
     new_dataset = indexed_ds.where(indexed_cond)
 
+    """for var_name, variable in new_dataset.variables.items():
+        print ('\n')
+        print (var_name)
+        #try:
+        #print (indexed_ds[var_name].shape)
+        print (variable.shape)"""
+
     # Cast all variables to their original type
+    count = 0
     for variable_name, variable in new_dataset.data_vars.items():
         original_type = indexed_ds[variable_name].dtype
         new_type = variable.dtype
 
         indexed_var = indexed_ds[variable_name]
+        #print (variable_name)
+        #print (partial_dim_in_in_vars)
+        #print (indexers.keys() - dataset[variable_name].dims)
+        #print (set(indexers.keys()).intersection(dataset[variable_name].dims))
+        #print (indexers.keys())
+        #print (dataset[variable_name].dims)
+
+        #print (variable.shape)
 
         if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
                 indexers.keys()).intersection(dataset[variable_name].dims):
@@ -209,9 +225,10 @@ def where(dataset, cond, cut):
             indexed_var = dataset[variable_name].isel(**var_indexers)
             new_dataset[variable_name] = indexed_var.where(var_cond)
             variable = new_dataset[variable_name]
+            #print (1)
 
         # Check if variable has no _FillValue. If so, use original data
-        if '_FillValue' not in variable.attrs:
+        if '_FillValue' not in variable.attrs or len(indexed_var.shape)==0:
 
             if original_type != new_type:
                 new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
@@ -233,14 +250,24 @@ def where(dataset, cond, cut):
             # Manually replace nans with FillValue
             # If variable represents time, cast _FillValue to datetime
             fill_value = new_dataset[variable_name].attrs.get('_FillValue')
-
+            #print (3)
             if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
                 fill_value = np.datetime64('nat')
+                #print (4)
             new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
 
             if original_type != new_type:
                 new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
                                                             str(original_type), dask='allowed',
                                                             keep_attrs=True)
+                #print (5)
+
+            if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
+                    indexers.keys()).intersection(new_dataset[variable_name].dims):
+                new_dataset[variable_name] = indexed_var
+
+                new_dataset[variable_name].attrs = indexed_var.attrs
+                variable.attrs = indexed_var.attrs
+                #print (6)
 
     return new_dataset
