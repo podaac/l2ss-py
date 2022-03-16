@@ -1263,23 +1263,21 @@ class TestSubsetter(unittest.TestCase):
         these files have variables with duplicate dimensions
         """
         SNDR_dir = join(self.test_data_dir, 'SNDR')
-        sndr_files = [f for f in listdir(SNDR_dir)
-                          if isfile(join(SNDR_dir, f)) and f.endswith(".nc")]
+        sndr_file = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
 
         bbox = np.array(((-180, 90), (-90, 90)))
-        for file in sndr_files:
-            output_file = "{}_{}".format(self._testMethodName, file)
-            shutil.copyfile(
-                os.path.join(SNDR_dir, file),
-                os.path.join(self.subset_output_dir, file)
-            )
-            box_test = subset.subset(
-                file_to_subset=join(self.subset_output_dir, file),
-                bbox=bbox,
-                output_file=join(self.subset_output_dir, output_file),
-            )
-            # check if the box_test is
-            assert len(box_test)==2
+        output_file = "{}_{}".format(self._testMethodName, sndr_file)
+        shutil.copyfile(
+            os.path.join(SNDR_dir, sndr_file),
+            os.path.join(self.subset_output_dir, sndr_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, sndr_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+        )
+        # check if the box_test is
+        assert len(box_test)==2
 
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
@@ -1688,3 +1686,62 @@ class TestSubsetter(unittest.TestCase):
             ]
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
+
+    
+    def test_sndr_dims(self):
+        """SNDR products had variables with more dimensions in the output than the input.
+        Some variables have no dimensions, and need to have a place in the output.
+        xre.where now catches these cases and handles it"""
+
+        SNDR_dir = join(self.test_data_dir, 'SNDR')
+        sndr_file = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
+
+        bbox = np.array(((-180, 90), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, sndr_file)
+        shutil.copyfile(
+            os.path.join(SNDR_dir, sndr_file),
+            os.path.join(self.subset_output_dir, sndr_file)
+        )
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file), mode='r')
+
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, omi_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+
+            lat_var_names, lon_var_names = subset.get_coord_variable_names(dataset)
+            time_var_names = [
+                subset.get_time_variable_name(
+                    dataset, dataset[lat_var_name]
+                ) for lat_var_name in lat_var_names
+            ]
+
+        chunks_dict = calculate_chunks(dataset)
+
+        if chunks_dict:
+            dataset = dataset.chunk(chunks_dict)
+
+        if bbox is not None:
+            variables = list(dataset.variables.keys())
+            datasets = subset_with_bbox(
+                dataset=dataset,
+                lat_var_names=lat_var_names,
+                lon_var_names=lon_var_names,
+                time_var_names=time_var_names,
+                variables=variables,
+                bbox=bbox,
+                cut=cut,
+                min_time=min_time,
+                max_time=max_time
+            )
+
+
+
