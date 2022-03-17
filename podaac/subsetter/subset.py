@@ -348,7 +348,7 @@ def get_coord_variable_names(dataset):
 
         def var_is_coord(var_name, possible_coord_names):
             var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-            return var_name in possible_coord_names
+            return var_name.lower() in possible_coord_names
 
         lat_coord_names = list(filter(
             lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
@@ -518,8 +518,9 @@ def get_time_variable_name(dataset, lat_var):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
-        if 'time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
+
     raise ValueError('Unable to determine time variable')
 
 
