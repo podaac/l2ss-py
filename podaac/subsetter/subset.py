@@ -25,7 +25,7 @@ import operator
 import os
 from shutil import copy
 
-import cf_xarray as cfxr  # noqa pylint: disable=unused-import
+import cf_xarray as cfxr
 import geopandas as gpd
 import importlib_metadata
 import julian
@@ -324,24 +324,40 @@ def get_coord_variable_names(dataset):
         name and the second element is the lon coordinate name
     """
 
-    possible_lat_coord_names = ['lat', 'latitude', 'y'] + dataset.cf.coordinates.get('latitude', []) + dataset.cf.axes.get('Y', [])
-    possible_lon_coord_names = ['lon', 'longitude', 'x'] + dataset.cf.coordinates.get('longitude', []) + dataset.cf.axes.get('X', [])
+    dataset = xr.decode_cf(dataset)
 
-    possible_lat_coord_names = list(set(possible_lat_coord_names))
-    possible_lon_coord_names = list(set(possible_lon_coord_names))
+    # look for lon and lat using standard name in coordinates and axes
+    custom_criteria = {
+        "latitude": {
+            "standard_name": "latitude|projection_y_coordinate",
+        },
+        "longitude": {
+            "standard_name": "longitude|projection_x_coordinate",
+        }
+    }
 
-    def var_is_coord(var_name, possible_coord_names):
-        var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-        return var_name in possible_coord_names
+    with cfxr.set_options(custom_criteria=custom_criteria):
+        lat_coord_names = dataset.cf.coordinates.get('latitude', [])
+        lon_coord_names = dataset.cf.coordinates.get('longitude', [])
 
-    lat_coord_names = list(filter(
-        lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
-    lon_coord_names = list(filter(
-        lambda var_name: var_is_coord(var_name, possible_lon_coord_names), dataset.variables))
-
+    # lon and lat not found in coordinates so look in data variables
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-        lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
-        lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
+
+        possible_lat_coord_names = ['lat', 'latitude', 'y']
+        possible_lon_coord_names = ['lon', 'longitude', 'x']
+
+        def var_is_coord(var_name, possible_coord_names):
+            var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
+            return var_name in possible_coord_names
+
+        lat_coord_names = list(filter(
+            lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
+        lon_coord_names = list(filter(
+            lambda var_name: var_is_coord(var_name, possible_lon_coord_names), dataset.variables))
+
+        if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+            lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
+            lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
 
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         raise ValueError('Could not determine coordinate variables')
