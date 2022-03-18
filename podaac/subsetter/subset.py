@@ -767,9 +767,6 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
 
         datasets.append(group_dataset)
 
-    #for var_name, variable in datasets[0].data_vars.items():
-    #    print (var_name)
-    #    print (variable.shape)
 
     return datasets
 

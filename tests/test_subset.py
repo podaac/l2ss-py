@@ -39,6 +39,7 @@ from shapely.geometry import Point
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import dimension_cleanup as dc
 
 
 class TestSubsetter(unittest.TestCase):
@@ -1687,7 +1688,7 @@ class TestSubsetter(unittest.TestCase):
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
 
-    
+
     def test_sndr_dims(self):
         """SNDR products had variables with more dimensions in the output than the input.
         Some variables have no dimensions, and need to have a place in the output.
@@ -1696,21 +1697,40 @@ class TestSubsetter(unittest.TestCase):
         SNDR_dir = join(self.test_data_dir, 'SNDR')
         sndr_file = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
 
-        bbox = np.array(((-180, 90), (-90, 90)))
+        bbox = np.array(((-180, 180), (-90, 90)))
         output_file = "{}_{}".format(self._testMethodName, sndr_file)
         shutil.copyfile(
             os.path.join(SNDR_dir, sndr_file),
             os.path.join(self.subset_output_dir, sndr_file)
         )
-        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file), mode='r')
+        file_to_subset = os.path.join(self.subset_output_dir, sndr_file)
+        file_extension = file_to_subset.split('.')[-1]
+        if file_extension in ('nc4', 'nc'):
+            # Open dataset with netCDF4 first, so we can get group info
+            nc_dataset = nc.Dataset(file_to_subset, mode='r')
+            has_groups = bool(nc_dataset.groups)
 
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, omi_file))
+            # If dataset has groups, transform to work with xarray
+            if has_groups:
+                nc_dataset = subset.transform_grouped_dataset(nc_dataset, file_to_subset)
+        elif file_extension == 'he5':
+            nc_dataset = h5file_transform(file_to_subset)
+            has_groups = True
+
+        nc_dataset = dc.remove_duplicate_dims(nc_dataset)
+        variables = None
+        if variables:
+            variables = [x.replace('/', GROUP_DELIM) for x in variables]
 
         args = {
             'decode_coords': False,
             'mask_and_scale': False,
             'decode_times': False
         }
+        min_time = None
+        max_time = None
+        if min_time or max_time:
+            args['decode_times'] = True
 
         with xr.open_dataset(
                 xr.backends.NetCDF4DataStore(nc_dataset),
@@ -1723,25 +1743,45 @@ class TestSubsetter(unittest.TestCase):
                     dataset, dataset[lat_var_name]
                 ) for lat_var_name in lat_var_names
             ]
+            chunks_dict = subset.calculate_chunks(dataset)
 
-        chunks_dict = calculate_chunks(dataset)
+            if chunks_dict:
+                dataset = dataset.chunk(chunks_dict)
 
-        if chunks_dict:
-            dataset = dataset.chunk(chunks_dict)
+            if variables:
+                # Drop variables that aren't explicitly requested, except lat_var_name and
+                # lon_var_name which are needed for subsetting
+                variables_upper = [variable.upper() for variable in variables]
+                vars_to_drop = [
+                    var_name for var_name, var in dataset.data_vars.items()
+                    if var_name.upper() not in variables_upper
+                    and var_name not in lat_var_names
+                    and var_name not in lon_var_names
+                    and var_name not in time_var_names
+                ]
+                dataset = dataset.drop_vars(vars_to_drop)
 
-        if bbox is not None:
-            variables = list(dataset.variables.keys())
-            datasets = subset_with_bbox(
-                dataset=dataset,
-                lat_var_names=lat_var_names,
-                lon_var_names=lon_var_names,
-                time_var_names=time_var_names,
-                variables=variables,
-                bbox=bbox,
-                cut=cut,
-                min_time=min_time,
-                max_time=max_time
-            )
+            if bbox is not None:
+                variables = list(dataset.variables.keys())
+                datasets = subset.subset_with_bbox(
+                    dataset=dataset,
+                    lat_var_names=lat_var_names,
+                    lon_var_names=lon_var_names,
+                    time_var_names=time_var_names,
+                    variables=variables,
+                    bbox=bbox,
+                    cut=True,
+                    min_time=None,
+                    max_time=None
+                )
+
+            else:
+                raise ValueError('Either bbox or shapefile must be provided')
+
+            for var_name, variables in dataset.variables.items():
+                assert dataset[var_name].shape == datasets[0][var_name].shape
+
+
 
 
 
