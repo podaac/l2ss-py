@@ -1780,8 +1780,3 @@ class TestSubsetter(unittest.TestCase):
 
             for var_name, variables in dataset.variables.items():
                 assert dataset[var_name].shape == datasets[0][var_name].shape
-
-
-
-
-
