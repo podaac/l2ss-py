@@ -7,21 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - [issues/46](https://github.com/podaac/l2ss-py/issues/46). Flattening of h5py file.
+<<<<<<< HEAD
+=======
+- [issues/58](https://github.com/podaac/l2ss-py/issues/58). Expand coordinates to accomodate OMI files 
+	latitude variable in OMI has a capital L for Latitude that needs to be added to the list in 
+	get_coordinate_variable_names. 
+>>>>>>> develop
 ### Changed 
 ### Deprecated 
 ### Removed
+- Remove OCO3 test. Get_coordinate_variables passed OMI and fails OCO3 because OCO3 has a multiple Latitude variable. Subset with bbox method is not
+	applied properly to OCO3. Further manipulating will need to be done - OMI is a higher priority.
 ### Fixed
 ### Security
 
 ## [1.3.1]
 ### Added
 - [issues/50](https://github.com/podaac/l2ss-py/issues/50): Spatial bounds are computed correctly for grouped empty subset operations
+- Added `timeout` option to `cmr-umm-updater`
 ### Changed 
-- Upgraded `cmr-umm-updater` to 0.2.0
+- Upgraded `cmr-umm-updater` to 0.2.1
 ### Deprecated 
 ### Removed
 ### Fixed
 - [issues/48](https://github.com/podaac/l2ss-py/issues/48): get_epoch_time_var was not able to pick up the 'time' variable for the TROPOMI CH4 collection. Extra elif statement was added to get the full time variable returned.
+- [issues/54](https://github.com/podaac/l2ss-py/issues/54): Skip encoding when xr dataset is empty
 ### Security
 
 ## [1.3.0]

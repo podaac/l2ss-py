@@ -327,7 +327,7 @@ def get_coord_variable_names(dataset):
 
     def var_is_coord(var_name, possible_coord_names):
         var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-        return var_name in possible_coord_names
+        return var_name.lower() in possible_coord_names
 
     lat_coord_names = list(filter(
         lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
@@ -497,11 +497,15 @@ def get_time_variable_name(dataset, lat_var):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
-        if 'time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
+<<<<<<< HEAD
     for var_name in list(dataset.data_vars.keys()):
         if 'Time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
+=======
+
+>>>>>>> develop
     raise ValueError('Unable to determine time variable')
 
 
@@ -1020,6 +1024,10 @@ def h5file_transform(finput):
     """
     data_new = h5py.File(finput, 'r+')
     del_group_list = list(data_new.keys())
+<<<<<<< HEAD
+=======
+    has_groups = bool(data_new['/'])
+>>>>>>> develop
 
     def walk_h5py(data_new, group):
         # flattens h5py file
@@ -1050,7 +1058,11 @@ def h5file_transform(finput):
 
     nc_dataset = nc.Dataset(finputnc, mode='r')
 
+<<<<<<< HEAD
     return nc_dataset
+=======
+    return nc_dataset, has_groups
+>>>>>>> develop
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
@@ -1089,6 +1101,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         granule will not be subset temporally on the upper bound.
     """
     file_extension = file_to_subset.split('.')[-1]
+<<<<<<< HEAD
     if file_extension in ('nc4', 'nc'):
         # Open dataset with netCDF4 first, so we can get group info
         nc_dataset = nc.Dataset(file_to_subset, mode='r')
@@ -1100,6 +1113,20 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     elif file_extension == 'he5':
         nc_dataset = h5file_transform(file_to_subset)
         has_groups = True
+=======
+
+    if file_extension == 'he5':
+        nc_dataset, has_groups = h5file_transform(file_to_subset)
+
+    else:
+        # Open dataset with netCDF4 first, so we can get group info
+        nc_dataset = nc.Dataset(file_to_subset, mode='r')
+        has_groups = bool(nc_dataset.groups)
+
+        # If dataset has groups, transform to work with xarray
+        if has_groups:
+            nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
+>>>>>>> develop
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
@@ -1180,7 +1207,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 encoding = {}
                 compression = dict(zlib=True, complevel=5, _FillValue=None)
 
-                if (min_time or max_time) and any(dataset.dims.values()):
+                if (min_time or max_time) and not all(
+                        dim_size == 1 for dim_size in dataset.dims.values()):
                     encoding = {
                         var_name: {
                             'units': nc_dataset.variables[var_name].__dict__['units'],

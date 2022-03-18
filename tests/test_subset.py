@@ -1415,9 +1415,14 @@ class TestSubsetter(unittest.TestCase):
                     if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
                         entry_lst.append(entry_str + "/" + group_keys)
                     key_lst.append(entry_str + "/" + group_keys)
+<<<<<<< HEAD
         
 
         nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+=======
+
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+>>>>>>> develop
 
         nc_vars_flattened = list(nc_dataset.variables.keys())
         for i in range(len(entry_lst)): # go through all the datasets in h5py file
@@ -1666,7 +1671,11 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', omi_file),
                         os.path.join(self.subset_output_dir, omi_file))
 
+<<<<<<< HEAD
         nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
+=======
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
+>>>>>>> develop
 
         args = {
             'decode_coords': False,
@@ -1688,6 +1697,7 @@ class TestSubsetter(unittest.TestCase):
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
 
+<<<<<<< HEAD
 
     def test_sndr_dims(self):
         """SNDR products had variables with more dimensions in the output than the input.
@@ -1780,3 +1790,35 @@ class TestSubsetter(unittest.TestCase):
 
             for var_name, variables in dataset.variables.items():
                 assert dataset[var_name].shape == datasets[0][var_name].shape
+=======
+    def test_empty_temporal_subset(self):
+        """
+        Test the edge case where a subsetted empty granule
+        (due to bbox) is temporally subset, which causes the encoding
+        step to fail due to size '1' data for each dimension.
+        """
+        #  37.707:38.484
+        bbox = np.array(((37.707, 38.484), (-13.265, -12.812)))
+        file = '20190927000500-JPL-L2P_GHRSST-SSTskin-MODIS_A-D-v02.0-fv01.0.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2019-09-01'
+        max_time = '2019-09-30'
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_coords=False
+        )
+
+        assert all(dim_size == 1 for dim_size in ds.dims.values())
+>>>>>>> develop
