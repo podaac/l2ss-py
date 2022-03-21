@@ -737,7 +737,6 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
                 var for var in dataset.data_vars.keys()
                 if var.startswith(f'{GROUP_DELIM}{var_prefix}')
             ]
-            #if variables:
             group_vars.extend([
                 var for var in dataset.data_vars.keys()
                 if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
@@ -767,7 +766,6 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
 
 
     return datasets
-
 
 def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
     """
@@ -1049,8 +1047,6 @@ def h5file_transform(finput):
     nc_dataset = nc.Dataset(finputnc, mode='r')
 
     return nc_dataset, has_groups
-
-
 
 def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):

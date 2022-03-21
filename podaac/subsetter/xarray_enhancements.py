@@ -211,7 +211,7 @@ def where(dataset, cond, cut):
             variable = new_dataset[variable_name]
 
         # Check if variable has no _FillValue. If so, use original data
-        if '_FillValue' not in variable.attrs or len(indexed_var.shape)==0:
+        if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
 
             if original_type != new_type:
                 new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
