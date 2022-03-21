@@ -1415,14 +1415,8 @@ class TestSubsetter(unittest.TestCase):
                     if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
                         entry_lst.append(entry_str + "/" + group_keys)
                     key_lst.append(entry_str + "/" + group_keys)
-<<<<<<< HEAD
-        
-
-        nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
-=======
 
         nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
->>>>>>> develop
 
         nc_vars_flattened = list(nc_dataset.variables.keys())
         for i in range(len(entry_lst)): # go through all the datasets in h5py file
@@ -1671,11 +1665,7 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', omi_file),
                         os.path.join(self.subset_output_dir, omi_file))
 
-<<<<<<< HEAD
-        nc_dataset = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
-=======
         nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
->>>>>>> develop
 
         args = {
             'decode_coords': False,
@@ -1696,8 +1686,6 @@ class TestSubsetter(unittest.TestCase):
             ]
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
-
-<<<<<<< HEAD
 
     def test_sndr_dims(self):
         """SNDR products had variables with more dimensions in the output than the input.
@@ -1790,7 +1778,7 @@ class TestSubsetter(unittest.TestCase):
 
             for var_name, variables in dataset.variables.items():
                 assert dataset[var_name].shape == datasets[0][var_name].shape
-=======
+
     def test_empty_temporal_subset(self):
         """
         Test the edge case where a subsetted empty granule
@@ -1821,4 +1809,3 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert all(dim_size == 1 for dim_size in ds.dims.values())
->>>>>>> develop
