@@ -967,7 +967,6 @@ def _rename_variables(dataset, base_dataset):
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
         if not var_dims:
             var_dims = []
-            pass
 
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
