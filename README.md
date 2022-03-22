@@ -8,9 +8,11 @@ main: [![Main Build](https://github.com/podaac/l2ss-py/actions/workflows/build-p
 Harmony service for subsetting L2 data. l2ss-py supports:
 
 - Spatial subsetting
+    - Bounding box
+    - Shapefile subsetting
+    - GeoJSON subsetting
 - Temporal subsetting
 - Variable subsetting
-- Shapefile subsetting
 
 If you would like to contribute to l2ss-py, refer to the [contribution document](CONTRIBUTING.md).
 
