@@ -967,7 +967,7 @@ def _rename_variables(dataset, base_dataset):
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
         if not var_dims:
             var_dims = []
-            break
+            pass
 
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
@@ -1124,7 +1124,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             ) for lat_var_name in lat_var_names
         ]
         chunks_dict = calculate_chunks(dataset)
-
+        print (lat_var_names)
         if chunks_dict:
             dataset = dataset.chunk(chunks_dict)
 
@@ -1143,6 +1143,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
 
         if bbox is not None:
             variables = list(dataset.variables.keys())
+            print (variables)
             datasets = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
