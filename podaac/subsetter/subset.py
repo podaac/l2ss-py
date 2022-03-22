@@ -322,8 +322,8 @@ def get_coord_variable_names(dataset):
         Tuple of strings, where the first element is the lat coordinate
         name and the second element is the lon coordinate name
     """
-    possible_lat_coord_names = ['lat', 'latitude', 'y', 'Latitude']
-    possible_lon_coord_names = ['lon', 'longitude', 'x', 'Longitude']
+    possible_lat_coord_names = ['lat', 'latitude', 'y']
+    possible_lon_coord_names = ['lon', 'longitude', 'x']
 
     def var_is_coord(var_name, possible_coord_names):
         var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
