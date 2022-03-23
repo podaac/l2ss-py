@@ -1139,8 +1139,11 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             ]
             dataset = dataset.drop_vars(vars_to_drop)
 
-        if bbox is not None:
-            variables = list(dataset.variables.keys())
+        if shapefile:
+            datasets = [
+                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
+            ]
+        elif bbox is not None:
             datasets = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
@@ -1152,11 +1155,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 min_time=min_time,
                 max_time=max_time
             )
-
-        elif shapefile:
-            datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
-            ]
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
