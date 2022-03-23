@@ -737,10 +737,11 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
                 var for var in dataset.data_vars.keys()
                 if var.startswith(f'{GROUP_DELIM}{var_prefix}')
             ]
-            group_vars.extend([
-                var for var in dataset.data_vars.keys()
-                if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
-            ])
+            if variables:
+                group_vars.extend([
+                    var for var in dataset.data_vars.keys()
+                    if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
+                ])
 
         else:
             group_vars = list(dataset.keys())
@@ -965,8 +966,6 @@ def _rename_variables(dataset, base_dataset):
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
-        if not var_dims:
-            var_dims = []
 
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
@@ -1048,7 +1047,7 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
-def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
+def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):
     """
     Subset a given NetCDF file given a bounding box
@@ -1123,7 +1122,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             ) for lat_var_name in lat_var_names
         ]
         chunks_dict = calculate_chunks(dataset)
-        print (lat_var_names)
+
         if chunks_dict:
             dataset = dataset.chunk(chunks_dict)
 
