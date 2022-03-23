@@ -778,7 +778,7 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
         Name of the latitude variable in the given dataset
     lon_var_name : str
         Name of the longitude variable in the given dataset
-    shapefile : np.array
+    shapefile : str
         Absolute path to the shapefile used to subset the given dataset
     cut : bool
         True if scanline should be cut.
@@ -1142,7 +1142,11 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             ]
             dataset = dataset.drop_vars(vars_to_drop)
 
-        if bbox is not None:
+        if shapefile:
+            datasets = [
+                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
+            ]
+        elif bbox is not None:
             datasets = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
@@ -1154,10 +1158,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 min_time=min_time,
                 max_time=max_time
             )
-        elif shapefile:
-            datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
-            ]
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
