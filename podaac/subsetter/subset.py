@@ -777,7 +777,7 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
         Name of the latitude variable in the given dataset
     lon_var_name : str
         Name of the longitude variable in the given dataset
-    shapefile : np.array
+    shapefile : str
         Absolute path to the shapefile used to subset the given dataset
     cut : bool
         True if scanline should be cut.
