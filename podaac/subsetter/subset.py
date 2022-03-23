@@ -1141,7 +1141,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
 
         if bbox is not None:
             variables = list(dataset.variables.keys())
-            print (variables)
             datasets = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
