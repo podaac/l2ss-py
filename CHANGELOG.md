@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed 
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+## [0.4.0]
+### Added
 - [issues/46](https://github.com/podaac/l2ss-py/issues/46). Flattening of h5py file.
 - [issues/39](https://github.com/podaac/l2ss-py/issues/39): Exposed shapefile subsetting capability to Harmony
 - [issues/58](https://github.com/podaac/l2ss-py/issues/58). Expand coordinates to accomodate OMI files 
