@@ -28,6 +28,7 @@ from os.path import dirname, join, realpath, isfile, basename
 import geopandas as gpd
 import importlib_metadata
 import netCDF4 as nc
+import h5py
 import numpy as np
 import pandas as pd
 import pytest
@@ -846,31 +847,6 @@ class TestSubsetter(unittest.TestCase):
         var_listout = list(out_nc.groups['Retrieval'].variables.keys())
         assert ('water_height' in var_listout)
 
-    def test_variable_subset_oco3(self):
-        """
-        multiple variable subset of variables in different groups in oco3
-        """
-
-        oco3_file_name = 'oco3_LtSIF_200226_B10206r_200709053505s.nc4'
-        output_file_name = 'oco3_test_out.nc'
-        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO3/OCO3_L2_LITE_SIF.EarlyR', oco3_file_name),
-                        os.path.join(self.subset_output_dir, oco3_file_name))
-        bbox = np.array(((-180,180),(-90.0,90)))
-        variables = ['/Science/IGBP_index', '/Offset/SIF_Relative_SDev_757nm','/Meteo/temperature_skin']
-        subset.subset(
-            file_to_subset=join(self.subset_output_dir, oco3_file_name),
-            bbox=bbox,
-            variables=variables,
-            output_file=join(self.subset_output_dir, output_file_name),
-        )
-        
-        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
-        var_listout =list(out_nc.groups['Science'].variables.keys())
-        var_listout.extend(list(out_nc.groups['Offset'].variables.keys()))
-        var_listout.extend(list(out_nc.groups['Meteo'].variables.keys()))
-        assert ('IGBP_index' in var_listout)
-        assert ('SIF_Relative_SDev_757nm' in var_listout)
-        assert ('temperature_skin' in var_listout)
 
     def test_variable_subset_s6(self):
         """
@@ -932,6 +908,7 @@ class TestSubsetter(unittest.TestCase):
             for g in path[1:-1]:
                 group = group[g]
             assert var_name.strip('__').split('__')[-1] in group.variables.keys()
+
 
     def test_group_subset(self):
         """
@@ -1307,7 +1284,7 @@ class TestSubsetter(unittest.TestCase):
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
 
-        sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326.nc'
+        sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
         shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
                         os.path.join(self.subset_output_dir, sndr_file_name))
 
@@ -1415,6 +1392,42 @@ class TestSubsetter(unittest.TestCase):
         in_nc = xr.open_dataset(join(self.test_data_dir, 'OCO2',oco2_file_name))
         out_nc = xr.open_dataset(join(self.subset_output_dir, output_file_name))
         assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
+
+    def test_transform_h5py_dataset(self):
+        """
+        Test that the transformation function results in a correctly
+        formatted dataset for h5py files
+        """
+        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
+                        os.path.join(self.subset_output_dir, OMI_file_name))
+
+        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name), 'r')
+
+        entry_lst = []
+        # Get root level objects
+        key_lst = list(h5_ds.keys())
+        
+        # Go through every level of the file to fill out the remaining objects
+        for entry_str in key_lst:
+            # If object is a group, add it to the loop list
+            if (isinstance(h5_ds[entry_str],h5py.Group)):
+                for group_keys in list(h5_ds[entry_str].keys()):
+                    if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
+                        entry_lst.append(entry_str + "/" + group_keys)
+                    key_lst.append(entry_str + "/" + group_keys)
+
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+
+        nc_vars_flattened = list(nc_dataset.variables.keys())
+        for i in range(len(entry_lst)): # go through all the datasets in h5py file
+            input_variable = '__'+entry_lst[i].replace('/', '__')
+            output_variable = nc_vars_flattened[i]
+            assert (input_variable == output_variable)
+
+        nc_dataset.close()
+        h5_ds.close()
+
 
     def test_variable_dims_matched_tropomi(self):
         """
@@ -1643,6 +1656,37 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert spatial_bounds is None
+
+    def test_get_time_OMI(self):
+        """
+        Test that code get time variables for OMI .he5 files"
+        """
+        omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', omi_file),
+                        os.path.join(self.subset_output_dir, omi_file))
+
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+
+            lat_var_names, lon_var_names = subset.get_coord_variable_names(dataset)
+            time_var_names = [
+                subset.get_time_variable_name(
+                    dataset, dataset[lat_var_name]
+                ) for lat_var_name in lat_var_names
+            ]
+            assert "Time" in time_var_names[0]
+            assert "Latitude" in lat_var_names[0]
 
     def test_empty_temporal_subset(self):
         """

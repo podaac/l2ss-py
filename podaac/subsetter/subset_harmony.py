@@ -122,9 +122,19 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             # Transform params to PO.DAAC subsetter arguments and invoke the subsetter
             harmony_bbox = [-180, -90, 180, 90]
+            shapefile_path = None
 
             if message.subset and message.subset.bbox:
                 harmony_bbox = message.subset.bbox
+
+            if message.subset and message.subset.shape:
+                shapefile_path = download(
+                    message.subset.shape.href,
+                    temp_dir,
+                    logger=self.logger,
+                    access_token=self.message.accessToken,
+                    cfg=self.config
+                )
 
             min_time = None
             max_time = None
@@ -139,14 +149,16 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 variables = [variable.name for variable in source.process('variables')]
 
             output_filename = f'{output_dir}/{os.path.basename(input_filename)}'
-            result_bbox = subset.subset(input_filename,
-                                        bbox,
-                                        output_filename,
-                                        variables=variables,
-                                        min_time=min_time,
-                                        max_time=max_time,
-                                        origin_source=origin_source
-                                        )
+            result_bbox = subset.subset(
+                input_filename,
+                bbox,
+                output_filename,
+                variables=variables,
+                min_time=min_time,
+                max_time=max_time,
+                origin_source=origin_source,
+                shapefile=shapefile_path
+            )
 
             # Stage the output file with a conventional filename
             mime = 'application/x-netcdf4'

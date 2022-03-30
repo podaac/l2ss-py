@@ -23,11 +23,13 @@ import functools
 import json
 import operator
 import os
+from shutil import copy
 
 import geopandas as gpd
 import importlib_metadata
 import julian
 import netCDF4 as nc
+import h5py
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -325,7 +327,7 @@ def get_coord_variable_names(dataset):
 
     def var_is_coord(var_name, possible_coord_names):
         var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-        return var_name in possible_coord_names
+        return var_name.lower() in possible_coord_names
 
     lat_coord_names = list(filter(
         lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
@@ -495,8 +497,9 @@ def get_time_variable_name(dataset, lat_var):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
-        if 'time' in var_name and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
+
     raise ValueError('Unable to determine time variable')
 
 
@@ -775,7 +778,7 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
         Name of the latitude variable in the given dataset
     lon_var_name : str
         Name of the longitude variable in the given dataset
-    shapefile : np.array
+    shapefile : str
         Absolute path to the shapefile used to subset the given dataset
     cut : bool
         True if scanline should be cut.
@@ -997,6 +1000,56 @@ def _rename_variables(dataset, base_dataset):
         var_group.variables[new_var_name][:] = variable.data
 
 
+def h5file_transform(finput):
+    """
+    Transform a h5py  Dataset that has groups to an xarray compatible
+    dataset. xarray does not work with groups, so this transformation
+    will flatten the variables in the dataset and use the group path as
+    the new variable name. For example, data_01 > km > sst would become
+    'data_01__km__sst', where GROUP_DELIM is __.
+
+    Returns
+    -------
+    nc.Dataset
+        netCDF4 Dataset that does not contain groups and that has been
+        flattened.
+    """
+    data_new = h5py.File(finput, 'r+')
+    del_group_list = list(data_new.keys())
+    has_groups = bool(data_new['/'])
+
+    def walk_h5py(data_new, group):
+        # flattens h5py file
+        for key, item in data_new[group].items():
+            group_path = f'{group}{key}'
+            if isinstance(item, h5py.Dataset):
+                new_var_name = group_path.replace('/', '__')
+
+                data_new[new_var_name] = data_new[group_path]
+                del data_new[group_path]
+
+            elif isinstance(item, h5py.Group):
+                if len(list(item.keys())) == 0:
+                    new_group_name = group_path.replace('/', '__')
+                    data_new[new_group_name] = data_new[group_path]
+
+                walk_h5py(data_new, data_new[group_path].name+'/')
+
+    walk_h5py(data_new, data_new.name)
+
+    for del_group in del_group_list:
+        del data_new[del_group]
+
+    finputnc = '.'.join(finput.split('.')[:-1])+'.nc'
+
+    data_new.close()  # close the h5py dataset
+    copy(finput, finputnc)  # copy to a nc file
+
+    nc_dataset = nc.Dataset(finputnc, mode='r')
+
+    return nc_dataset, has_groups
+
+
 def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):
     """
@@ -1032,15 +1085,19 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         subset to be performed. If this value is not provided, the
         granule will not be subset temporally on the upper bound.
     """
+    file_extension = file_to_subset.split('.')[-1]
 
-    # Open dataset with netCDF4 first, so we can get group info
-    nc_dataset = nc.Dataset(file_to_subset, mode='r')
+    if file_extension == 'he5':
+        nc_dataset, has_groups = h5file_transform(file_to_subset)
 
-    has_groups = bool(nc_dataset.groups)
+    else:
+        # Open dataset with netCDF4 first, so we can get group info
+        nc_dataset = nc.Dataset(file_to_subset, mode='r')
+        has_groups = bool(nc_dataset.groups)
 
-    # If dataset has groups, transform to work with xarray
-    if has_groups:
-        nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
+        # If dataset has groups, transform to work with xarray
+        if has_groups:
+            nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
@@ -1085,7 +1142,11 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             ]
             dataset = dataset.drop_vars(vars_to_drop)
 
-        if bbox is not None:
+        if shapefile:
+            datasets = [
+                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
+            ]
+        elif bbox is not None:
             datasets = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
@@ -1097,10 +1158,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 min_time=min_time,
                 max_time=max_time
             )
-        elif shapefile:
-            datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
-            ]
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
