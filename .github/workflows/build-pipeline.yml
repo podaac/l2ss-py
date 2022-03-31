@@ -105,8 +105,7 @@ jobs:
           command: monitor
           args: >
             --org=${{ secrets.SNYK_ORG_ID }}
-            --file=pyproject.toml
-            --package-manager=poetry
+            --project-name=${{ github.repository }}
       - name: Commit Version Bump
         # If building develop, a release branch, or main then we commit the version bump back to the repo
         if: |
