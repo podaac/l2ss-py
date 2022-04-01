@@ -8,10 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added Shapefile option to UMM-S entry
 ### Changed 
+- Updated dependency versions
 ### Deprecated 
 ### Removed
 ### Fixed
 ### Security
+- Changed CLI step in build action to use snyk monitor so that report is uploaded to SNYK podaac org
 
 ## [0.4.0]
 ### Added
