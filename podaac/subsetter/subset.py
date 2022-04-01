@@ -1113,7 +1113,12 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     if min_time or max_time:
         args['decode_times'] = True
 
-    with xr.open_dataset(
+    units = {}
+    for var in nc_dataset.variables:
+        if 'units' in nc_dataset.variables[var].__dict__:
+            units[var] = nc_dataset.variables[var].__dict__.get('units')
+
+    with xr.load_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
@@ -1180,12 +1185,12 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                         dim_size == 1 for dim_size in dataset.dims.values()):
                     encoding = {
                         var_name: {
-                            'units': nc_dataset.variables[var_name].__dict__['units'],
+                            'units': units[var_name],
                             'zlib': True,
                             "complevel": 5,
                             "_FillValue": None
                         } for var_name in time_var_names
-                        if 'units' in nc_dataset.variables[var_name].__dict__
+                        if var_name in units
                     }
 
                 for var in dataset.data_vars:
