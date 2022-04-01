@@ -256,14 +256,18 @@ def calculate_chunks(dataset):
 
     Returns
     -------
-    dict
+    dict or auto
         The chunk dictionary, where the key is the dimension and the
-        value is 4000.
+        value is 4000. If dict is empty return auto.
     """
-    chunk_dict = {dim: 4000 for dim in dataset.dims
-                  if dataset.dims[dim] > 4000
-                  and len(dataset.dims) > 1}
-    return chunk_dict
+    chunk = {dim: 4000 for dim in dataset.dims
+             if dataset.dims[dim] > 4000
+             and len(dataset.dims) > 1}
+
+    if not chunk:
+        chunk = "auto"
+
+    return chunk
 
 
 def find_matching_coords(dataset, match_list):
@@ -1113,12 +1117,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
     if min_time or max_time:
         args['decode_times'] = True
 
-    units = {}
-    for var in nc_dataset.variables:
-        if 'units' in nc_dataset.variables[var].__dict__:
-            units[var] = nc_dataset.variables[var].__dict__.get('units')
-
-    with xr.load_dataset(
+    with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
@@ -1129,10 +1128,9 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 dataset, dataset[lat_var_name]
             ) for lat_var_name in lat_var_names
         ]
-        chunks_dict = calculate_chunks(dataset)
 
-        if chunks_dict:
-            dataset = dataset.chunk(chunks_dict)
+        chunks = calculate_chunks(dataset)
+        dataset = dataset.chunk(chunks)
 
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
@@ -1185,12 +1183,12 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                         dim_size == 1 for dim_size in dataset.dims.values()):
                     encoding = {
                         var_name: {
-                            'units': units[var_name],
+                            'units': nc_dataset.variables[var_name].__dict__['units'],
                             'zlib': True,
                             "complevel": 5,
                             "_FillValue": None
                         } for var_name in time_var_names
-                        if var_name in units
+                        if 'units' in nc_dataset.variables[var_name].__dict__
                     }
 
                 for var in dataset.data_vars:
