@@ -258,14 +258,17 @@ def calculate_chunks(dataset):
     -------
     dict or auto
         The chunk dictionary, where the key is the dimension and the
-        value is 4000. If dict is empty return auto.
+        value is 4000. If dict is empty return auto if all dtype.hasobject
+        is false.
     """
     chunk = {dim: 4000 for dim in dataset.dims
              if dataset.dims[dim] > 4000
              and len(dataset.dims) > 1}
 
     if not chunk:
-        chunk = "auto"
+        dataset_dtypes_hasobject = [dataset.variables[var].dtype.hasobject for var in dataset.variables]
+        if not any(dataset_dtypes_hasobject):
+            chunk = "auto"
 
     return chunk
 
@@ -770,7 +773,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
     return datasets
 
 
-def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
+def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, chunks):
     """
     Subset an xarray Dataset using a shapefile
 
@@ -823,8 +826,12 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
         point_in_shapefile = shapefile_df.contains(point)
         return point_in_shapefile.array[0]
 
+    dask = "forbidden"
+    if chunks:
+        dask = "allowed"
+
     in_shape_vec = np.vectorize(in_shape)
-    boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name])
+    boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name], dask=dask)
     return xre.where(dataset, boolean_mask, cut)
 
 
@@ -1130,7 +1137,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         ]
 
         chunks = calculate_chunks(dataset)
-        dataset = dataset.chunk(chunks)
+        if chunks:
+            dataset = dataset.chunk(chunks)
 
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
@@ -1147,7 +1155,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
 
         if shapefile:
             datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
+                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
             ]
         elif bbox is not None:
             datasets = subset_with_bbox(

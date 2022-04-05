@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issues/72](https://github.com/podaac/l2ss-py/issues/72). Fix SMAP_RSS_L2_SSS_V4 subsetting, changed calculate chunk function.
 ### Security
 
 ## [0.4.0]
