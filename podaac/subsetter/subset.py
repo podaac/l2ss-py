@@ -256,19 +256,17 @@ def calculate_chunks(dataset):
 
     Returns
     -------
-    dict or auto
+    dict
         The chunk dictionary, where the key is the dimension and the
-        value is 4000. If dict is empty return auto if all dtype.hasobject
-        is false.
+        value is 4000 or 500 depending on how many dimensions.
     """
-    chunk = {dim: 4000 for dim in dataset.dims
-             if dataset.dims[dim] > 4000
-             and len(dataset.dims) > 1}
-
-    if not chunk:
-        dataset_dtypes_hasobject = [dataset.variables[var].dtype.hasobject for var in dataset.variables]
-        if not any(dataset_dtypes_hasobject):
-            chunk = "auto"
+    if len(dataset.dims) <= 3:
+        chunk = {dim: 4000 for dim in dataset.dims
+                 if dataset.dims[dim] > 4000
+                 and len(dataset.dims) > 1}
+    else:
+        chunk = {dim: 500 for dim in dataset.dims
+                 if dataset.dims[dim] > 500}
 
     return chunk
 
