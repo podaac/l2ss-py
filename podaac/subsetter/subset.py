@@ -341,28 +341,27 @@ def get_coord_variable_names(dataset):
         }
     }
 
-    with cfxr.set_options(custom_criteria=custom_criteria):
-        lat_coord_names = dataset.cf.coordinates.get('latitude', [])
-        lon_coord_names = dataset.cf.coordinates.get('longitude', [])
+    possible_lat_coord_names = ['lat', 'latitude', 'y']
+    possible_lon_coord_names = ['lon', 'longitude', 'x']
 
-    # lon and lat not found in coordinates so look in data variables
+    def var_is_coord(var_name, possible_coord_names):
+        var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
+        return var_name.lower() in possible_coord_names
+
+    lat_coord_names = list(filter(
+        lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
+    lon_coord_names = list(filter(
+        lambda var_name: var_is_coord(var_name, possible_lon_coord_names), dataset.variables))
+
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-
-        possible_lat_coord_names = ['lat', 'latitude', 'y']
-        possible_lon_coord_names = ['lon', 'longitude', 'x']
-
-        def var_is_coord(var_name, possible_coord_names):
-            var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-            return var_name.lower() in possible_coord_names
-
-        lat_coord_names = list(filter(
-            lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
-        lon_coord_names = list(filter(
-            lambda var_name: var_is_coord(var_name, possible_lon_coord_names), dataset.variables))
-
-        if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-            lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
-            lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
+        lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
+        lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
+    
+    # Couldn't find lon lat in data variables look in coordinates
+    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+        with cfxr.set_options(custom_criteria=custom_criteria):
+            lat_coord_names = dataset.cf.coordinates.get('latitude', [])
+            lon_coord_names = dataset.cf.coordinates.get('longitude', [])
 
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         raise ValueError('Could not determine coordinate variables')
