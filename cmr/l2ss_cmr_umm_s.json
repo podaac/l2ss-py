@@ -57,7 +57,18 @@
             "SpatialSubset": {
                 "BoundingBox": {
                     "AllowMultipleValues": false
-                }
+                },
+                "Shapefile": [
+                    {
+                        "Format": "ESRI"
+                    },
+                    {
+                        "Format": "KML"
+                    },
+                    {
+                        "Format": "GeoJSON"
+                    }
+                ]
             },
             "TemporalSubset": {
                 "AllowMultipleValues": false

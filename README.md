@@ -8,6 +8,9 @@ main: [![Main Build](https://github.com/podaac/l2ss-py/actions/workflows/build-p
 Harmony service for subsetting L2 data. l2ss-py supports:
 
 - Spatial subsetting
+    - Bounding box
+    - Shapefile subsetting
+    - GeoJSON subsetting
 - Temporal subsetting
 - Variable subsetting
 
@@ -63,12 +66,26 @@ optional arguments:
   --max-time MAX_TIME   Max time. Should be ISO-8601 format. Only include if
                         temporal subset is desired.
   --cut                 If provided, scanline will be cut
+  --shapefile SHAPEFILE
+                        Path to either shapefile or geojson file used to subset the provided input granule
 ```
 
 For example:
 
 ```
 l2ss-py /path/to/input.nc /path/to/output.nc --bbox -50 -10 50 10 --variables wind_speed wind_dir ice_age time --min-time '2015-07-02T09:00:00' --max-time '2015-07-02T10:00:00' --cut
+```
+
+An addition to providing a bounding box, spatial subsetting can be achieved by passing in a shapefile or a geojson file. 
+
+```shell script
+poetry run l2ss-py /path/to/input.nc /path/to/output.nc --shapefile /path/to/test.shp
+```
+
+or 
+
+```shell script
+poetry run l2ss-py /path/to/input.nc /path/to/output.nc --shapefile /path/to/test.geojson
 ```
 
 ### Running Harmony locally
