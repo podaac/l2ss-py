@@ -6,7 +6,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Added Shapefile option to UMM-S entry
+### Changed 
+- Updated dependency versions
+### Deprecated 
+### Removed
+### Fixed
+- [issues/72](https://github.com/podaac/l2ss-py/issues/72). Fix SMAP_RSS_L2_SSS_V4 subsetting, changed calculate chunk function.
+### Security
+- Changed CLI step in build action to use snyk monitor so that report is uploaded to SNYK podaac org
+
+## [0.4.0]
+### Added
 - [issues/46](https://github.com/podaac/l2ss-py/issues/46). Flattening of h5py file.
+- [issues/39](https://github.com/podaac/l2ss-py/issues/39): Exposed shapefile subsetting capability to Harmony
 - [issues/58](https://github.com/podaac/l2ss-py/issues/58). Expand coordinates to accomodate OMI files 
 	latitude variable in OMI has a capital L for Latitude that needs to be added to the list in 
 	get_coordinate_variable_names. 

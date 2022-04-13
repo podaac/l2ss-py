@@ -99,13 +99,13 @@ jobs:
             -Dsonar.python.version=3.7,3.8,3.9
       - name: Run Snyk on Python
         uses: snyk/actions/python-3.8@master
-        continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
+          command: monitor
           args: >
-            --severity-threshold=high
-            --sarif-file-output=python.sarif
+            --org=${{ secrets.SNYK_ORG_ID }}
+            --project-name=${{ github.repository }}
       - name: Commit Version Bump
         # If building develop, a release branch, or main then we commit the version bump back to the repo
         if: |

@@ -258,12 +258,17 @@ def calculate_chunks(dataset):
     -------
     dict
         The chunk dictionary, where the key is the dimension and the
-        value is 4000.
+        value is 4000 or 500 depending on how many dimensions.
     """
-    chunk_dict = {dim: 4000 for dim in dataset.dims
-                  if dataset.dims[dim] > 4000
-                  and len(dataset.dims) > 1}
-    return chunk_dict
+    if len(dataset.dims) <= 3:
+        chunk = {dim: 4000 for dim in dataset.dims
+                 if dataset.dims[dim] > 4000
+                 and len(dataset.dims) > 1}
+    else:
+        chunk = {dim: 500 for dim in dataset.dims
+                 if dataset.dims[dim] > 500}
+
+    return chunk
 
 
 def find_matching_coords(dataset, match_list):
@@ -768,7 +773,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
     return datasets
 
 
-def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
+def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, chunks):
     """
     Subset an xarray Dataset using a shapefile
 
@@ -780,7 +785,7 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
         Name of the latitude variable in the given dataset
     lon_var_name : str
         Name of the longitude variable in the given dataset
-    shapefile : np.array
+    shapefile : str
         Absolute path to the shapefile used to subset the given dataset
     cut : bool
         True if scanline should be cut.
@@ -821,8 +826,12 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
         point_in_shapefile = shapefile_df.contains(point)
         return point_in_shapefile.array[0]
 
+    dask = "forbidden"
+    if chunks:
+        dask = "allowed"
+
     in_shape_vec = np.vectorize(in_shape)
-    boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name])
+    boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name], dask=dask)
     return xre.where(dataset, boolean_mask, cut)
 
 
@@ -1121,10 +1130,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
                 dataset, dataset[lat_var_name]
             ) for lat_var_name in lat_var_names
         ]
-        chunks_dict = calculate_chunks(dataset)
 
-        if chunks_dict:
-            dataset = dataset.chunk(chunks_dict)
+        chunks = calculate_chunks(dataset)
+        if chunks:
+            dataset = dataset.chunk(chunks)
 
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
@@ -1141,7 +1150,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
 
         if shapefile:
             datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
+                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
             ]
         elif bbox is not None:
             datasets = subset_with_bbox(
