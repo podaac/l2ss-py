@@ -200,6 +200,7 @@ def where(dataset, cond, cut):
 
         if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
                 indexers.keys()).intersection(dataset[variable_name].dims):
+
             missing_dim = (indexers.keys() - dataset[variable_name].dims).pop()  # Assume only 1
             var_indexers = {
                 dim_name: dim_value for dim_name, dim_value in indexers.items()
@@ -209,7 +210,12 @@ def where(dataset, cond, cut):
             indexed_var = dataset[variable_name].isel(**var_indexers)
             new_dataset[variable_name] = indexed_var.where(var_cond)
             variable = new_dataset[variable_name]
+        elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
+                indexers.keys()).intersection(new_dataset[variable_name].dims):
+            new_dataset[variable_name] = indexed_var
 
+            new_dataset[variable_name].attrs = indexed_var.attrs
+            variable.attrs = indexed_var.attrs
         # Check if variable has no _FillValue. If so, use original data
         if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
 
@@ -240,12 +246,5 @@ def where(dataset, cond, cut):
                 new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
                                                             str(original_type), dask='allowed',
                                                             keep_attrs=True)
-
-            if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
-                    indexers.keys()).intersection(new_dataset[variable_name].dims):
-                new_dataset[variable_name] = indexed_var
-
-                new_dataset[variable_name].attrs = indexed_var.attrs
-                variable.attrs = indexed_var.attrs
 
     return new_dataset
