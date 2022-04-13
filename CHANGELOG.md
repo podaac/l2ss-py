@@ -23,12 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issues/58](https://github.com/podaac/l2ss-py/issues/58). Expand coordinates to accomodate OMI files 
 	latitude variable in OMI has a capital L for Latitude that needs to be added to the list in 
 	get_coordinate_variable_names. 
+
 ### Changed 
 ### Deprecated 
 ### Removed
 - Remove OCO3 test. Get_coordinate_variables passed OMI and fails OCO3 because OCO3 has a multiple Latitude variable. Subset with bbox method is not
 	applied properly to OCO3. Further manipulating will need to be done - OMI is a higher priority.
 ### Fixed
+- [issues/61](https://github.com/podaac/l2ss-py/issues/61). Variables without dimensions should be included in the output subset. Previous code was
+	adding dimension to variables in tropomi and SNDR as well as not have enough memory to {SCALAR} dimensions.
 ### Security
 
 ## [1.3.1]

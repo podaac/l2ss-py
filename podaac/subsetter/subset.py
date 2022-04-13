@@ -755,6 +755,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -766,6 +767,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
             temporal_cond,
             cut
         )
+
         datasets.append(group_dataset)
 
     return datasets
@@ -973,12 +975,6 @@ def _rename_variables(dataset, base_dataset):
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
-        if not var_dims:
-            var_group_parent = var_group
-            # This group doesn't contain dimensions. Look at parent group to find dimensions.
-            while not var_dims:
-                var_group_parent = var_group_parent.parent
-                var_dims = list(var_group_parent.dimensions.keys())
 
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
@@ -993,13 +989,14 @@ def _rename_variables(dataset, base_dataset):
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
+        comp_args = {"zlib": True, "complevel": 1}
 
         if variable.dtype == object:
-            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
+            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value, **comp_args)
         elif variable.dtype == 'timedelta64[ns]':
-            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value)
+            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
         else:
-            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
+            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value, **comp_args)
 
         # Copy attributes
         var_group.variables[new_var_name].setncatts(var_attrs)
@@ -1059,7 +1056,7 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
-def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
+def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):
     """
     Subset a given NetCDF file given a bounding box
@@ -1171,10 +1168,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             raise ValueError('Either bbox or shapefile must be provided')
 
         spatial_bounds = []
+
         for dataset in datasets:
             set_version_history(dataset, cut, bbox, shapefile)
             set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)
-
             if has_groups:
                 spatial_bounds.append(get_spatial_bounds(
                     dataset=dataset,
