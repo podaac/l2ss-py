@@ -39,6 +39,7 @@ from shapely.geometry import Point
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import dimension_cleanup as dc
 
 
 class TestSubsetter(unittest.TestCase):
@@ -1263,23 +1264,26 @@ class TestSubsetter(unittest.TestCase):
         these files have variables with duplicate dimensions
         """
         SNDR_dir = join(self.test_data_dir, 'SNDR')
-        sndr_files = [f for f in listdir(SNDR_dir)
-                          if isfile(join(SNDR_dir, f)) and f.endswith(".nc")]
+        sndr_file = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
 
         bbox = np.array(((-180, 90), (-90, 90)))
-        for file in sndr_files:
-            output_file = "{}_{}".format(self._testMethodName, file)
-            shutil.copyfile(
-                os.path.join(SNDR_dir, file),
-                os.path.join(self.subset_output_dir, file)
-            )
-            box_test = subset.subset(
-                file_to_subset=join(self.subset_output_dir, file),
-                bbox=bbox,
-                output_file=join(self.subset_output_dir, output_file),
-            )
-            # check if the box_test is
-            assert len(box_test)==2
+        output_file = "{}_{}".format(self._testMethodName, sndr_file)
+        shutil.copyfile(
+            os.path.join(SNDR_dir, sndr_file),
+            os.path.join(self.subset_output_dir, sndr_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, sndr_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(SNDR_dir, sndr_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.variables.items():
+            assert in_nc[var_name].shape == out_nc[var_name].shape
 
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
@@ -1687,6 +1691,7 @@ class TestSubsetter(unittest.TestCase):
             ]
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
+
 
     def test_empty_temporal_subset(self):
         """
