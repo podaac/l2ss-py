@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Fixed
 - [issues/72](https://github.com/podaac/l2ss-py/issues/72). Fix SMAP_RSS_L2_SSS_V4 subsetting, changed calculate chunk function.
+- [issues/9](https://github.com/podaac/l2ss-py/issues/9). Determinate coordinate variables using cf_xarray.
 ### Security
 - Changed CLI step in build action to use snyk monitor so that report is uploaded to SNYK podaac org
 
@@ -32,7 +33,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - [issues/61](https://github.com/podaac/l2ss-py/issues/61). Variables without dimensions should be included in the output subset. Previous code was
 	adding dimension to variables in tropomi and SNDR as well as not have enough memory to {SCALAR} dimensions.
-### Security
 
 ## [1.3.1]
 ### Added

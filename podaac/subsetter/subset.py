@@ -25,6 +25,7 @@ import operator
 import os
 from shutil import copy
 
+import cf_xarray as cfxr
 import geopandas as gpd
 import importlib_metadata
 import julian
@@ -327,6 +328,19 @@ def get_coord_variable_names(dataset):
         Tuple of strings, where the first element is the lat coordinate
         name and the second element is the lon coordinate name
     """
+
+    dataset = xr.decode_cf(dataset)
+
+    # look for lon and lat using standard name in coordinates and axes
+    custom_criteria = {
+        "latitude": {
+            "standard_name": "latitude|projection_y_coordinate",
+        },
+        "longitude": {
+            "standard_name": "longitude|projection_x_coordinate",
+        }
+    }
+
     possible_lat_coord_names = ['lat', 'latitude', 'y']
     possible_lon_coord_names = ['lon', 'longitude', 'x']
 
@@ -342,6 +356,12 @@ def get_coord_variable_names(dataset):
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
         lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
+    
+    # Couldn't find lon lat in data variables look in coordinates
+    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+        with cfxr.set_options(custom_criteria=custom_criteria):
+            lat_coord_names = dataset.cf.coordinates.get('latitude', [])
+            lon_coord_names = dataset.cf.coordinates.get('longitude', [])
 
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         raise ValueError('Could not determine coordinate variables')

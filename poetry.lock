@@ -155,6 +155,19 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "cf-xarray"
+version = "0.7.0"
+description = "A lightweight convenience wrapper for using CF attributes on xarray objects"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+numpy = ">=1.15"
+pandas = ">=0.25"
+xarray = "*"
+
+[[package]]
 name = "cffi"
 version = "1.15.0"
 description = "Foreign Function Interface for Python calling C code."
@@ -1626,7 +1639,7 @@ harmony = ["harmony-service-lib", "pystac"]
 [metadata]
 lock-version = "1.1"
 python-versions = ">=3.7,<4.0"
-content-hash = "b2535c5fd018f8fa70bba9f05ea077596a40afcdbd9dce2d3a2687f2154032dd"
+content-hash = "bb9ef7e4160f540c6089f707a2d3e32d468203583b2377ca846b936e566b88e1"
 
 [metadata.files]
 alabaster = [
@@ -1681,6 +1694,10 @@ cached-property = [
 certifi = [
     {file = "certifi-2021.10.8-py2.py3-none-any.whl", hash = "sha256:d62a0163eb4c2344ac042ab2bdf75399a71a2d8c7d47eac2e2ee91b9d6339569"},
     {file = "certifi-2021.10.8.tar.gz", hash = "sha256:78884e7c1d4b00ce3cea67b44566851c4343c120abd683433ce934a68ea58872"},
+]
+cf-xarray = [
+    {file = "cf_xarray-0.7.0-py3-none-any.whl", hash = "sha256:123aec3ccd8077cb5f468d0d84376a65791bc26509a6c6edc7c34504827ee764"},
+    {file = "cf_xarray-0.7.0.tar.gz", hash = "sha256:8afc7cd55d2de8aa80605fbd27a7bb90db013f7b13e261d7ff36072c9edec7f5"},
 ]
 cffi = [
     {file = "cffi-1.15.0-cp27-cp27m-macosx_10_9_x86_64.whl", hash = "sha256:c2502a1a03b6312837279c8c1bd3ebedf6c12c4228ddbad40912d671ccc8a962"},
