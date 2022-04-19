@@ -27,18 +27,18 @@ from shutil import copy
 
 import cf_xarray as cfxr
 import geopandas as gpd
+import h5py
 import importlib_metadata
 import julian
 import netCDF4 as nc
-import h5py
 import numpy as np
 import pandas as pd
 import xarray as xr
 from shapely.geometry import Point
 from shapely.ops import transform
 
-from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter import dimension_cleanup as dc
+from podaac.subsetter import xarray_enhancements as xre
 
 GROUP_DELIM = '__'
 SERVICE_NAME = 'l2ss-py'
@@ -356,7 +356,7 @@ def get_coord_variable_names(dataset):
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
         lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
-    
+
     # Couldn't find lon lat in data variables look in coordinates
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         with cfxr.set_options(custom_criteria=custom_criteria):
@@ -751,10 +751,11 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
 
-    lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
+    lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in
+                      lat_var_names]
     datasets = []
     for lat_var_name, lon_var_name, time_var_name in zip(
-        lat_var_names, lon_var_names, time_var_names
+            lat_var_names, lon_var_names, time_var_names
     ):
         if GROUP_DELIM in lat_var_name:
             var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
@@ -1059,14 +1060,14 @@ def h5file_transform(finput):
                     new_group_name = group_path.replace('/', '__')
                     data_new[new_group_name] = data_new[group_path]
 
-                walk_h5py(data_new, data_new[group_path].name+'/')
+                walk_h5py(data_new, data_new[group_path].name + '/')
 
     walk_h5py(data_new, data_new.name)
 
     for del_group in del_group_list:
         del data_new[del_group]
 
-    finputnc = '.'.join(finput.split('.')[:-1])+'.nc'
+    finputnc = '.'.join(finput.split('.')[:-1]) + '.nc'
 
     data_new.close()  # close the h5py dataset
     copy(finput, finputnc)  # copy to a nc file
@@ -1076,7 +1077,8 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
-def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches, disable=too-many-statements
+def subset(file_to_subset, bbox, output_file, variables=None,
+           # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):
     """
     Subset a given NetCDF file given a bounding box
