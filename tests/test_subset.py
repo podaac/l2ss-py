@@ -1723,3 +1723,63 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert all(dim_size == 1 for dim_size in ds.dims.values())
+
+    def test_passed_coords(self):
+        """
+        Ensure the coordinates passed in to the subsetter are
+        utilized and not manually calculated.
+        """
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+
+        dataset = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        dummy_lats = ['dummy_lat']
+        dummy_lons = ['dummy_lon']
+        dummy_times = ['dummy_time']
+
+        actual_lats = ['lat']
+        actual_lons = ['lon']
+        actual_times = ['time']
+
+        # When none are passed in, variables are computed manually
+        lats, lons, times = subset.get_coord_vars(
+            dataset,
+            lat_var_names=None,
+            lon_var_names=None,
+            time_var_names=None
+        )
+
+        assert lats == actual_lats
+        assert lons == actual_lons
+        assert times == actual_times
+
+        # When lats or lons are passed in, only time is computed manually
+        # This case is a bit different because the lat values are used to
+        # compute the time variable so we can't pass in dummy values.
+
+        lats, lons, times = subset.get_coord_vars(
+            dataset,
+            lat_var_names=actual_lats,
+            lon_var_names=dummy_lons,
+            time_var_names=None
+        )
+
+        assert lats == actual_lats
+        assert lons == dummy_lons
+        assert times == actual_times
+
+        # When only time is passed in, lats and lons are computed manually
+
+        # When time, lats, and lons are passed in, nothing is computed manually
+        lats, lons, times = subset.get_coord_vars(
+            dataset,
+            lat_var_names=None,
+            lon_var_names=None,
+            time_var_names=dummy_times
+        )
+
+        assert lats == actual_lats
+        assert lons == actual_lons
+        assert times == dummy_times
