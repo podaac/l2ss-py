@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>podaac.subsetter.run_subsetter &mdash; l2ss-py 1.4.0a12 documentation</title>
+  <title>podaac.subsetter.run_subsetter &mdash; l2ss-py 1.5.0a10 documentation</title>
   
 
   
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.4.0a12
+                1.5.0a10
               </div>
             
           
@@ -227,19 +227,26 @@
         <span class="n">action</span><span class="o">=</span><span class="s1">&#39;store_true&#39;</span><span class="p">,</span>
         <span class="n">help</span><span class="o">=</span><span class="s1">&#39;If provided, scanline will be cut&#39;</span>
     <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s1">&#39;--shapefile&#39;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s1">&#39;Path to either shapefile or geojson file used to subset &#39;</span>
+             <span class="s1">&#39;the provided input granule&#39;</span>
+    <span class="p">)</span>
 
     <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="o">=</span><span class="n">args</span><span class="p">)</span>
     <span class="n">bbox</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">args</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">args</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="mi">2</span><span class="p">]],</span> <span class="p">[</span><span class="n">args</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">args</span><span class="o">.</span><span class="n">bbox</span><span class="p">[</span><span class="mi">3</span><span class="p">]]])</span>
 
     <span class="k">return</span> <span class="n">args</span><span class="o">.</span><span class="n">input_file</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">output_file</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">variables</span><span class="p">,</span> \
-        <span class="n">args</span><span class="o">.</span><span class="n">min_time</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">max_time</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">cut</span></div>
+        <span class="n">args</span><span class="o">.</span><span class="n">min_time</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">max_time</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">cut</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">shapefile</span></div>
 
 
 <div class="viewcode-block" id="run_subsetter"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.run_subsetter.run_subsetter">[docs]</a><span class="k">def</span> <span class="nf">run_subsetter</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Parse arguments and run subsetter on the specified input file</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">input_file</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">variables</span><span class="p">,</span> <span class="n">min_time</span><span class="p">,</span> <span class="n">max_time</span><span class="p">,</span> <span class="n">cut</span> <span class="o">=</span> <span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+    <span class="n">input_file</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">variables</span><span class="p">,</span> <span class="n">min_time</span><span class="p">,</span> <span class="n">max_time</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">shapefile</span> <span class="o">=</span> <span class="n">parse_args</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
 
     <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Executing subset on </span><span class="si">%s</span><span class="s1">...&#39;</span><span class="p">,</span> <span class="n">input_file</span><span class="p">)</span>
     <span class="n">subset</span><span class="o">.</span><span class="n">subset</span><span class="p">(</span>
@@ -250,7 +257,8 @@
         <span class="n">cut</span><span class="o">=</span><span class="n">cut</span><span class="p">,</span>
         <span class="n">min_time</span><span class="o">=</span><span class="n">min_time</span><span class="p">,</span>
         <span class="n">max_time</span><span class="o">=</span><span class="n">max_time</span><span class="p">,</span>
-        <span class="n">origin_source</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">input_file</span><span class="p">)</span>
+        <span class="n">origin_source</span><span class="o">=</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">input_file</span><span class="p">),</span>
+        <span class="n">shapefile</span><span class="o">=</span><span class="n">shapefile</span>
     <span class="p">)</span>
     <span class="n">logging</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s1">&#39;Subset complete. Result in </span><span class="si">%s</span><span class="s1">&#39;</span><span class="p">,</span> <span class="n">output_file</span><span class="p">)</span></div>
 

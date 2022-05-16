@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>podaac.subsetter.xarray_enhancements &mdash; l2ss-py 1.4.0a12 documentation</title>
+  <title>podaac.subsetter.xarray_enhancements &mdash; l2ss-py 1.5.0a10 documentation</title>
   
 
   
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.4.0a12
+                1.5.0a10
               </div>
             
           
@@ -357,6 +357,7 @@
 
         <span class="k">if</span> <span class="n">partial_dim_in_in_vars</span> <span class="ow">and</span> <span class="p">(</span><span class="n">indexers</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">-</span> <span class="n">dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">set</span><span class="p">(</span>
                 <span class="n">indexers</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">):</span>
+
             <span class="n">missing_dim</span> <span class="o">=</span> <span class="p">(</span><span class="n">indexers</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">-</span> <span class="n">dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span><span class="o">.</span><span class="n">pop</span><span class="p">()</span>  <span class="c1"># Assume only 1</span>
             <span class="n">var_indexers</span> <span class="o">=</span> <span class="p">{</span>
                 <span class="n">dim_name</span><span class="p">:</span> <span class="n">dim_value</span> <span class="k">for</span> <span class="n">dim_name</span><span class="p">,</span> <span class="n">dim_value</span> <span class="ow">in</span> <span class="n">indexers</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
@@ -366,9 +367,14 @@
             <span class="n">indexed_var</span> <span class="o">=</span> <span class="n">dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">isel</span><span class="p">(</span><span class="o">**</span><span class="n">var_indexers</span><span class="p">)</span>
             <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">indexed_var</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">var_cond</span><span class="p">)</span>
             <span class="n">variable</span> <span class="o">=</span> <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span>
+        <span class="k">elif</span> <span class="n">partial_dim_in_in_vars</span> <span class="ow">and</span> <span class="p">(</span><span class="n">indexers</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span> <span class="o">-</span> <span class="n">dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">set</span><span class="p">(</span>
+                <span class="n">indexers</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="o">.</span><span class="n">intersection</span><span class="p">(</span><span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">):</span>
+            <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">indexed_var</span>
 
+            <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">attrs</span> <span class="o">=</span> <span class="n">indexed_var</span><span class="o">.</span><span class="n">attrs</span>
+            <span class="n">variable</span><span class="o">.</span><span class="n">attrs</span> <span class="o">=</span> <span class="n">indexed_var</span><span class="o">.</span><span class="n">attrs</span>
         <span class="c1"># Check if variable has no _FillValue. If so, use original data</span>
-        <span class="k">if</span> <span class="s1">&#39;_FillValue&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">variable</span><span class="o">.</span><span class="n">attrs</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s1">&#39;_FillValue&#39;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">variable</span><span class="o">.</span><span class="n">attrs</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">indexed_var</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
 
             <span class="k">if</span> <span class="n">original_type</span> <span class="o">!=</span> <span class="n">new_type</span><span class="p">:</span>
                 <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">apply_ufunc</span><span class="p">(</span><span class="n">cast_type</span><span class="p">,</span> <span class="n">variable</span><span class="p">,</span>
@@ -390,11 +396,9 @@
             <span class="c1"># Manually replace nans with FillValue</span>
             <span class="c1"># If variable represents time, cast _FillValue to datetime</span>
             <span class="n">fill_value</span> <span class="o">=</span> <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;_FillValue&#39;</span><span class="p">)</span>
-
             <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span><span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">datetime64</span><span class="p">)):</span>
                 <span class="n">fill_value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">datetime64</span><span class="p">(</span><span class="s1">&#39;nat&#39;</span><span class="p">)</span>
             <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span><span class="o">.</span><span class="n">fillna</span><span class="p">(</span><span class="n">fill_value</span><span class="p">)</span>
-
             <span class="k">if</span> <span class="n">original_type</span> <span class="o">!=</span> <span class="n">new_type</span><span class="p">:</span>
                 <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">apply_ufunc</span><span class="p">(</span><span class="n">cast_type</span><span class="p">,</span> <span class="n">new_dataset</span><span class="p">[</span><span class="n">variable_name</span><span class="p">],</span>
                                                             <span class="nb">str</span><span class="p">(</span><span class="n">original_type</span><span class="p">),</span> <span class="n">dask</span><span class="o">=</span><span class="s1">&#39;allowed&#39;</span><span class="p">,</span>

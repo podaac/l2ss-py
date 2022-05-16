@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>podaac.subsetter.subset_harmony &mdash; l2ss-py 1.4.0a12 documentation</title>
+  <title>podaac.subsetter.subset_harmony &mdash; l2ss-py 1.5.0a10 documentation</title>
   
 
   
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.4.0a12
+                1.5.0a10
               </div>
             
           
@@ -279,9 +279,19 @@
 
             <span class="c1"># Transform params to PO.DAAC subsetter arguments and invoke the subsetter</span>
             <span class="n">harmony_bbox</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mi">180</span><span class="p">,</span> <span class="o">-</span><span class="mi">90</span><span class="p">,</span> <span class="mi">180</span><span class="p">,</span> <span class="mi">90</span><span class="p">]</span>
+            <span class="n">shapefile_path</span> <span class="o">=</span> <span class="kc">None</span>
 
             <span class="k">if</span> <span class="n">message</span><span class="o">.</span><span class="n">subset</span> <span class="ow">and</span> <span class="n">message</span><span class="o">.</span><span class="n">subset</span><span class="o">.</span><span class="n">bbox</span><span class="p">:</span>
                 <span class="n">harmony_bbox</span> <span class="o">=</span> <span class="n">message</span><span class="o">.</span><span class="n">subset</span><span class="o">.</span><span class="n">bbox</span>
+
+            <span class="k">if</span> <span class="n">message</span><span class="o">.</span><span class="n">subset</span> <span class="ow">and</span> <span class="n">message</span><span class="o">.</span><span class="n">subset</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+                <span class="n">shapefile_path</span> <span class="o">=</span> <span class="n">download</span><span class="p">(</span>
+                    <span class="n">message</span><span class="o">.</span><span class="n">subset</span><span class="o">.</span><span class="n">shape</span><span class="o">.</span><span class="n">href</span><span class="p">,</span>
+                    <span class="n">temp_dir</span><span class="p">,</span>
+                    <span class="n">logger</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">logger</span><span class="p">,</span>
+                    <span class="n">access_token</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="o">.</span><span class="n">accessToken</span><span class="p">,</span>
+                    <span class="n">cfg</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">config</span>
+                <span class="p">)</span>
 
             <span class="n">min_time</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="n">max_time</span> <span class="o">=</span> <span class="kc">None</span>
@@ -296,14 +306,16 @@
                 <span class="n">variables</span> <span class="o">=</span> <span class="p">[</span><span class="n">variable</span><span class="o">.</span><span class="n">name</span> <span class="k">for</span> <span class="n">variable</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">process</span><span class="p">(</span><span class="s1">&#39;variables&#39;</span><span class="p">)]</span>
 
             <span class="n">output_filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">output_dir</span><span class="si">}</span><span class="s1">/</span><span class="si">{</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">input_filename</span><span class="p">)</span><span class="si">}</span><span class="s1">&#39;</span>
-            <span class="n">result_bbox</span> <span class="o">=</span> <span class="n">subset</span><span class="o">.</span><span class="n">subset</span><span class="p">(</span><span class="n">input_filename</span><span class="p">,</span>
-                                        <span class="n">bbox</span><span class="p">,</span>
-                                        <span class="n">output_filename</span><span class="p">,</span>
-                                        <span class="n">variables</span><span class="o">=</span><span class="n">variables</span><span class="p">,</span>
-                                        <span class="n">min_time</span><span class="o">=</span><span class="n">min_time</span><span class="p">,</span>
-                                        <span class="n">max_time</span><span class="o">=</span><span class="n">max_time</span><span class="p">,</span>
-                                        <span class="n">origin_source</span><span class="o">=</span><span class="n">origin_source</span>
-                                        <span class="p">)</span>
+            <span class="n">result_bbox</span> <span class="o">=</span> <span class="n">subset</span><span class="o">.</span><span class="n">subset</span><span class="p">(</span>
+                <span class="n">input_filename</span><span class="p">,</span>
+                <span class="n">bbox</span><span class="p">,</span>
+                <span class="n">output_filename</span><span class="p">,</span>
+                <span class="n">variables</span><span class="o">=</span><span class="n">variables</span><span class="p">,</span>
+                <span class="n">min_time</span><span class="o">=</span><span class="n">min_time</span><span class="p">,</span>
+                <span class="n">max_time</span><span class="o">=</span><span class="n">max_time</span><span class="p">,</span>
+                <span class="n">origin_source</span><span class="o">=</span><span class="n">origin_source</span><span class="p">,</span>
+                <span class="n">shapefile</span><span class="o">=</span><span class="n">shapefile_path</span>
+            <span class="p">)</span>
 
             <span class="c1"># Stage the output file with a conventional filename</span>
             <span class="n">mime</span> <span class="o">=</span> <span class="s1">&#39;application/x-netcdf4&#39;</span>

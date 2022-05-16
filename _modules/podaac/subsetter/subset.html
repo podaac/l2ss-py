@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>podaac.subsetter.subset &mdash; l2ss-py 1.4.0a12 documentation</title>
+  <title>podaac.subsetter.subset &mdash; l2ss-py 1.5.0a10 documentation</title>
   
 
   
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.4.0a12
+                1.5.0a10
               </div>
             
           
@@ -182,20 +182,20 @@
 <span class="kn">import</span> <span class="nn">os</span>
 <span class="kn">from</span> <span class="nn">shutil</span> <span class="kn">import</span> <span class="n">copy</span>
 
-<span class="kn">import</span> <span class="nn">cf_xarray</span> <span class="k">as</span> <span class="nn">cfxr</span>  <span class="c1"># noqa pylint: disable=unused-import</span>
+<span class="kn">import</span> <span class="nn">cf_xarray</span> <span class="k">as</span> <span class="nn">cfxr</span>
 <span class="kn">import</span> <span class="nn">geopandas</span> <span class="k">as</span> <span class="nn">gpd</span>
+<span class="kn">import</span> <span class="nn">h5py</span>
 <span class="kn">import</span> <span class="nn">importlib_metadata</span>
 <span class="kn">import</span> <span class="nn">julian</span>
 <span class="kn">import</span> <span class="nn">netCDF4</span> <span class="k">as</span> <span class="nn">nc</span>
-<span class="kn">import</span> <span class="nn">h5py</span>
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 <span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span>
 <span class="kn">import</span> <span class="nn">xarray</span> <span class="k">as</span> <span class="nn">xr</span>
 <span class="kn">from</span> <span class="nn">shapely.geometry</span> <span class="kn">import</span> <span class="n">Point</span>
 <span class="kn">from</span> <span class="nn">shapely.ops</span> <span class="kn">import</span> <span class="n">transform</span>
 
-<span class="kn">from</span> <span class="nn">podaac.subsetter</span> <span class="kn">import</span> <span class="n">xarray_enhancements</span> <span class="k">as</span> <span class="n">xre</span>
 <span class="kn">from</span> <span class="nn">podaac.subsetter</span> <span class="kn">import</span> <span class="n">dimension_cleanup</span> <span class="k">as</span> <span class="n">dc</span>
+<span class="kn">from</span> <span class="nn">podaac.subsetter</span> <span class="kn">import</span> <span class="n">xarray_enhancements</span> <span class="k">as</span> <span class="n">xre</span>
 
 <span class="n">GROUP_DELIM</span> <span class="o">=</span> <span class="s1">&#39;__&#39;</span>
 <span class="n">SERVICE_NAME</span> <span class="o">=</span> <span class="s1">&#39;l2ss-py&#39;</span>
@@ -416,12 +416,17 @@
 <span class="sd">    -------</span>
 <span class="sd">    dict</span>
 <span class="sd">        The chunk dictionary, where the key is the dimension and the</span>
-<span class="sd">        value is 4000.</span>
+<span class="sd">        value is 4000 or 500 depending on how many dimensions.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">chunk_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="mi">4000</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dims</span>
-                  <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dims</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">4000</span>
-                  <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">}</span>
-    <span class="k">return</span> <span class="n">chunk_dict</span></div>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="mi">4000</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dims</span>
+                 <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dims</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">4000</span>
+                 <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">dims</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">chunk</span> <span class="o">=</span> <span class="p">{</span><span class="n">dim</span><span class="p">:</span> <span class="mi">500</span> <span class="k">for</span> <span class="n">dim</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dims</span>
+                 <span class="k">if</span> <span class="n">dataset</span><span class="o">.</span><span class="n">dims</span><span class="p">[</span><span class="n">dim</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">500</span><span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">chunk</span></div>
 
 
 <div class="viewcode-block" id="find_matching_coords"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.find_matching_coords">[docs]</a><span class="k">def</span> <span class="nf">find_matching_coords</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">match_list</span><span class="p">):</span>
@@ -481,15 +486,24 @@
 <span class="sd">        name and the second element is the lon coordinate name</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">possible_lat_coord_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;lat&#39;</span><span class="p">,</span> <span class="s1">&#39;latitude&#39;</span><span class="p">,</span> <span class="s1">&#39;y&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cf</span><span class="o">.</span><span class="n">coordinates</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;latitude&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="o">+</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cf</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;Y&#39;</span><span class="p">,</span> <span class="p">[])</span>
-    <span class="n">possible_lon_coord_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;lon&#39;</span><span class="p">,</span> <span class="s1">&#39;longitude&#39;</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cf</span><span class="o">.</span><span class="n">coordinates</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;longitude&#39;</span><span class="p">,</span> <span class="p">[])</span> <span class="o">+</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cf</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;X&#39;</span><span class="p">,</span> <span class="p">[])</span>
+    <span class="n">dataset</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">decode_cf</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
 
-    <span class="n">possible_lat_coord_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">possible_lat_coord_names</span><span class="p">))</span>
-    <span class="n">possible_lon_coord_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">set</span><span class="p">(</span><span class="n">possible_lon_coord_names</span><span class="p">))</span>
+    <span class="c1"># look for lon and lat using standard name in coordinates and axes</span>
+    <span class="n">custom_criteria</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;latitude&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;standard_name&quot;</span><span class="p">:</span> <span class="s2">&quot;latitude|projection_y_coordinate&quot;</span><span class="p">,</span>
+        <span class="p">},</span>
+        <span class="s2">&quot;longitude&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;standard_name&quot;</span><span class="p">:</span> <span class="s2">&quot;longitude|projection_x_coordinate&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">}</span>
+
+    <span class="n">possible_lat_coord_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;lat&#39;</span><span class="p">,</span> <span class="s1">&#39;latitude&#39;</span><span class="p">,</span> <span class="s1">&#39;y&#39;</span><span class="p">]</span>
+    <span class="n">possible_lon_coord_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;lon&#39;</span><span class="p">,</span> <span class="s1">&#39;longitude&#39;</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">var_is_coord</span><span class="p">(</span><span class="n">var_name</span><span class="p">,</span> <span class="n">possible_coord_names</span><span class="p">):</span>
         <span class="n">var_name</span> <span class="o">=</span> <span class="n">var_name</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="n">possible_coord_names</span>
+        <span class="k">return</span> <span class="n">var_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">in</span> <span class="n">possible_coord_names</span>
 
     <span class="n">lat_coord_names</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span>
         <span class="k">lambda</span> <span class="n">var_name</span><span class="p">:</span> <span class="n">var_is_coord</span><span class="p">(</span><span class="n">var_name</span><span class="p">,</span> <span class="n">possible_lat_coord_names</span><span class="p">),</span> <span class="n">dataset</span><span class="o">.</span><span class="n">variables</span><span class="p">))</span>
@@ -499,6 +513,12 @@
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lat_coord_names</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">lon_coord_names</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="n">lat_coord_names</span> <span class="o">=</span> <span class="n">find_matching_coords</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">possible_lat_coord_names</span><span class="p">)</span>
         <span class="n">lon_coord_names</span> <span class="o">=</span> <span class="n">find_matching_coords</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">possible_lon_coord_names</span><span class="p">)</span>
+
+    <span class="c1"># Couldn&#39;t find lon lat in data variables look in coordinates</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lat_coord_names</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">lon_coord_names</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">cfxr</span><span class="o">.</span><span class="n">set_options</span><span class="p">(</span><span class="n">custom_criteria</span><span class="o">=</span><span class="n">custom_criteria</span><span class="p">):</span>
+            <span class="n">lat_coord_names</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cf</span><span class="o">.</span><span class="n">coordinates</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;latitude&#39;</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="n">lon_coord_names</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">cf</span><span class="o">.</span><span class="n">coordinates</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;longitude&#39;</span><span class="p">,</span> <span class="p">[])</span>
 
     <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">lat_coord_names</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">lon_coord_names</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Could not determine coordinate variables&#39;</span><span class="p">)</span>
@@ -659,8 +679,9 @@
         <span class="k">if</span> <span class="s2">&quot;time&quot;</span> <span class="ow">in</span> <span class="n">var_name</span> <span class="ow">and</span> <span class="n">dataset</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">dims</span> <span class="o">==</span> <span class="n">lat_var</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">dims</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">var_name</span>
     <span class="k">for</span> <span class="n">var_name</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">data_vars</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
-        <span class="k">if</span> <span class="s1">&#39;time&#39;</span> <span class="ow">in</span> <span class="n">var_name</span> <span class="ow">and</span> <span class="n">dataset</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">dims</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">lat_var</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">dims</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s1">&#39;time&#39;</span> <span class="ow">in</span> <span class="n">var_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="ow">and</span> <span class="n">dataset</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">dims</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="ow">in</span> <span class="n">lat_var</span><span class="o">.</span><span class="n">squeeze</span><span class="p">()</span><span class="o">.</span><span class="n">dims</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">var_name</span>
+
     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Unable to determine time variable&#39;</span><span class="p">)</span></div>
 
 
@@ -887,10 +908,11 @@
     <span class="k">if</span> <span class="n">lon_bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">lon_bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">]:</span>
         <span class="n">oper</span> <span class="o">=</span> <span class="n">operator</span><span class="o">.</span><span class="n">or_</span>
 
-    <span class="n">lat_var_prefix</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">GROUP_DELIM</span><span class="si">}{</span><span class="n">GROUP_DELIM</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">lat_var_names</span><span class="p">]</span>
+    <span class="n">lat_var_prefix</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s1">&#39;</span><span class="si">{</span><span class="n">GROUP_DELIM</span><span class="si">}{</span><span class="n">GROUP_DELIM</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">x</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="si">}</span><span class="s1">&#39;</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span>
+                      <span class="n">lat_var_names</span><span class="p">]</span>
     <span class="n">datasets</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">for</span> <span class="n">lat_var_name</span><span class="p">,</span> <span class="n">lon_var_name</span><span class="p">,</span> <span class="n">time_var_name</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span>
-        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="p">,</span> <span class="n">time_var_names</span>
+            <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="p">,</span> <span class="n">time_var_names</span>
     <span class="p">):</span>
         <span class="k">if</span> <span class="n">GROUP_DELIM</span> <span class="ow">in</span> <span class="n">lat_var_name</span><span class="p">:</span>
             <span class="n">var_prefix</span> <span class="o">=</span> <span class="n">GROUP_DELIM</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">lat_var_name</span><span class="o">.</span><span class="n">strip</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span>
@@ -911,6 +933,7 @@
 
         <span class="c1"># Calculate temporal conditions</span>
         <span class="n">temporal_cond</span> <span class="o">=</span> <span class="n">build_temporal_cond</span><span class="p">(</span><span class="n">min_time</span><span class="p">,</span> <span class="n">max_time</span><span class="p">,</span> <span class="n">group_dataset</span><span class="p">,</span> <span class="n">time_var_name</span><span class="p">)</span>
+
         <span class="n">group_dataset</span> <span class="o">=</span> <span class="n">xre</span><span class="o">.</span><span class="n">where</span><span class="p">(</span>
             <span class="n">group_dataset</span><span class="p">,</span>
             <span class="n">oper</span><span class="p">(</span>
@@ -922,12 +945,13 @@
             <span class="n">temporal_cond</span><span class="p">,</span>
             <span class="n">cut</span>
         <span class="p">)</span>
+
         <span class="n">datasets</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">group_dataset</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">datasets</span></div>
 
 
-<div class="viewcode-block" id="subset_with_shapefile"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.subset_with_shapefile">[docs]</a><span class="k">def</span> <span class="nf">subset_with_shapefile</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_name</span><span class="p">,</span> <span class="n">lon_var_name</span><span class="p">,</span> <span class="n">shapefile</span><span class="p">,</span> <span class="n">cut</span><span class="p">):</span>
+<div class="viewcode-block" id="subset_with_shapefile"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.subset_with_shapefile">[docs]</a><span class="k">def</span> <span class="nf">subset_with_shapefile</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_name</span><span class="p">,</span> <span class="n">lon_var_name</span><span class="p">,</span> <span class="n">shapefile</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">chunks</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Subset an xarray Dataset using a shapefile</span>
 
@@ -939,7 +963,7 @@
 <span class="sd">        Name of the latitude variable in the given dataset</span>
 <span class="sd">    lon_var_name : str</span>
 <span class="sd">        Name of the longitude variable in the given dataset</span>
-<span class="sd">    shapefile : np.array</span>
+<span class="sd">    shapefile : str</span>
 <span class="sd">        Absolute path to the shapefile used to subset the given dataset</span>
 <span class="sd">    cut : bool</span>
 <span class="sd">        True if scanline should be cut.</span>
@@ -980,8 +1004,12 @@
         <span class="n">point_in_shapefile</span> <span class="o">=</span> <span class="n">shapefile_df</span><span class="o">.</span><span class="n">contains</span><span class="p">(</span><span class="n">point</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">point_in_shapefile</span><span class="o">.</span><span class="n">array</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
+    <span class="n">dask</span> <span class="o">=</span> <span class="s2">&quot;forbidden&quot;</span>
+    <span class="k">if</span> <span class="n">chunks</span><span class="p">:</span>
+        <span class="n">dask</span> <span class="o">=</span> <span class="s2">&quot;allowed&quot;</span>
+
     <span class="n">in_shape_vec</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vectorize</span><span class="p">(</span><span class="n">in_shape</span><span class="p">)</span>
-    <span class="n">boolean_mask</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">apply_ufunc</span><span class="p">(</span><span class="n">in_shape_vec</span><span class="p">,</span> <span class="n">dataset</span><span class="p">[</span><span class="n">lon_var_name</span><span class="p">],</span> <span class="n">dataset</span><span class="p">[</span><span class="n">lat_var_name</span><span class="p">])</span>
+    <span class="n">boolean_mask</span> <span class="o">=</span> <span class="n">xr</span><span class="o">.</span><span class="n">apply_ufunc</span><span class="p">(</span><span class="n">in_shape_vec</span><span class="p">,</span> <span class="n">dataset</span><span class="p">[</span><span class="n">lon_var_name</span><span class="p">],</span> <span class="n">dataset</span><span class="p">[</span><span class="n">lat_var_name</span><span class="p">],</span> <span class="n">dask</span><span class="o">=</span><span class="n">dask</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">xre</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">boolean_mask</span><span class="p">,</span> <span class="n">cut</span><span class="p">)</span></div>
 
 
@@ -1125,12 +1153,6 @@
         <span class="n">var_group</span> <span class="o">=</span> <span class="n">_get_nested_group</span><span class="p">(</span><span class="n">base_dataset</span><span class="p">,</span> <span class="n">var_name</span><span class="p">)</span>
         <span class="n">variable</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">variables</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span>
         <span class="n">var_dims</span> <span class="o">=</span> <span class="p">[</span><span class="n">x</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="n">GROUP_DELIM</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">variables</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span><span class="o">.</span><span class="n">dims</span><span class="p">]</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">var_dims</span><span class="p">:</span>
-            <span class="n">var_group_parent</span> <span class="o">=</span> <span class="n">var_group</span>
-            <span class="c1"># This group doesn&#39;t contain dimensions. Look at parent group to find dimensions.</span>
-            <span class="k">while</span> <span class="ow">not</span> <span class="n">var_dims</span><span class="p">:</span>
-                <span class="n">var_group_parent</span> <span class="o">=</span> <span class="n">var_group_parent</span><span class="o">.</span><span class="n">parent</span>
-                <span class="n">var_dims</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">var_group_parent</span><span class="o">.</span><span class="n">dimensions</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
 
         <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">issubdtype</span><span class="p">(</span>
                 <span class="n">dataset</span><span class="o">.</span><span class="n">variables</span><span class="p">[</span><span class="n">var_name</span><span class="p">]</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">dtype</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">datetime64</span><span class="p">)</span>
@@ -1145,13 +1167,14 @@
         <span class="n">var_attrs</span> <span class="o">=</span> <span class="n">variable</span><span class="o">.</span><span class="n">attrs</span>
         <span class="n">fill_value</span> <span class="o">=</span> <span class="n">var_attrs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;_FillValue&#39;</span><span class="p">)</span>
         <span class="n">var_attrs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="s1">&#39;_FillValue&#39;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">comp_args</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;zlib&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;complevel&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
 
         <span class="k">if</span> <span class="n">variable</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="nb">object</span><span class="p">:</span>
-            <span class="n">var_group</span><span class="o">.</span><span class="n">createVariable</span><span class="p">(</span><span class="n">new_var_name</span><span class="p">,</span> <span class="s1">&#39;S1&#39;</span><span class="p">,</span> <span class="n">var_dims</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">)</span>
+            <span class="n">var_group</span><span class="o">.</span><span class="n">createVariable</span><span class="p">(</span><span class="n">new_var_name</span><span class="p">,</span> <span class="s1">&#39;S1&#39;</span><span class="p">,</span> <span class="n">var_dims</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span> <span class="o">**</span><span class="n">comp_args</span><span class="p">)</span>
         <span class="k">elif</span> <span class="n">variable</span><span class="o">.</span><span class="n">dtype</span> <span class="o">==</span> <span class="s1">&#39;timedelta64[ns]&#39;</span><span class="p">:</span>
-            <span class="n">var_group</span><span class="o">.</span><span class="n">createVariable</span><span class="p">(</span><span class="n">new_var_name</span><span class="p">,</span> <span class="s1">&#39;i4&#39;</span><span class="p">,</span> <span class="n">var_dims</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">)</span>
+            <span class="n">var_group</span><span class="o">.</span><span class="n">createVariable</span><span class="p">(</span><span class="n">new_var_name</span><span class="p">,</span> <span class="s1">&#39;i4&#39;</span><span class="p">,</span> <span class="n">var_dims</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span> <span class="o">**</span><span class="n">comp_args</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">var_group</span><span class="o">.</span><span class="n">createVariable</span><span class="p">(</span><span class="n">new_var_name</span><span class="p">,</span> <span class="n">variable</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">var_dims</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">)</span>
+            <span class="n">var_group</span><span class="o">.</span><span class="n">createVariable</span><span class="p">(</span><span class="n">new_var_name</span><span class="p">,</span> <span class="n">variable</span><span class="o">.</span><span class="n">dtype</span><span class="p">,</span> <span class="n">var_dims</span><span class="p">,</span> <span class="n">fill_value</span><span class="o">=</span><span class="n">fill_value</span><span class="p">,</span> <span class="o">**</span><span class="n">comp_args</span><span class="p">)</span>
 
         <span class="c1"># Copy attributes</span>
         <span class="n">var_group</span><span class="o">.</span><span class="n">variables</span><span class="p">[</span><span class="n">new_var_name</span><span class="p">]</span><span class="o">.</span><span class="n">setncatts</span><span class="p">(</span><span class="n">var_attrs</span><span class="p">)</span>
@@ -1194,14 +1217,14 @@
                     <span class="n">new_group_name</span> <span class="o">=</span> <span class="n">group_path</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;/&#39;</span><span class="p">,</span> <span class="s1">&#39;__&#39;</span><span class="p">)</span>
                     <span class="n">data_new</span><span class="p">[</span><span class="n">new_group_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">data_new</span><span class="p">[</span><span class="n">group_path</span><span class="p">]</span>
 
-                <span class="n">walk_h5py</span><span class="p">(</span><span class="n">data_new</span><span class="p">,</span> <span class="n">data_new</span><span class="p">[</span><span class="n">group_path</span><span class="p">]</span><span class="o">.</span><span class="n">name</span><span class="o">+</span><span class="s1">&#39;/&#39;</span><span class="p">)</span>
+                <span class="n">walk_h5py</span><span class="p">(</span><span class="n">data_new</span><span class="p">,</span> <span class="n">data_new</span><span class="p">[</span><span class="n">group_path</span><span class="p">]</span><span class="o">.</span><span class="n">name</span> <span class="o">+</span> <span class="s1">&#39;/&#39;</span><span class="p">)</span>
 
     <span class="n">walk_h5py</span><span class="p">(</span><span class="n">data_new</span><span class="p">,</span> <span class="n">data_new</span><span class="o">.</span><span class="n">name</span><span class="p">)</span>
 
     <span class="k">for</span> <span class="n">del_group</span> <span class="ow">in</span> <span class="n">del_group_list</span><span class="p">:</span>
         <span class="k">del</span> <span class="n">data_new</span><span class="p">[</span><span class="n">del_group</span><span class="p">]</span>
 
-    <span class="n">finputnc</span> <span class="o">=</span> <span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">finput</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span><span class="o">+</span><span class="s1">&#39;.nc&#39;</span>
+    <span class="n">finputnc</span> <span class="o">=</span> <span class="s1">&#39;.&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">finput</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[:</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="s1">&#39;.nc&#39;</span>
 
     <span class="n">data_new</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>  <span class="c1"># close the h5py dataset</span>
     <span class="n">copy</span><span class="p">(</span><span class="n">finput</span><span class="p">,</span> <span class="n">finputnc</span><span class="p">)</span>  <span class="c1"># copy to a nc file</span>
@@ -1211,8 +1234,39 @@
     <span class="k">return</span> <span class="n">nc_dataset</span><span class="p">,</span> <span class="n">has_groups</span></div>
 
 
-<div class="viewcode-block" id="subset"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.subset">[docs]</a><span class="k">def</span> <span class="nf">subset</span><span class="p">(</span><span class="n">file_to_subset</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>  <span class="c1"># pylint: disable=too-many-branches</span>
-           <span class="n">cut</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">shapefile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">min_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">origin_source</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="get_coord_vars"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.get_coord_vars">[docs]</a><span class="k">def</span> <span class="nf">get_coord_vars</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">time_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Retrieve coordinate variables for this dataset. If coordinate</span>
+<span class="sd">    variables are provided, use those, Otherwise, attempt to determine</span>
+<span class="sd">    coordinate variables manually.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    dataset : xr.Dataset</span>
+<span class="sd">        xarray Dataset used to compute coordinate variables manually.</span>
+<span class="sd">        Only used if lat, lon, or time vars are not provided.</span>
+<span class="sd">    lat_var_names : list</span>
+<span class="sd">        List of latitude coordinate variables.</span>
+<span class="sd">    lon_var_names : list</span>
+<span class="sd">        List of longitude coordinate variables.</span>
+<span class="sd">    time_var_names : list</span>
+<span class="sd">        List of time coordinate variables.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">lat_var_names</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">lon_var_names</span><span class="p">:</span>
+        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span> <span class="o">=</span> <span class="n">get_coord_variable_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">time_var_names</span><span class="p">:</span>
+        <span class="n">time_var_names</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">get_time_variable_name</span><span class="p">(</span>
+                <span class="n">dataset</span><span class="p">,</span> <span class="n">dataset</span><span class="p">[</span><span class="n">lat_var_name</span><span class="p">]</span>
+            <span class="p">)</span> <span class="k">for</span> <span class="n">lat_var_name</span> <span class="ow">in</span> <span class="n">lat_var_names</span>
+        <span class="p">]</span>
+    <span class="k">return</span> <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="p">,</span> <span class="n">time_var_names</span></div>
+
+
+<div class="viewcode-block" id="subset"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.subset">[docs]</a><span class="k">def</span> <span class="nf">subset</span><span class="p">(</span><span class="n">file_to_subset</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">output_file</span><span class="p">,</span> <span class="n">variables</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+           <span class="c1"># pylint: disable=too-many-branches, disable=too-many-statements</span>
+           <span class="n">cut</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">shapefile</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">min_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">max_time</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">origin_source</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+           <span class="n">lat_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">time_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Subset a given NetCDF file given a bounding box</span>
 
@@ -1245,6 +1299,21 @@
 <span class="sd">        ISO timestamp representing the upper bound of the temporal</span>
 <span class="sd">        subset to be performed. If this value is not provided, the</span>
 <span class="sd">        granule will not be subset temporally on the upper bound.</span>
+<span class="sd">    lat_var_names : list</span>
+<span class="sd">        List of variables that represent the latitude coordinate</span>
+<span class="sd">        variables for this granule. This list will only contain more</span>
+<span class="sd">        than one value in the case where there are multiple groups and</span>
+<span class="sd">        different coordinate variables for each group.</span>
+<span class="sd">    lon_var_names : list</span>
+<span class="sd">        List of variables that represent the longitude coordinate</span>
+<span class="sd">        variables for this granule. This list will only contain more</span>
+<span class="sd">        than one value in the case where there are multiple groups and</span>
+<span class="sd">        different coordinate variables for each group.</span>
+<span class="sd">    time_var_names : list</span>
+<span class="sd">        List of variables that represent the time coordinate</span>
+<span class="sd">        variables for this granule. This list will only contain more</span>
+<span class="sd">        than one value in the case where there are multiple groups and</span>
+<span class="sd">        different coordinate variables for each group.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">file_extension</span> <span class="o">=</span> <span class="n">file_to_subset</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
 
@@ -1279,16 +1348,16 @@
             <span class="o">**</span><span class="n">args</span>
     <span class="p">)</span> <span class="k">as</span> <span class="n">dataset</span><span class="p">:</span>
 
-        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span> <span class="o">=</span> <span class="n">get_coord_variable_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
-        <span class="n">time_var_names</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="n">get_time_variable_name</span><span class="p">(</span>
-                <span class="n">dataset</span><span class="p">,</span> <span class="n">dataset</span><span class="p">[</span><span class="n">lat_var_name</span><span class="p">]</span>
-            <span class="p">)</span> <span class="k">for</span> <span class="n">lat_var_name</span> <span class="ow">in</span> <span class="n">lat_var_names</span>
-        <span class="p">]</span>
-        <span class="n">chunks_dict</span> <span class="o">=</span> <span class="n">calculate_chunks</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="p">,</span> <span class="n">time_var_names</span> <span class="o">=</span> <span class="n">get_coord_vars</span><span class="p">(</span>
+            <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
+            <span class="n">lat_var_names</span><span class="o">=</span><span class="n">lat_var_names</span><span class="p">,</span>
+            <span class="n">lon_var_names</span><span class="o">=</span><span class="n">lon_var_names</span><span class="p">,</span>
+            <span class="n">time_var_names</span><span class="o">=</span><span class="n">time_var_names</span>
+        <span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">chunks_dict</span><span class="p">:</span>
-            <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">chunk</span><span class="p">(</span><span class="n">chunks_dict</span><span class="p">)</span>
+        <span class="n">chunks</span> <span class="o">=</span> <span class="n">calculate_chunks</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">chunks</span><span class="p">:</span>
+            <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">chunk</span><span class="p">(</span><span class="n">chunks</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">variables</span><span class="p">:</span>
             <span class="c1"># Drop variables that aren&#39;t explicitly requested, except lat_var_name and</span>
@@ -1303,7 +1372,11 @@
             <span class="p">]</span>
             <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">drop_vars</span><span class="p">(</span><span class="n">vars_to_drop</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">shapefile</span><span class="p">:</span>
+            <span class="n">datasets</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="n">subset_with_shapefile</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_names</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">lon_var_names</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">shapefile</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">chunks</span><span class="p">)</span>
+            <span class="p">]</span>
+        <span class="k">elif</span> <span class="n">bbox</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">datasets</span> <span class="o">=</span> <span class="n">subset_with_bbox</span><span class="p">(</span>
                 <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
                 <span class="n">lat_var_names</span><span class="o">=</span><span class="n">lat_var_names</span><span class="p">,</span>
@@ -1315,18 +1388,14 @@
                 <span class="n">min_time</span><span class="o">=</span><span class="n">min_time</span><span class="p">,</span>
                 <span class="n">max_time</span><span class="o">=</span><span class="n">max_time</span>
             <span class="p">)</span>
-        <span class="k">elif</span> <span class="n">shapefile</span><span class="p">:</span>
-            <span class="n">datasets</span> <span class="o">=</span> <span class="p">[</span>
-                <span class="n">subset_with_shapefile</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_names</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">lon_var_names</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">shapefile</span><span class="p">,</span> <span class="n">cut</span><span class="p">)</span>
-            <span class="p">]</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Either bbox or shapefile must be provided&#39;</span><span class="p">)</span>
 
         <span class="n">spatial_bounds</span> <span class="o">=</span> <span class="p">[]</span>
+
         <span class="k">for</span> <span class="n">dataset</span> <span class="ow">in</span> <span class="n">datasets</span><span class="p">:</span>
             <span class="n">set_version_history</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">shapefile</span><span class="p">)</span>
             <span class="n">set_json_history</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">file_to_subset</span><span class="p">,</span> <span class="n">bbox</span><span class="p">,</span> <span class="n">shapefile</span><span class="p">,</span> <span class="n">origin_source</span><span class="p">)</span>
-
             <span class="k">if</span> <span class="n">has_groups</span><span class="p">:</span>
                 <span class="n">spatial_bounds</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_spatial_bounds</span><span class="p">(</span>
                     <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>

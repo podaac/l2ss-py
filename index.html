@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Reference Guide for l2ss-py &mdash; l2ss-py 1.4.0a12 documentation</title>
+  <title>Reference Guide for l2ss-py &mdash; l2ss-py 1.5.0a10 documentation</title>
   
 
   
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.4.0a12
+                1.5.0a10
               </div>
             
           
@@ -211,7 +211,13 @@ main:
 </div></blockquote>
 <p>Harmony service for subsetting L2 data. l2ss-py supports:</p>
 <ul class="simple">
-<li><p>Spatial subsetting</p></li>
+<li><p>Spatial subsetting</p>
+<ul>
+<li><p>Bounding box</p></li>
+<li><p>Shapefile subsetting</p></li>
+<li><p>GeoJSON subsetting</p></li>
+</ul>
+</li>
 <li><p>Temporal subsetting</p></li>
 <li><p>Variable subsetting</p></li>
 </ul>
@@ -260,10 +266,21 @@ optional arguments:
   --max-time MAX_TIME   Max time. Should be ISO-8601 format. Only include if
                         temporal subset is desired.
   --cut                 If provided, scanline will be cut
+  --shapefile SHAPEFILE
+                        Path to either shapefile or geojson file used to subset the provided input granule
 </pre></div>
 </div>
 <p>For example:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">l2ss</span><span class="o">-</span><span class="n">py</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="nb">input</span><span class="o">.</span><span class="n">nc</span> <span class="o">/</span><span class="n">path</span><span class="o">/</span><span class="n">to</span><span class="o">/</span><span class="n">output</span><span class="o">.</span><span class="n">nc</span> <span class="o">--</span><span class="n">bbox</span> <span class="o">-</span><span class="mi">50</span> <span class="o">-</span><span class="mi">10</span> <span class="mi">50</span> <span class="mi">10</span> <span class="o">--</span><span class="n">variables</span> <span class="n">wind_speed</span> <span class="n">wind_dir</span> <span class="n">ice_age</span> <span class="n">time</span> <span class="o">--</span><span class="nb">min</span><span class="o">-</span><span class="n">time</span> <span class="s1">&#39;2015-07-02T09:00:00&#39;</span> <span class="o">--</span><span class="nb">max</span><span class="o">-</span><span class="n">time</span> <span class="s1">&#39;2015-07-02T10:00:00&#39;</span> <span class="o">--</span><span class="n">cut</span>
+</pre></div>
+</div>
+<p>An addition to providing a bounding box, spatial subsetting can be achieved by passing in a shapefile or a geojson file.</p>
+<p><a href="#id1"><span class="problematic" id="id2">``</span></a><a href="#id3"><span class="problematic" id="id4">`</span></a>shell script
+poetry run l2ss-py /path/to/input.nc /path/to/output.nc –shapefile /path/to/test.shp</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>or
+
+```shell script
+poetry run l2ss-py /path/to/input.nc /path/to/output.nc --shapefile /path/to/test.geojson
 </pre></div>
 </div>
 </div>
@@ -334,7 +351,7 @@ is done to ensure that the variable can fit in memory.</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>The chunk dictionary, where the key is the dimension and the
-value is 4000.</p>
+value is 4000 or 500 depending on how many dimensions.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>dict</p>
@@ -461,6 +478,25 @@ name and the second element is the lon coordinate name</p>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>tuple, str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="podaac.subsetter.subset.get_coord_vars">
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">get_coord_vars</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#get_coord_vars"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.get_coord_vars" title="Permalink to this definition">¶</a></dt>
+<dd><p>Retrieve coordinate variables for this dataset. If coordinate
+variables are provided, use those, Otherwise, attempt to determine
+coordinate variables manually.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>xr.Dataset</em>) – xarray Dataset used to compute coordinate variables manually.
+Only used if lat, lon, or time vars are not provided.</p></li>
+<li><p><strong>lat_var_names</strong> (<em>list</em>) – List of latitude coordinate variables.</p></li>
+<li><p><strong>lon_var_names</strong> (<em>list</em>) – List of longitude coordinate variables.</p></li>
+<li><p><strong>time_var_names</strong> (<em>list</em>) – List of time coordinate variables.</p></li>
+</ul>
 </dd>
 </dl>
 </dd></dl>
@@ -664,7 +700,7 @@ the following format:</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="podaac.subsetter.subset.subset">
-<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">subset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_to_subset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cut</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shapefile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin_source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#subset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.subset" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">subset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">file_to_subset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bbox</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_file</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">variables</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cut</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shapefile</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">origin_source</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#subset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.subset" title="Permalink to this definition">¶</a></dt>
 <dd><p>Subset a given NetCDF file given a bounding box</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -688,6 +724,18 @@ granule will not be subset temporally on the lower bound.</p></li>
 <li><p><strong>max_time</strong> (<em>str</em>) – ISO timestamp representing the upper bound of the temporal
 subset to be performed. If this value is not provided, the
 granule will not be subset temporally on the upper bound.</p></li>
+<li><p><strong>lat_var_names</strong> (<em>list</em>) – List of variables that represent the latitude coordinate
+variables for this granule. This list will only contain more
+than one value in the case where there are multiple groups and
+different coordinate variables for each group.</p></li>
+<li><p><strong>lon_var_names</strong> (<em>list</em>) – List of variables that represent the longitude coordinate
+variables for this granule. This list will only contain more
+than one value in the case where there are multiple groups and
+different coordinate variables for each group.</p></li>
+<li><p><strong>time_var_names</strong> (<em>list</em>) – List of variables that represent the time coordinate
+variables for this granule. This list will only contain more
+than one value in the case where there are multiple groups and
+different coordinate variables for each group.</p></li>
 </ul>
 </dd>
 </dl>
@@ -721,7 +769,7 @@ granule will not be subset temporally on the upper bound.</p></li>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="podaac.subsetter.subset.subset_with_shapefile">
-<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">subset_with_shapefile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shapefile</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cut</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#subset_with_shapefile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.subset_with_shapefile" title="Permalink to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">subset_with_shapefile</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shapefile</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cut</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chunks</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#subset_with_shapefile"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.subset_with_shapefile" title="Permalink to this definition">¶</a></dt>
 <dd><p>Subset an xarray Dataset using a shapefile</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -729,7 +777,7 @@ granule will not be subset temporally on the upper bound.</p></li>
 <li><p><strong>dataset</strong> (<em>xr.Dataset</em>) – Dataset to subset</p></li>
 <li><p><strong>lat_var_name</strong> (<em>str</em>) – Name of the latitude variable in the given dataset</p></li>
 <li><p><strong>lon_var_name</strong> (<em>str</em>) – Name of the longitude variable in the given dataset</p></li>
-<li><p><strong>shapefile</strong> (<em>np.array</em>) – Absolute path to the shapefile used to subset the given dataset</p></li>
+<li><p><strong>shapefile</strong> (<em>str</em>) – Absolute path to the shapefile used to subset the given dataset</p></li>
 <li><p><strong>cut</strong> (<em>bool</em>) – True if scanline should be cut.</p></li>
 </ul>
 </dd>
