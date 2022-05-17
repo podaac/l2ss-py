@@ -312,7 +312,7 @@ def find_matching_coords(dataset, match_list):
     return match_coord_vars
 
 
-def get_coord_variable_names(dataset):
+def compute_coordinate_variable_names(dataset):
     """
     Given a dataset, determine the coordinate variable from a list
     of options
@@ -480,7 +480,7 @@ def get_spatial_bounds(dataset, lat_var_names, lon_var_names):
     return np.array([[min_lon, max_lon], [min_lat, max_lat]])
 
 
-def get_time_variable_name(dataset, lat_var):
+def compute_time_variable_name(dataset, lat_var):
     """
     Try to determine the name of the 'time' variable. This is done as
     follows:
@@ -1077,9 +1077,39 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
+def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None):
+    """
+    Retrieve coordinate variables for this dataset. If coordinate
+    variables are provided, use those, Otherwise, attempt to determine
+    coordinate variables manually.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        xarray Dataset used to compute coordinate variables manually.
+        Only used if lat, lon, or time vars are not provided.
+    lat_var_names : list
+        List of latitude coordinate variables.
+    lon_var_names : list
+        List of longitude coordinate variables.
+    time_var_names : list
+        List of time coordinate variables.
+    """
+    if not lat_var_names or not lon_var_names:
+        lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
+    if not time_var_names:
+        time_var_names = [
+            compute_time_variable_name(
+                dataset, dataset[lat_var_name]
+            ) for lat_var_name in lat_var_names
+        ]
+    return lat_var_names, lon_var_names, time_var_names
+
+
 def subset(file_to_subset, bbox, output_file, variables=None,
            # pylint: disable=too-many-branches, disable=too-many-statements
-           cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):
+           cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
+           lat_var_names=None, lon_var_names=None, time_var_names=None):
     """
     Subset a given NetCDF file given a bounding box
 
@@ -1112,6 +1142,21 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         ISO timestamp representing the upper bound of the temporal
         subset to be performed. If this value is not provided, the
         granule will not be subset temporally on the upper bound.
+    lat_var_names : list
+        List of variables that represent the latitude coordinate
+        variables for this granule. This list will only contain more
+        than one value in the case where there are multiple groups and
+        different coordinate variables for each group.
+    lon_var_names : list
+        List of variables that represent the longitude coordinate
+        variables for this granule. This list will only contain more
+        than one value in the case where there are multiple groups and
+        different coordinate variables for each group.
+    time_var_names : list
+        List of variables that represent the time coordinate
+        variables for this granule. This list will only contain more
+        than one value in the case where there are multiple groups and
+        different coordinate variables for each group.
     """
     file_extension = file_to_subset.split('.')[-1]
 
@@ -1146,12 +1191,12 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             **args
     ) as dataset:
 
-        lat_var_names, lon_var_names = get_coord_variable_names(dataset)
-        time_var_names = [
-            get_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
+        lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
+            dataset=dataset,
+            lat_var_names=lat_var_names,
+            lon_var_names=lon_var_names,
+            time_var_names=time_var_names
+        )
 
         chunks = calculate_chunks(dataset)
         if chunks:

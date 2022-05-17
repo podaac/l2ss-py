@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added Shapefile option to UMM-S entry
+- Added optional coordinate variable params
 ### Changed 
 - Updated dependency versions
 ### Deprecated 
