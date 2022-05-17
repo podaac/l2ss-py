@@ -1771,8 +1771,6 @@ class TestSubsetter(unittest.TestCase):
         assert times == actual_times
 
         # When only time is passed in, lats and lons are computed manually
-
-        # When time, lats, and lons are passed in, nothing is computed manually
         lats, lons, times = subset.get_coord_vars(
             dataset,
             lat_var_names=None,
@@ -1782,4 +1780,16 @@ class TestSubsetter(unittest.TestCase):
 
         assert lats == actual_lats
         assert lons == actual_lons
+        assert times == dummy_times
+
+        # When time, lats, and lons are passed in, nothing is computed manually
+        lats, lons, times = subset.get_coord_vars(
+            dataset,
+            lat_var_names=dummy_lats,
+            lon_var_names=dummy_lons,
+            time_var_names=dummy_times
+        )
+
+        assert lats == dummy_lats
+        assert lons == dummy_lons
         assert times == dummy_times
