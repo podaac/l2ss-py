@@ -312,7 +312,7 @@ def find_matching_coords(dataset, match_list):
     return match_coord_vars
 
 
-def get_coord_variable_names(dataset):
+def compute_coordinate_variable_names(dataset):
     """
     Given a dataset, determine the coordinate variable from a list
     of options
@@ -480,7 +480,7 @@ def get_spatial_bounds(dataset, lat_var_names, lon_var_names):
     return np.array([[min_lon, max_lon], [min_lat, max_lat]])
 
 
-def get_time_variable_name(dataset, lat_var):
+def compute_time_variable_name(dataset, lat_var):
     """
     Try to determine the name of the 'time' variable. This is done as
     follows:
@@ -1077,7 +1077,7 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
-def get_coord_vars(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None):
+def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None):
     """
     Retrieve coordinate variables for this dataset. If coordinate
     variables are provided, use those, Otherwise, attempt to determine
@@ -1096,10 +1096,10 @@ def get_coord_vars(dataset, lat_var_names=None, lon_var_names=None, time_var_nam
         List of time coordinate variables.
     """
     if not lat_var_names or not lon_var_names:
-        lat_var_names, lon_var_names = get_coord_variable_names(dataset)
+        lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
     if not time_var_names:
         time_var_names = [
-            get_time_variable_name(
+            compute_time_variable_name(
                 dataset, dataset[lat_var_name]
             ) for lat_var_name in lat_var_names
         ]
@@ -1191,7 +1191,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             **args
     ) as dataset:
 
-        lat_var_names, lon_var_names, time_var_names = get_coord_vars(
+        lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
             lon_var_names=lon_var_names,
