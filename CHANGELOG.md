@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Fixed
 - [issues/72](https://github.com/podaac/l2ss-py/issues/72). Fix SMAP_RSS_L2_SSS_V4 subsetting, changed calculate chunk function.
-- [issues/9](https://github.com/podaacpodaac/subsetter/subset_harmony.py:171:19:/l2ss-py/issues/9). Determinate coordinate variables using cf_xarray.
+- [issues/9](https://github.com/podaac/l2ss-py/issues/9). Determinate coordinate variables using cf_xarray.
 ### Security
 - Changed CLI step in build action to use snyk monitor so that report is uploaded to SNYK podaac org
 
