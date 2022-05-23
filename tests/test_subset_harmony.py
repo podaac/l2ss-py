@@ -35,8 +35,9 @@ from harmony.util import config
 def temp_dir():
     test_data_dir = os.path.dirname(os.path.realpath(__file__))
     temp_dir = tempfile.mkdtemp(dir=test_data_dir)
+    print(f'{temp_dir=}')
     yield temp_dir
-    shutil.rmtree(temp_dir)
+    # shutil.rmtree(temp_dir)
 
 
 def spy_on(method):
@@ -153,3 +154,55 @@ def test_service_invoke(mock_environ, temp_dir):
         # Uses a filename that indicates no spatial subsetting
         # filename = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316_bathymetry.nc4'
         assert 'subsetted' not in result.assets['data'].title
+
+
+def test_service_invoke_coord_vars(mock_environ, temp_dir):
+    test_dir = os.path.dirname(os.path.realpath(__file__))
+    input_json = json.load(
+        open(os.path.join(test_dir, 'data', 'test_subset_harmony',
+                          'test_service_invoke.input.json')))
+
+    test_granule = os.path.join(test_dir, 'data',
+                                'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc')
+    input_json['sources'][0]['granules'][0]['url'] = f'file://{test_granule}'
+    input_json['sources'][0]['variables'][0]['name'] = 'bathymetry'
+    input_json['sources'][0]['coordinateVariables'] = [
+        {
+            'id': 'V0001-EXAMPLE',
+            'name': 'lat',
+            'fullPath': 'example/group/path/ExampleVar2',
+            'type': 'COORDINATE',
+            'subtype': 'LATITUDE'
+        },
+        {
+            'id': 'V0001-EXAMPLE',
+            'name': 'lon',
+            'fullPath': 'example/group/path/ExampleVar3',
+            'type': 'COORDINATE',
+            'subtype': 'LONGITUDE'
+        },
+        {
+            'id': 'V0001-EXAMPLE',
+            'name': 'time',
+            'fullPath': 'example/group/path/ExampleVar4',
+            'type': 'COORDINATE',
+            'subtype': 'TIME'
+        }
+    ]
+
+    test_args = [
+        podaac.subsetter.subset_harmony.__file__,
+        "--harmony-action", "invoke",
+        "--harmony-input", json.dumps(input_json)
+    ]
+
+    process_item_spy = spy_on(L2SubsetterService.process_item)
+    with patch.object(sys, 'argv', test_args), \
+         patch.object(L2SubsetterService, 'process_item', process_item_spy):
+        # Mocks / spies
+        podaac.subsetter.subset_harmony.main(config(False))
+        process_item_spy.mock.assert_called_once()
+
+        result = process_item_spy.return_values[0]
+        np.testing.assert_almost_equal([-91.1, -43.8, -73.0, -8.8], result.bbox, decimal=1)
+
