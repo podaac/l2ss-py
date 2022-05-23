@@ -165,11 +165,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
             subset_params['origin_source'] = asset.href
 
             self.logger.info('Calling l2ss-py subset with params %s', subset_params)
-
-            try:
-                result_bbox = subset.subset(**subset_params)
-            except Exception as e:
-                self.logger.error(f'Error while running l2ss-py {e}')
+            result_bbox = subset.subset(**subset_params)
 
             # Stage the output file with a conventional filename
             mime = 'application/x-netcdf4'
