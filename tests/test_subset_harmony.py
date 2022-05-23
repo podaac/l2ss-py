@@ -35,9 +35,8 @@ from harmony.util import config
 def temp_dir():
     test_data_dir = os.path.dirname(os.path.realpath(__file__))
     temp_dir = tempfile.mkdtemp(dir=test_data_dir)
-    print(f'{temp_dir=}')
     yield temp_dir
-    # shutil.rmtree(temp_dir)
+    shutil.rmtree(temp_dir)
 
 
 def spy_on(method):
