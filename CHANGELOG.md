@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added Shapefile option to UMM-S entry
 - Added optional coordinate variable params
+- [issues/78](https://github.com/podaac/l2ss-py/issues/72): Pass coordinate variables from service to l2ss-py
 ### Changed 
 - Updated dependency versions
 ### Deprecated 
