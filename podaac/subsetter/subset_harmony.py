@@ -151,11 +151,10 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 coordinate_variables = list(
                     filter(lambda var: var.type and var.subtype, source.coordinateVariables)
                 )
-                filter_by_subtype = lambda vars, subtype: list(
-                    map(lambda var: var.name, filter(
-                            lambda var: var.subtype == subtype, vars
-                    ))
-                )
+                def filter_by_subtype(vars, subtype):
+                    return list(map(lambda var: var.name, filter(
+                                lambda var: var.subtype == subtype, vars
+                    )))
                 subset_params['lat_var_names'] = filter_by_subtype(coordinate_variables, 'LATITUDE')
                 subset_params['lon_var_names'] = filter_by_subtype(coordinate_variables, 'LONGITUDE')
                 subset_params['time_var_names'] = filter_by_subtype(coordinate_variables, 'TIME')
