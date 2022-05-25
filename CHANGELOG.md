@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed 
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+## [1.5.0]
+### Added
 - Added Shapefile option to UMM-S entry
 - Added optional coordinate variable params
 - [issues/78](https://github.com/podaac/l2ss-py/issues/72): Pass coordinate variables from service to l2ss-py
@@ -20,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Changed CLI step in build action to use snyk monitor so that report is uploaded to SNYK podaac org
 
-## [0.4.0]
+## [1.4.0]
 ### Added
 - [issues/46](https://github.com/podaac/l2ss-py/issues/46). Flattening of h5py file.
 - [issues/39](https://github.com/podaac/l2ss-py/issues/39): Exposed shapefile subsetting capability to Harmony
