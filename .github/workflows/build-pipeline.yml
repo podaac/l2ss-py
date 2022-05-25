@@ -118,14 +118,15 @@ jobs:
           git commit -am "/version ${{ env.software_version }}"
           git push
       - name: Push Tag
-        uses: actions-ecosystem/action-push-tag@v1
         if: |
           github.ref == 'refs/heads/develop' ||
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
-        with:
-          tag: ${{ env.software_version }}
-          message: "Version ${{ env.software_version }}"
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
+          git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
         uses: podaac/cmr-umm-updater@0.2.1
         if: |
