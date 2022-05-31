@@ -39,6 +39,7 @@ from shapely.geometry import Point
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import dimension_cleanup as dc
 
 
 class TestSubsetter(unittest.TestCase):
@@ -172,7 +173,7 @@ class TestSubsetter(unittest.TestCase):
                                      decode_coords=False,
                                      mask_and_scale=False)
 
-            lat_var_name, lon_var_name = subset.get_coord_variable_names(out_ds)
+            lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(out_ds)
 
             lat_var_name = lat_var_name[0]
             lon_var_name = lon_var_name[0]
@@ -561,10 +562,10 @@ class TestSubsetter(unittest.TestCase):
             )
 
             # Get coord variables
-            lat_var_names, lon_var_names = subset.get_coord_variable_names(in_ds)
+            lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(in_ds)
             lat_var_name = lat_var_names[0]
             lon_var_name = lon_var_names[0]
-            time_var_name = subset.get_time_variable_name(in_ds, in_ds[lat_var_name])
+            time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name])
 
             included_variables.append(lat_var_name)
             included_variables.append(lon_var_name)
@@ -663,7 +664,7 @@ class TestSubsetter(unittest.TestCase):
         old_lat_var_name = 'lat'
         old_lon_var_name = 'lon'
 
-        lat_var_name, lon_var_name = subset.get_coord_variable_names(ds)
+        lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(ds)
 
         assert lat_var_name[0] == old_lat_var_name
         assert lon_var_name[0] == old_lon_var_name
@@ -673,7 +674,7 @@ class TestSubsetter(unittest.TestCase):
         ds = ds.rename({old_lat_var_name: new_lat_var_name,
                         old_lon_var_name: new_lon_var_name})
 
-        lat_var_name, lon_var_name = subset.get_coord_variable_names(ds)
+        lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(ds)
 
         assert lat_var_name[0] == new_lat_var_name
         assert lon_var_name[0] == new_lon_var_name
@@ -698,7 +699,7 @@ class TestSubsetter(unittest.TestCase):
             if 'coordinates' in var.attrs:
                 del var.attrs['coordinates']
 
-        self.assertRaises(ValueError, subset.get_coord_variable_names, ds)
+        self.assertRaises(ValueError, subset.compute_coordinate_variable_names, ds)
 
     def test_get_spatial_bounds(self):
         """
@@ -1218,8 +1219,8 @@ class TestSubsetter(unittest.TestCase):
             }
 
             ds = xr.open_dataset(os.path.join(self.test_data_dir, test_file), **args)
-            lat_var_name = subset.get_coord_variable_names(ds)[0][0]
-            time_var_name = subset.get_time_variable_name(ds, ds[lat_var_name])
+            lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
+            time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
             assert time_var_name is not None
             assert 'time' in time_var_name
 
@@ -1263,23 +1264,26 @@ class TestSubsetter(unittest.TestCase):
         these files have variables with duplicate dimensions
         """
         SNDR_dir = join(self.test_data_dir, 'SNDR')
-        sndr_files = [f for f in listdir(SNDR_dir)
-                          if isfile(join(SNDR_dir, f)) and f.endswith(".nc")]
+        sndr_file = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
 
         bbox = np.array(((-180, 90), (-90, 90)))
-        for file in sndr_files:
-            output_file = "{}_{}".format(self._testMethodName, file)
-            shutil.copyfile(
-                os.path.join(SNDR_dir, file),
-                os.path.join(self.subset_output_dir, file)
-            )
-            box_test = subset.subset(
-                file_to_subset=join(self.subset_output_dir, file),
-                bbox=bbox,
-                output_file=join(self.subset_output_dir, output_file),
-            )
-            # check if the box_test is
-            assert len(box_test)==2
+        output_file = "{}_{}".format(self._testMethodName, sndr_file)
+        shutil.copyfile(
+            os.path.join(SNDR_dir, sndr_file),
+            os.path.join(self.subset_output_dir, sndr_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, sndr_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(SNDR_dir, sndr_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.variables.items():
+            assert in_nc[var_name].shape == out_nc[var_name].shape
 
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
@@ -1331,8 +1335,8 @@ class TestSubsetter(unittest.TestCase):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
         ) as dataset:
-            lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
-            time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
+            lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
+            time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
             lat_dims = dataset[lat_var_name].squeeze().dims
             time_dims = dataset[time_var_name].squeeze().dims
             assert (lat_dims == time_dims)
@@ -1356,9 +1360,9 @@ class TestSubsetter(unittest.TestCase):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
         ) as dataset:
-            lat_var_name = subset.get_coord_variable_names(dataset)[0][0]
-            lon_var_name = subset.get_coord_variable_names(dataset)[1][0]
-            time_var_name = subset.get_time_variable_name(dataset, dataset[lat_var_name])
+            lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
+            lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
+            time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
             oper = operator.and_
 
             cond = oper(
@@ -1548,9 +1552,9 @@ class TestSubsetter(unittest.TestCase):
                 **args
         ) as dataset:
 
-            lat_var_names, lon_var_names = subset.get_coord_variable_names(dataset)
+            lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
             time_var_names = [
-                subset.get_time_variable_name(
+                subset.compute_time_variable_name(
                     dataset, dataset[lat_var_name]
                 ) for lat_var_name in lat_var_names
             ]
@@ -1679,14 +1683,15 @@ class TestSubsetter(unittest.TestCase):
                 **args
         ) as dataset:
 
-            lat_var_names, lon_var_names = subset.get_coord_variable_names(dataset)
+            lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
             time_var_names = [
-                subset.get_time_variable_name(
+                subset.compute_time_variable_name(
                     dataset, dataset[lat_var_name]
                 ) for lat_var_name in lat_var_names
             ]
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
+
 
     def test_empty_temporal_subset(self):
         """
@@ -1718,3 +1723,73 @@ class TestSubsetter(unittest.TestCase):
         )
 
         assert all(dim_size == 1 for dim_size in ds.dims.values())
+
+    def test_passed_coords(self):
+        """
+        Ensure the coordinates passed in to the subsetter are
+        utilized and not manually calculated.
+        """
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+
+        dataset = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        dummy_lats = ['dummy_lat']
+        dummy_lons = ['dummy_lon']
+        dummy_times = ['dummy_time']
+
+        actual_lats = ['lat']
+        actual_lons = ['lon']
+        actual_times = ['time']
+
+        # When none are passed in, variables are computed manually
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=None,
+            lon_var_names=None,
+            time_var_names=None
+        )
+
+        assert lats == actual_lats
+        assert lons == actual_lons
+        assert times == actual_times
+
+        # When lats or lons are passed in, only time is computed manually
+        # This case is a bit different because the lat values are used to
+        # compute the time variable so we can't pass in dummy values.
+
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=actual_lats,
+            lon_var_names=dummy_lons,
+            time_var_names=None
+        )
+
+        assert lats == actual_lats
+        assert lons == dummy_lons
+        assert times == actual_times
+
+        # When only time is passed in, lats and lons are computed manually
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=None,
+            lon_var_names=None,
+            time_var_names=dummy_times
+        )
+
+        assert lats == actual_lats
+        assert lons == actual_lons
+        assert times == dummy_times
+
+        # When time, lats, and lons are passed in, nothing is computed manually
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=dummy_lats,
+            lon_var_names=dummy_lons,
+            time_var_names=dummy_times
+        )
+
+        assert lats == dummy_lats
+        assert lons == dummy_lons
+        assert times == dummy_times

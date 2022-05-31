@@ -99,13 +99,13 @@ jobs:
             -Dsonar.python.version=3.7,3.8,3.9
       - name: Run Snyk on Python
         uses: snyk/actions/python-3.8@master
-        continue-on-error: true # To make sure that SARIF upload gets called
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
+          command: monitor
           args: >
-            --severity-threshold=high
-            --sarif-file-output=python.sarif
+            --org=${{ secrets.SNYK_ORG_ID }}
+            --project-name=${{ github.repository }}
       - name: Commit Version Bump
         # If building develop, a release branch, or main then we commit the version bump back to the repo
         if: |
@@ -118,14 +118,15 @@ jobs:
           git commit -am "/version ${{ env.software_version }}"
           git push
       - name: Push Tag
-        uses: actions-ecosystem/action-push-tag@v1
         if: |
           github.ref == 'refs/heads/develop' ||
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
-        with:
-          tag: ${{ env.software_version }}
-          message: "Version ${{ env.software_version }}"
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
+          git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
         uses: podaac/cmr-umm-updater@0.2.1
         if: |

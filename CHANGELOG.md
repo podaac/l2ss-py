@@ -12,20 +12,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 ### Security
 
-## [0.4.0]
+## [1.5.0]
+### Added
+- Added Shapefile option to UMM-S entry
+- Added optional coordinate variable params
+- [issues/78](https://github.com/podaac/l2ss-py/issues/72): Pass coordinate variables from service to l2ss-py
+### Changed 
+- Updated dependency versions
+- [issues/88](https://github.com/podaac/l2ss-py/issues/88): Build pipeline manually pushes tag rather than use action-push-tag
+### Deprecated 
+### Removed
+### Fixed
+- [issues/72](https://github.com/podaac/l2ss-py/issues/72). Fix SMAP_RSS_L2_SSS_V4 subsetting, changed calculate chunk function.
+- [issues/9](https://github.com/podaac/l2ss-py/issues/9). Determinate coordinate variables using cf_xarray.
+### Security
+- Changed CLI step in build action to use snyk monitor so that report is uploaded to SNYK podaac org
+
+## [1.4.0]
 ### Added
 - [issues/46](https://github.com/podaac/l2ss-py/issues/46). Flattening of h5py file.
 - [issues/39](https://github.com/podaac/l2ss-py/issues/39): Exposed shapefile subsetting capability to Harmony
 - [issues/58](https://github.com/podaac/l2ss-py/issues/58). Expand coordinates to accomodate OMI files 
 	latitude variable in OMI has a capital L for Latitude that needs to be added to the list in 
 	get_coordinate_variable_names. 
+
 ### Changed 
 ### Deprecated 
 ### Removed
 - Remove OCO3 test. Get_coordinate_variables passed OMI and fails OCO3 because OCO3 has a multiple Latitude variable. Subset with bbox method is not
 	applied properly to OCO3. Further manipulating will need to be done - OMI is a higher priority.
 ### Fixed
-### Security
+- [issues/61](https://github.com/podaac/l2ss-py/issues/61). Variables without dimensions should be included in the output subset. Previous code was
+	adding dimension to variables in tropomi and SNDR as well as not have enough memory to {SCALAR} dimensions.
 
 ## [1.3.1]
 ### Added

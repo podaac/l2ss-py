@@ -25,19 +25,20 @@ import operator
 import os
 from shutil import copy
 
+import cf_xarray as cfxr
 import geopandas as gpd
+import h5py
 import importlib_metadata
 import julian
 import netCDF4 as nc
-import h5py
 import numpy as np
 import pandas as pd
 import xarray as xr
 from shapely.geometry import Point
 from shapely.ops import transform
 
-from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter import dimension_cleanup as dc
+from podaac.subsetter import xarray_enhancements as xre
 
 GROUP_DELIM = '__'
 SERVICE_NAME = 'l2ss-py'
@@ -258,12 +259,17 @@ def calculate_chunks(dataset):
     -------
     dict
         The chunk dictionary, where the key is the dimension and the
-        value is 4000.
+        value is 4000 or 500 depending on how many dimensions.
     """
-    chunk_dict = {dim: 4000 for dim in dataset.dims
-                  if dataset.dims[dim] > 4000
-                  and len(dataset.dims) > 1}
-    return chunk_dict
+    if len(dataset.dims) <= 3:
+        chunk = {dim: 4000 for dim in dataset.dims
+                 if dataset.dims[dim] > 4000
+                 and len(dataset.dims) > 1}
+    else:
+        chunk = {dim: 500 for dim in dataset.dims
+                 if dataset.dims[dim] > 500}
+
+    return chunk
 
 
 def find_matching_coords(dataset, match_list):
@@ -306,7 +312,7 @@ def find_matching_coords(dataset, match_list):
     return match_coord_vars
 
 
-def get_coord_variable_names(dataset):
+def compute_coordinate_variable_names(dataset):
     """
     Given a dataset, determine the coordinate variable from a list
     of options
@@ -322,6 +328,19 @@ def get_coord_variable_names(dataset):
         Tuple of strings, where the first element is the lat coordinate
         name and the second element is the lon coordinate name
     """
+
+    dataset = xr.decode_cf(dataset)
+
+    # look for lon and lat using standard name in coordinates and axes
+    custom_criteria = {
+        "latitude": {
+            "standard_name": "latitude|projection_y_coordinate",
+        },
+        "longitude": {
+            "standard_name": "longitude|projection_x_coordinate",
+        }
+    }
+
     possible_lat_coord_names = ['lat', 'latitude', 'y']
     possible_lon_coord_names = ['lon', 'longitude', 'x']
 
@@ -337,6 +356,12 @@ def get_coord_variable_names(dataset):
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
         lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
+
+    # Couldn't find lon lat in data variables look in coordinates
+    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+        with cfxr.set_options(custom_criteria=custom_criteria):
+            lat_coord_names = dataset.cf.coordinates.get('latitude', [])
+            lon_coord_names = dataset.cf.coordinates.get('longitude', [])
 
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         raise ValueError('Could not determine coordinate variables')
@@ -455,7 +480,7 @@ def get_spatial_bounds(dataset, lat_var_names, lon_var_names):
     return np.array([[min_lon, max_lon], [min_lat, max_lat]])
 
 
-def get_time_variable_name(dataset, lat_var):
+def compute_time_variable_name(dataset, lat_var):
     """
     Try to determine the name of the 'time' variable. This is done as
     follows:
@@ -726,10 +751,11 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
 
-    lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
+    lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in
+                      lat_var_names]
     datasets = []
     for lat_var_name, lon_var_name, time_var_name in zip(
-        lat_var_names, lon_var_names, time_var_names
+            lat_var_names, lon_var_names, time_var_names
     ):
         if GROUP_DELIM in lat_var_name:
             var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
@@ -750,6 +776,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -761,12 +788,13 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
             temporal_cond,
             cut
         )
+
         datasets.append(group_dataset)
 
     return datasets
 
 
-def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
+def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, chunks):
     """
     Subset an xarray Dataset using a shapefile
 
@@ -819,8 +847,12 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut):
         point_in_shapefile = shapefile_df.contains(point)
         return point_in_shapefile.array[0]
 
+    dask = "forbidden"
+    if chunks:
+        dask = "allowed"
+
     in_shape_vec = np.vectorize(in_shape)
-    boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name])
+    boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name], dask=dask)
     return xre.where(dataset, boolean_mask, cut)
 
 
@@ -964,12 +996,6 @@ def _rename_variables(dataset, base_dataset):
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
-        if not var_dims:
-            var_group_parent = var_group
-            # This group doesn't contain dimensions. Look at parent group to find dimensions.
-            while not var_dims:
-                var_group_parent = var_group_parent.parent
-                var_dims = list(var_group_parent.dimensions.keys())
 
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
@@ -984,13 +1010,14 @@ def _rename_variables(dataset, base_dataset):
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
+        comp_args = {"zlib": True, "complevel": 1}
 
         if variable.dtype == object:
-            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value)
+            var_group.createVariable(new_var_name, 'S1', var_dims, fill_value=fill_value, **comp_args)
         elif variable.dtype == 'timedelta64[ns]':
-            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value)
+            var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
         else:
-            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
+            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value, **comp_args)
 
         # Copy attributes
         var_group.variables[new_var_name].setncatts(var_attrs)
@@ -1033,14 +1060,14 @@ def h5file_transform(finput):
                     new_group_name = group_path.replace('/', '__')
                     data_new[new_group_name] = data_new[group_path]
 
-                walk_h5py(data_new, data_new[group_path].name+'/')
+                walk_h5py(data_new, data_new[group_path].name + '/')
 
     walk_h5py(data_new, data_new.name)
 
     for del_group in del_group_list:
         del data_new[del_group]
 
-    finputnc = '.'.join(finput.split('.')[:-1])+'.nc'
+    finputnc = '.'.join(finput.split('.')[:-1]) + '.nc'
 
     data_new.close()  # close the h5py dataset
     copy(finput, finputnc)  # copy to a nc file
@@ -1050,8 +1077,39 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
-def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable=too-many-branches
-           cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None):
+def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None):
+    """
+    Retrieve coordinate variables for this dataset. If coordinate
+    variables are provided, use those, Otherwise, attempt to determine
+    coordinate variables manually.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        xarray Dataset used to compute coordinate variables manually.
+        Only used if lat, lon, or time vars are not provided.
+    lat_var_names : list
+        List of latitude coordinate variables.
+    lon_var_names : list
+        List of longitude coordinate variables.
+    time_var_names : list
+        List of time coordinate variables.
+    """
+    if not lat_var_names or not lon_var_names:
+        lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
+    if not time_var_names:
+        time_var_names = [
+            compute_time_variable_name(
+                dataset, dataset[lat_var_name]
+            ) for lat_var_name in lat_var_names
+        ]
+    return lat_var_names, lon_var_names, time_var_names
+
+
+def subset(file_to_subset, bbox, output_file, variables=None,
+           # pylint: disable=too-many-branches, disable=too-many-statements
+           cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
+           lat_var_names=None, lon_var_names=None, time_var_names=None):
     """
     Subset a given NetCDF file given a bounding box
 
@@ -1084,6 +1142,21 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
         ISO timestamp representing the upper bound of the temporal
         subset to be performed. If this value is not provided, the
         granule will not be subset temporally on the upper bound.
+    lat_var_names : list
+        List of variables that represent the latitude coordinate
+        variables for this granule. This list will only contain more
+        than one value in the case where there are multiple groups and
+        different coordinate variables for each group.
+    lon_var_names : list
+        List of variables that represent the longitude coordinate
+        variables for this granule. This list will only contain more
+        than one value in the case where there are multiple groups and
+        different coordinate variables for each group.
+    time_var_names : list
+        List of variables that represent the time coordinate
+        variables for this granule. This list will only contain more
+        than one value in the case where there are multiple groups and
+        different coordinate variables for each group.
     """
     file_extension = file_to_subset.split('.')[-1]
 
@@ -1118,16 +1191,16 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             **args
     ) as dataset:
 
-        lat_var_names, lon_var_names = get_coord_variable_names(dataset)
-        time_var_names = [
-            get_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
-        chunks_dict = calculate_chunks(dataset)
+        lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
+            dataset=dataset,
+            lat_var_names=lat_var_names,
+            lon_var_names=lon_var_names,
+            time_var_names=time_var_names
+        )
 
-        if chunks_dict:
-            dataset = dataset.chunk(chunks_dict)
+        chunks = calculate_chunks(dataset)
+        if chunks:
+            dataset = dataset.chunk(chunks)
 
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
@@ -1144,7 +1217,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
 
         if shapefile:
             datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut)
+                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
             ]
         elif bbox is not None:
             datasets = subset_with_bbox(
@@ -1162,10 +1235,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,  # pylint: disable
             raise ValueError('Either bbox or shapefile must be provided')
 
         spatial_bounds = []
+
         for dataset in datasets:
             set_version_history(dataset, cut, bbox, shapefile)
             set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)
-
             if has_groups:
                 spatial_bounds.append(get_spatial_bounds(
                     dataset=dataset,

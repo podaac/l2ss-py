@@ -117,18 +117,20 @@ class L2SubsetterService(BaseHarmonyAdapter):
                                       access_token=self.message.accessToken,
                                       cfg=self.config)
 
-            origin_source = asset.href
             message = self.message
+
+            # Dictionary of keywords params that will be passed into
+            # the l2ss-py subset function
+            subset_params = {}
 
             # Transform params to PO.DAAC subsetter arguments and invoke the subsetter
             harmony_bbox = [-180, -90, 180, 90]
-            shapefile_path = None
 
             if message.subset and message.subset.bbox:
                 harmony_bbox = message.subset.bbox
 
             if message.subset and message.subset.shape:
-                shapefile_path = download(
+                subset_params['shapefile_path'] = download(
                     message.subset.shape.href,
                     temp_dir,
                     logger=self.logger,
@@ -136,39 +138,44 @@ class L2SubsetterService(BaseHarmonyAdapter):
                     cfg=self.config
                 )
 
-            min_time = None
-            max_time = None
             if message.temporal:
-                min_time = message.temporal.start
-                max_time = message.temporal.end
+                subset_params['min_time'] = message.temporal.start
+                subset_params['max_time'] = message.temporal.end
 
-            bbox = harmony_to_podaac_bbox(harmony_bbox)
+            subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
 
-            variables = None
             if source.variables:
-                variables = [variable.name for variable in source.process('variables')]
+                subset_params['variables'] = [variable.name for variable in source.process('variables')]
 
-            output_filename = f'{output_dir}/{os.path.basename(input_filename)}'
-            result_bbox = subset.subset(
-                input_filename,
-                bbox,
-                output_filename,
-                variables=variables,
-                min_time=min_time,
-                max_time=max_time,
-                origin_source=origin_source,
-                shapefile=shapefile_path
-            )
+            if source.coordinateVariables:
+                coordinate_variables = list(
+                    filter(lambda var: var.type and var.subtype, source.coordinateVariables)
+                )
+
+                def filter_by_subtype(variables, subtype):
+                    return list(map(lambda var: var.name, filter(
+                        lambda var: var.subtype == subtype, variables
+                    )))
+                subset_params['lat_var_names'] = filter_by_subtype(coordinate_variables, 'LATITUDE')
+                subset_params['lon_var_names'] = filter_by_subtype(coordinate_variables, 'LONGITUDE')
+                subset_params['time_var_names'] = filter_by_subtype(coordinate_variables, 'TIME')
+
+            subset_params['output_file'] = f'{output_dir}/{os.path.basename(input_filename)}'
+            subset_params['file_to_subset'] = input_filename
+            subset_params['origin_source'] = asset.href
+
+            self.logger.info('Calling l2ss-py subset with params %s', subset_params)
+            result_bbox = subset.subset(**subset_params)
 
             # Stage the output file with a conventional filename
             mime = 'application/x-netcdf4'
             operations = dict(
-                variable_subset=variables,
+                variable_subset=subset_params.get('variables'),
                 is_subsetted=bool(result_bbox is not None)
             )
             staged_filename = generate_output_filename(asset.href, '.nc4', **operations)
 
-            url = stage(output_filename,
+            url = stage(subset_params['output_file'],
                         staged_filename,
                         mime,
                         location=message.stagingLocation,
