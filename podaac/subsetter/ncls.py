@@ -1,0 +1,300 @@
+#
+'''
+This Python script collects metadata from a netCDF/HDF5 file.
+It walks recursively through a file, storing information about 
+the file's groups, attributes, dimensions, and variables. 
+File information is stored in three Dictionaries:
+  1. Dimensions
+  2. Variables
+  3. Attributes
+
+If the file has a group hierarchy, full path names (including a
+leading slash for the top level group) are used as the keys for
+variable and dimension dictionaries. If there are no groups, then
+the leading slash is not included in the key names. The keys for 
+the attribute dictionary are the variable name, the group name, or 
+"Global" for the file attributes. 
+
+The results of the file walk are printed in a human readable format. 
+Output is controlled by flags set at the beginning of the script. 
+
+The total number of dimensions is printed first, followed by 
+the dimension names (including the path) and their sizes.
+If the dimension name has an asterisk next to it, it means 
+a dimension scale variable is contained in the file. Paths 
+are assumed to be the same for a dimension and its scale variable.
+
+The total number of variables in printed next, followed by
+the name, data type, and each of the variables dimensions 
+with their sizes. 
+
+If a variable is flagged as a dimension scale variable, then 
+the string "<<< dimension scale >>>" appears next to the name.
+
+Variable attributes are printed if the 'printVarAtts' flag is 
+set to True. If there are no variable attributes, then the 
+string "<<< No Variable Attributes >>>" is printed instead.
+
+If a variable has duplicate dimension names and the 'printAlerts' 
+flag is set to True, then a message starting with "ALERT!" will 
+identify the variable name. 
+ 
+After the variable information, the total number of groups
+and their names are printed. If 'printGroupAtts' is set to True, 
+then all the attributes for each group will also be printed.
+
+The last thing to be printed are the file's global attributes.
+These will be suppressed if 'printFileAtts' is set to False.
+
+It also works with OPeDNAP URLs. 
+Use dap4:// instead of https:// for Earthdata Cloud OPeNDAP URLs.
+
+Written by Jennifer Adams <jennifer.m.adams@nasa.gov>
+Version 1.0 -- 19 April 2020
+
+'''
+
+import netCDF4 as nc4
+from collections import defaultdict
+import os
+from sys import argv
+
+# Print Settings
+printAlerts = True     # For variables with duplicate dimension names
+printVarAtts = True    # For seeing variable attributes
+printGrpAtts = True    # For seeing group attributes
+printFileAtts = True   # For seeing global file attributes
+
+
+class NCLS():
+
+    def __init__(self, file):
+        self.file = file
+        # Initialize stuff
+        self.hasGroups = -1
+        self.grpL = []
+        self.dimD = defaultdict(dict)
+        self.varD = defaultdict(dict)
+        self.attD = defaultdict(dict)
+
+        # Open the file and walk through it
+        self.f = nc4.Dataset(file,'r')
+        #self.hasGroups = self.walk(self.f,'')
+        self.walk(self.f, '')
+
+
+    # Update the dictionary of dimensions 
+    def update_dimD(self,path):
+
+        # Loop over dimension names in f (file or subgroup) 
+        for key in list(self.f.dimensions.keys()):
+
+            # Add path to dimname if file has Groups 
+            if self.hasGroups: 
+                dimname = path+'/'+key
+            else:
+                dimname = key
+
+            # Add the dimension to the dictionary
+            self.dimD[dimname]['size'] = self.f.dimensions[key].size
+            self.dimD[dimname]['path'] = path
+            self.dimD[dimname]['nopath'] = key                                  
+
+        #return dimD
+
+    # Update the dictionary of variables and attributes
+    def update_varD(self,path):
+        # Loop over variable names in file f
+        for key in list(self.f.variables.keys()):
+
+            # Add path to varname if file has Groups 
+            if self.hasGroups: 
+                varname = path+'/'+key
+            else:
+                varname = key
+
+            # Add the variable's data type, shape, path, name without path
+            self.varD[varname]['dtype'] = self.f[key].dtype
+            self.varD[varname]['shape'] = self.f[key].shape
+            self.varD[varname]['path'] = path
+            self.varD[varname]['nopath'] = key
+        
+            # Add the variable's dimension names
+            if len(f[key].shape):
+                self.varD[varname]['dimensions'] = self.f[key].dimensions
+            else:
+                # variable is dimensionless, use the empty shape instead
+                self.varD[varname]['dimensions'] = self.f[key].shape                                                
+            
+            # Add the variable's attributes
+            for akey in list(f[key].ncattrs()):
+                self.attD[varname][akey] = self.f[key].getncattr(akey)
+
+        #return varD,attD
+
+    # A recursive module to look for dimensions, variables, and subgroups in a file
+    def walk(self,f, path):
+        # The first pass will determine whether a Group hierarchy exists in the file
+        if self.hasGroups < 0:
+            if f.groups:
+                self.hasGroups = 1
+            else: 
+                self.hasGroups = 0
+
+            # Add any top-level file attributes to the dictionary
+            if f.ncattrs():
+                for akey in list(f.ncattrs()):
+                    self.attD['Global'][akey] = f.getncattr(akey)
+
+        # The hasGroups boolean variable is handed to the update_varD module
+        # Leading slash will not be added to variable names if there are no Groups
+
+        # Update the list of Groups and the dictionaries of the file's dimensions, variables, and attributes
+        if f.groups:
+            for grp in list(f.groups): 
+                # Update the list of Group names, using the full path 
+                gname = path+'/'+grp
+                self.grpL.append(gname)
+
+                # Add Group attributes to the dictionary
+                if f[grp].ncattrs():
+                    for akey in list(f[grp].ncattrs()):
+                        self.attD[gname][akey] = f[grp].getncattr(akey)
+
+        if f.dimensions: 
+            self.update_dimD(path)
+
+        if f.variables: 
+            self.update_varD(path)
+
+        # Here's the recursive part
+        keyL = list(f.groups.keys())
+        for key in keyL:
+            newpath = path+'/'+key
+            
+            self.hasGroups = self.walk(f[key],newpath)
+
+        return self.hasGroups
+
+
+    # These modules control the formatting of the output
+    def print_groups(self):
+        if self.hasGroups > 0:
+            print('%d GROUPS' % len(self.grpL))
+            for gname in self.grpL: 
+                print(gname)
+                if printGrpAtts:
+                    for key in list(self.attD[gname].keys()):
+                        print('     ',key+':',self.attD[gname][key])
+            print('')
+
+    def print_global_attributes(self):
+        if printFileAtts and list(self.attD['Global'].keys()):
+            print('GLOBAL ATTRIBUTES:')
+            for key in list(self.attD['Global'].keys()):
+                print('     ',key+':',self.attD['Global'][key])
+
+    def print_dims(self): 
+        print('%d DIMENSIONS  (* means it has a scale variable)' % len(list(self.dimD.keys())))
+        for key in list(self.dimD.keys()):
+            # Set a flag if dimension has a scale variable
+            # Paths are assumed to be the same for a dimension and its scale variable
+            flag = ' '
+            if key in list(self.varD.keys()):
+                flag = '* '
+            # Print the size and the fullpath of each dimension 
+            print('%8s   %2s%s' % (self.dimD[key]['size'],flag,key))
+        print('')
+
+    def print_vars(self):
+        print('%d VARIABLES' % len(list(self.varD.keys())))
+
+        for key in list(self.varD.keys()):
+            # Check if this variable is a dimension scale
+            # Paths are assumed to be the same for a dimension and its scale variable
+            flag = ''
+            if key in list(self.dimD.keys()):
+                flag = '   <<< dimension scale >>>'
+
+            # Name
+            print('Name:',key,flag)
+
+            # Data type 
+            if self.varD[key]['dtype'] == '|S1':
+                typstr = 'char'
+            elif str(self.varD[key]['dtype']) == "<class 'str'>": 
+                typstr = 'string'
+            else:
+                typstr = self.varD[key]['dtype']
+            print('Type:',typstr)
+
+            # Dimensions and their sizes
+            if len(self.varD[key]['dimensions']):
+
+                vardimL = list(self.varD[key]['dimensions'])
+                vardimsizeL = list(self.varD[key]['shape'])
+
+                # The list of variable dimensions does not include the path,
+                # so we'll need to extract the fullname from dimD
+                for d in range(len(vardimL)):
+
+                    dname = vardimL[d]
+                    dsize = vardimsizeL[d]
+                    dimMatchL = []
+                    for dimkey in list(self.dimD.keys()):
+                        ckname = os.path.split(dimkey)[1]       
+                        cksize = self.dimD[dimkey]['size']
+                        if (ckname == dname) and (cksize == dsize):
+                            dimMatchL.append(dimkey)
+
+                    if len(dimMatchL):
+                        if len(dimMatchL) > 1:
+                            # File has multiple dimensions with same name and size
+                            for dim in dimMatchL:
+                                # use the dimension with the same path as the variable
+                                dimpath = os.path.split(dim)[0]
+                                varpath = os.path.split(key)[0]
+                                if dimpath == varpath:
+                                    dimstr = dim+' {'+str(dsize)+'}'
+                        else:
+                            dimstr = dimMatchL[0]+' {'+str(dsize)+'}'
+                    else:
+                        # Something went wrong parsing dimensions
+                        print('Error: No dimensions found named',dname,'of size',str(dsize))
+
+
+                    # print the dimension info
+                    if d<1:
+                        print('Dims: '+dimstr)
+                    else:
+                        print('      '+dimstr)
+            else:
+                print('<<< Dimensionless >>>')
+
+            # Check if this variable has any duplicate dimension names
+            if printAlerts:
+                dimL = list(self.varD[key]['dimensions'])
+                dimS =  set(self.varD[key]['dimensions'])
+                if len(dimL) != len(dimS):
+                    print('ALERT! Variable',key,'has duplicate dimension names')
+
+            # Attributes
+            if printVarAtts:
+                if self.attD[key].keys():
+                    print('Variable Attributes:')
+                    for akey in self.attD[key].keys():
+                        print('     ',akey,':',self.attD[key][akey])
+                else:
+                    print('<<< No Variable Attributes >>>')
+
+            print('')
+        
+
+
+# Print stuff
+#print('NetCDF Library version:',nc4.getlibversion(),'\n')
+#print_dims()
+#print_vars()
+#print_groups()
+#print_global_attributes()
+    

@@ -117,6 +117,7 @@ def convert_bound(bound, coord_max, coord_var):
     # If the file longitude is -coord_max/2 --> coord_max/2
     if valid_min != 0:
         # If edges are the same, assume it wraps and return all
+
         if bound[0] == bound[1]:
             bound = np.array([-(coord_max / 2), coord_max / 2])
 
@@ -153,6 +154,7 @@ def convert_bbox(bbox, dataset, lat_var_name, lon_var_name):
     Assumption that the provided bounding box is always between
     -180 --> 180 for longitude and -90, 90 for latitude.
     """
+
     return np.array([convert_bound(bbox[0], 360, dataset[lon_var_name]),
                      convert_bound(bbox[1], 180, dataset[lat_var_name])])
 
