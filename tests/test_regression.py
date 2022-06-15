@@ -567,6 +567,7 @@ class TestSubsetter(unittest.TestCase):
             # where out-of-bounds values are 'False' will leave
             # those values assuming there are only NaN values
             # in the data at those locations.
+            
             np.testing.assert_equal(spatial_mask, combined_mask)
 
         hl2ss_ds.close()
