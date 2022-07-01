@@ -1285,6 +1285,34 @@ class TestSubsetter(unittest.TestCase):
         for var_name, variable in in_nc.variables.items():
             assert in_nc[var_name].shape == out_nc[var_name].shape
 
+    def test_omi_novars_subset(self):
+        """
+        Check that the OMI variables are conserved when no variable are specified
+        the data field and lat/lon are in different groups
+        """
+        omi_dir = join(self.test_data_dir, 'OMSO2')
+        omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+
+        bbox = np.array(((-180, 90), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, omi_file)
+        shutil.copyfile(
+            os.path.join(omi_dir, omi_file),
+            os.path.join(self.subset_output_dir, omi_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, omi_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(omi_dir, omi_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.variables.items():
+            assert in_nc[var_name].shape == out_nc[var_name].shape
+
+
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
 
