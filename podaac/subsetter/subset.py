@@ -768,7 +768,6 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
                     var for var in dataset.data_vars.keys()
                     if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
                 ])
-                
             else:
                 group_vars.extend([
                     var for var in dataset.data_vars.keys()
@@ -1221,12 +1220,10 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             ]
 
             dataset = dataset.drop_vars(vars_to_drop)
-            
         if shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
             ]
-        
         elif bbox is not None:
             datasets = subset_with_bbox(
                 dataset=dataset,
