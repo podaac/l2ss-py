@@ -10,8 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
-- Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
-- [issue/95](https://github.com/podaac/l2ss-py/issues/95): OMI non-variable subsetting
+- [issue/95](https://github.com/podaac/l2ss-py/issues/95): Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
 ### Security
 
 ## [1.5.0]
