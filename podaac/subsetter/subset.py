@@ -682,7 +682,6 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
 
     def build_cond(str_timestamp, compare):
         timestamp = translate_timestamp(str_timestamp)
-        
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.datetime64)):
             timestamp = pd.to_datetime(timestamp)
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.timedelta64)):
@@ -700,8 +699,8 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(float)):
-            dt = np.datetime64(dataset[time_var_name].attrs['Units'][-10:])
-            timestamp = (np.datetime64(timestamp) - dt).astype('timedelta64[s]').astype('float')
+            start_date = np.datetime64(dataset[time_var_name].attrs['Units'][-10:])
+            timestamp = (np.datetime64(timestamp) - start_date).astype('timedelta64[s]').astype('float')
 
         return compare(dataset[time_var_name], timestamp)
 
@@ -1190,9 +1189,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         'mask_and_scale': False,
         'decode_times': False
     }
-    
     if min_time or max_time:
-        args['decode_times'] = True  
+        args['decode_times'] = True
 
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),

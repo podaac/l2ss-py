@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added logic to handle time decoding for he5 tai93 files. Xarray was not decoding the time
   thus timestamp comparisons were failing
-- [issue/98](https://github.com/podaac/l2ss-py/issues/98): 
+- [issue/98](https://github.com/podaac/l2ss-py/issues/98): Add OMI Temporal Subsetting
 ### Changed 
 ### Deprecated 
 ### Removed
@@ -17,7 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/95](https://github.com/podaac/l2ss-py/issues/95): Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
 
 ### Security
-
 ## [1.5.0]
 ### Added
 - Added Shapefile option to UMM-S entry
