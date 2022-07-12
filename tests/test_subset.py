@@ -1646,6 +1646,62 @@ class TestSubsetter(unittest.TestCase):
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
 
+    def test_temporal__he5file_subset(self):
+        """
+        Test that both a temporal subset can be executed for he5 files in the OMI
+        collections
+        """
+        
+        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+        OMI_copy_file = 'OMI_copy_testing_2.he5'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
+                        os.path.join(self.subset_output_dir, OMI_copy_file))
+        min_time='2020-01-16T12:30:00Z'
+        max_time='2020-01-16T12:40:00Z'
+        bbox = np.array(((-180, 180), (-90, 90)))
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_copy_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        if min_time or max_time:
+            args['decode_times'] = True  
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+            lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+                dataset=dataset,
+                lat_var_names=None,
+                lon_var_names=None,
+                time_var_names=None
+            )
+
+            datasets = subset.subset_with_bbox(
+                dataset=dataset,
+                lat_var_names=lat_var_names,
+                lon_var_names=lon_var_names,
+                time_var_names=time_var_names,
+                variables=None,
+                bbox=bbox,
+                cut=None,
+                min_time=min_time,
+                max_time=max_time
+            )
+            output_max = np.max(datasets[0][time_var_names[0]].values)
+            input_max = np.max(nc_dataset[time_var_names[0]])
+
+            output_min = np.min(datasets[0][time_var_names[0]].values)
+            input_min = np.min(nc_dataset[time_var_names[0]])
+
+            # test that the output granule was subsetted with time
+            assert input_max > output_max
+            assert input_min < output_min
+
     def test_temporal_subset_lines(self):
         bbox = np.array(((-180, 180), (-90, 90)))
         file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
