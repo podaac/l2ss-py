@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>podaac.subsetter.subset &mdash; l2ss-py 1.5.0a10 documentation</title>
+  <title>podaac.subsetter.subset &mdash; l2ss-py 1.6.0a3 documentation</title>
   
 
   
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.5.0a10
+                1.6.0a3
               </div>
             
           
@@ -469,7 +469,7 @@
     <span class="k">return</span> <span class="n">match_coord_vars</span></div>
 
 
-<div class="viewcode-block" id="get_coord_variable_names"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.get_coord_variable_names">[docs]</a><span class="k">def</span> <span class="nf">get_coord_variable_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
+<div class="viewcode-block" id="compute_coordinate_variable_names"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.compute_coordinate_variable_names">[docs]</a><span class="k">def</span> <span class="nf">compute_coordinate_variable_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Given a dataset, determine the coordinate variable from a list</span>
 <span class="sd">    of options</span>
@@ -637,7 +637,7 @@
     <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([[</span><span class="n">min_lon</span><span class="p">,</span> <span class="n">max_lon</span><span class="p">],</span> <span class="p">[</span><span class="n">min_lat</span><span class="p">,</span> <span class="n">max_lat</span><span class="p">]])</span></div>
 
 
-<div class="viewcode-block" id="get_time_variable_name"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.get_time_variable_name">[docs]</a><span class="k">def</span> <span class="nf">get_time_variable_name</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var</span><span class="p">):</span>
+<div class="viewcode-block" id="compute_time_variable_name"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.compute_time_variable_name">[docs]</a><span class="k">def</span> <span class="nf">compute_time_variable_name</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Try to determine the name of the &#39;time&#39; variable. This is done as</span>
 <span class="sd">    follows:</span>
@@ -925,6 +925,11 @@
                     <span class="n">var</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">data_vars</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
                     <span class="k">if</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">variables</span> <span class="ow">and</span> <span class="n">var</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">group_vars</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">var</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">lat_var_prefix</span><span class="p">))</span>
                 <span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">group_vars</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span>
+                    <span class="n">var</span> <span class="k">for</span> <span class="n">var</span> <span class="ow">in</span> <span class="n">dataset</span><span class="o">.</span><span class="n">data_vars</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">var</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">group_vars</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">var</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="nb">tuple</span><span class="p">(</span><span class="n">lat_var_prefix</span><span class="p">))</span>
+                    <span class="p">])</span>
 
         <span class="k">else</span><span class="p">:</span>
             <span class="n">group_vars</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">dataset</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span>
@@ -1234,7 +1239,7 @@
     <span class="k">return</span> <span class="n">nc_dataset</span><span class="p">,</span> <span class="n">has_groups</span></div>
 
 
-<div class="viewcode-block" id="get_coord_vars"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.get_coord_vars">[docs]</a><span class="k">def</span> <span class="nf">get_coord_vars</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">time_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<div class="viewcode-block" id="get_coordinate_variable_names"><a class="viewcode-back" href="../../../index.html#podaac.subsetter.subset.get_coordinate_variable_names">[docs]</a><span class="k">def</span> <span class="nf">get_coordinate_variable_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">time_var_names</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Retrieve coordinate variables for this dataset. If coordinate</span>
 <span class="sd">    variables are provided, use those, Otherwise, attempt to determine</span>
@@ -1253,10 +1258,10 @@
 <span class="sd">        List of time coordinate variables.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">lat_var_names</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">lon_var_names</span><span class="p">:</span>
-        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span> <span class="o">=</span> <span class="n">get_coord_variable_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
+        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span> <span class="o">=</span> <span class="n">compute_coordinate_variable_names</span><span class="p">(</span><span class="n">dataset</span><span class="p">)</span>
     <span class="k">if</span> <span class="ow">not</span> <span class="n">time_var_names</span><span class="p">:</span>
         <span class="n">time_var_names</span> <span class="o">=</span> <span class="p">[</span>
-            <span class="n">get_time_variable_name</span><span class="p">(</span>
+            <span class="n">compute_time_variable_name</span><span class="p">(</span>
                 <span class="n">dataset</span><span class="p">,</span> <span class="n">dataset</span><span class="p">[</span><span class="n">lat_var_name</span><span class="p">]</span>
             <span class="p">)</span> <span class="k">for</span> <span class="n">lat_var_name</span> <span class="ow">in</span> <span class="n">lat_var_names</span>
         <span class="p">]</span>
@@ -1348,7 +1353,7 @@
             <span class="o">**</span><span class="n">args</span>
     <span class="p">)</span> <span class="k">as</span> <span class="n">dataset</span><span class="p">:</span>
 
-        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="p">,</span> <span class="n">time_var_names</span> <span class="o">=</span> <span class="n">get_coord_vars</span><span class="p">(</span>
+        <span class="n">lat_var_names</span><span class="p">,</span> <span class="n">lon_var_names</span><span class="p">,</span> <span class="n">time_var_names</span> <span class="o">=</span> <span class="n">get_coordinate_variable_names</span><span class="p">(</span>
             <span class="n">dataset</span><span class="o">=</span><span class="n">dataset</span><span class="p">,</span>
             <span class="n">lat_var_names</span><span class="o">=</span><span class="n">lat_var_names</span><span class="p">,</span>
             <span class="n">lon_var_names</span><span class="o">=</span><span class="n">lon_var_names</span><span class="p">,</span>
@@ -1370,8 +1375,8 @@
                 <span class="ow">and</span> <span class="n">var_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">lon_var_names</span>
                 <span class="ow">and</span> <span class="n">var_name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">time_var_names</span>
             <span class="p">]</span>
-            <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">drop_vars</span><span class="p">(</span><span class="n">vars_to_drop</span><span class="p">)</span>
 
+            <span class="n">dataset</span> <span class="o">=</span> <span class="n">dataset</span><span class="o">.</span><span class="n">drop_vars</span><span class="p">(</span><span class="n">vars_to_drop</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">shapefile</span><span class="p">:</span>
             <span class="n">datasets</span> <span class="o">=</span> <span class="p">[</span>
                 <span class="n">subset_with_shapefile</span><span class="p">(</span><span class="n">dataset</span><span class="p">,</span> <span class="n">lat_var_names</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">lon_var_names</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">shapefile</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">chunks</span><span class="p">)</span>
@@ -1388,6 +1393,7 @@
                 <span class="n">min_time</span><span class="o">=</span><span class="n">min_time</span><span class="p">,</span>
                 <span class="n">max_time</span><span class="o">=</span><span class="n">max_time</span>
             <span class="p">)</span>
+
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s1">&#39;Either bbox or shapefile must be provided&#39;</span><span class="p">)</span>
 

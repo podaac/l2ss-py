@@ -7,7 +7,7 @@
   
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   
-  <title>Reference Guide for l2ss-py &mdash; l2ss-py 1.5.0a10 documentation</title>
+  <title>Reference Guide for l2ss-py &mdash; l2ss-py 1.6.0a3 documentation</title>
   
 
   
@@ -64,7 +64,7 @@
             
             
               <div class="version">
-                1.5.0a10
+                1.6.0a3
               </div>
             
           
@@ -360,6 +360,53 @@ value is 4000 or 500 depending on how many dimensions.</p>
 </dd></dl>
 
 <dl class="py function">
+<dt class="sig sig-object py" id="podaac.subsetter.subset.compute_coordinate_variable_names">
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">compute_coordinate_variable_names</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#compute_coordinate_variable_names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.compute_coordinate_variable_names" title="Permalink to this definition">¶</a></dt>
+<dd><p>Given a dataset, determine the coordinate variable from a list
+of options</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>dataset</strong> (<em>xr.Dataset</em>) – The dataset to find the coordinate variables for</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Tuple of strings, where the first element is the lat coordinate
+name and the second element is the lon coordinate name</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>tuple, str</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="podaac.subsetter.subset.compute_time_variable_name">
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">compute_time_variable_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#compute_time_variable_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.compute_time_variable_name" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to determine the name of the ‘time’ variable. This is done as
+follows:</p>
+<ul class="simple">
+<li><p>The variable name contains ‘time’</p></li>
+<li><p>The variable dimensions match the dimensions of the given lat var</p></li>
+</ul>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset</strong> (<em>xr.Dataset:</em>) – xarray dataset to find time variable from</p></li>
+<li><p><strong>lat_var</strong> (<em>xr.Variable</em>) – Lat variable for this dataset</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The name of the variable</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>ValueError</strong> – If the time variable could not be determined</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="podaac.subsetter.subset.convert_bbox">
 <span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">convert_bbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bbox</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_var_name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#convert_bbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.convert_bbox" title="Permalink to this definition">¶</a></dt>
 <dd><p>This function will return a converted bbox which matches the range
@@ -464,27 +511,8 @@ or ‘latitude’</p></li>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="podaac.subsetter.subset.get_coord_variable_names">
-<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">get_coord_variable_names</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#get_coord_variable_names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.get_coord_variable_names" title="Permalink to this definition">¶</a></dt>
-<dd><p>Given a dataset, determine the coordinate variable from a list
-of options</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>dataset</strong> (<em>xr.Dataset</em>) – The dataset to find the coordinate variables for</p>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>Tuple of strings, where the first element is the lat coordinate
-name and the second element is the lon coordinate name</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>tuple, str</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="podaac.subsetter.subset.get_coord_vars">
-<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">get_coord_vars</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#get_coord_vars"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.get_coord_vars" title="Permalink to this definition">¶</a></dt>
+<dt class="sig sig-object py" id="podaac.subsetter.subset.get_coordinate_variable_names">
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">get_coordinate_variable_names</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lon_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time_var_names</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#get_coordinate_variable_names"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.get_coordinate_variable_names" title="Permalink to this definition">¶</a></dt>
 <dd><p>Retrieve coordinate variables for this dataset. If coordinate
 variables are provided, use those, Otherwise, attempt to determine
 coordinate variables manually.</p>
@@ -542,34 +570,6 @@ coord vars)</p></li>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>str</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="podaac.subsetter.subset.get_time_variable_name">
-<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset.</span></span><span class="sig-name descname"><span class="pre">get_time_variable_name</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lat_var</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset.html#get_time_variable_name"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset.get_time_variable_name" title="Permalink to this definition">¶</a></dt>
-<dd><p>Try to determine the name of the ‘time’ variable. This is done as
-follows:</p>
-<ul class="simple">
-<li><p>The variable name contains ‘time’</p></li>
-<li><p>The variable dimensions match the dimensions of the given lat var</p></li>
-</ul>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>dataset</strong> (<em>xr.Dataset:</em>) – xarray dataset to find time variable from</p></li>
-<li><p><strong>lat_var</strong> (<em>xr.Variable</em>) – Lat variable for this dataset</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The name of the variable</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>str</p>
-</dd>
-<dt class="field-even">Raises</dt>
-<dd class="field-even"><p><strong>ValueError</strong> – If the time variable could not be determined</p>
 </dd>
 </dl>
 </dd></dl>
