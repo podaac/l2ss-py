@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed 
+- [pull/101](https://github.com/podaac/l2ss-py/pull/101): Updated docker image to `python3.9-slim`
 ### Deprecated 
 ### Removed
 ### Fixed
