@@ -8,8 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed 
 - [pull/101](https://github.com/podaac/l2ss-py/pull/101): Updated docker image to `python3.9-slim`
+- [issue/99](https://github.com/podaac/l2ss-py/issues/99): Updated python dependencies including v1.0.20 of harmony-service-lib
 ### Deprecated 
 ### Removed
+- [issue/99](https://github.com/podaac/l2ss-py/issues/99): Removed support for python 3.7
 ### Fixed
 - [issue/95](https://github.com/podaac/l2ss-py/issues/95): Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
 ### Security
