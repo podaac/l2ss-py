@@ -51,6 +51,9 @@ jsonschema = "^3.2.0"
 m2r2 = "^0.3.1"
 sphinx-rtd-theme = "^0.5.2"
 
+[tool.pytest.ini_options]
+junit_family = "xunit2"
+
 [tool.poetry.extras]
 harmony = ["harmony-service-lib", "pystac"]
 
