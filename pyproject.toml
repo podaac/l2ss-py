@@ -27,17 +27,17 @@ packages = [
 ]
 
 [tool.poetry.dependencies]
-python = ">=3.7,<4.0"
+python = "^3.8"
 netCDF4 = "^1.5"
-xarray = {version = "^.18", extras = ["parallel"]}
-geopandas ="0.6.1"
+xarray = {version = "*", extras = ["parallel"]}
+geopandas ="^0.10"
 Shapely = "^1.7.1"
-harmony-service-lib = { version = "^1.0.15", optional = true }
+harmony-service-lib = { version = "^1.0.20", optional = true }
 pystac = { version = "^0.5.3", optional = true }
 julian = "^0.14"
 importlib-metadata = "^4.8.1"
 h5py = "^3.6.0"
-cf-xarray = "^0.7.0"
+cf-xarray = "*"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
@@ -50,6 +50,9 @@ moto = "1.3.14"
 jsonschema = "^3.2.0"
 m2r2 = "^0.3.1"
 sphinx-rtd-theme = "^0.5.2"
+
+[tool.pytest.ini_options]
+junit_family = "xunit2"
 
 [tool.poetry.extras]
 harmony = ["harmony-service-lib", "pystac"]

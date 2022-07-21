@@ -60,7 +60,7 @@ def harmony_to_podaac_bbox(bbox):
 
     Parameters
     ----------
-    bbox : array
+    bbox : list
         Harmony bbox
 
     Returns
