@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issue/93](https://github.com/podaac/l2ss-py/issues/93): Removed cause from build pipeline
 - [issue/98](https://github.com/podaac/l2ss-py/issues/98): Added logic to handle time decoding for he5 tai93 files. Changed the min and max inputs to tai93 format and compared to the time format in the file
 ### Changed 
 - [pull/101](https://github.com/podaac/l2ss-py/pull/101): Updated docker image to `python3.9-slim`
