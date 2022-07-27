@@ -83,7 +83,7 @@ def get_indexers_from_nd(cond, cut):
 
     cond_shape_list = list(cond.shape)
     cond_list = list(cond.dims)
-    output = [idx for idx, element in enumerate(cond_shape_list) if cond_shape_list[idx] == 1]
+    output = [idx for idx, element in enumerate(cond_shape_list) if element == 1]
     for i in output:
         cond_list.pop(i)
 

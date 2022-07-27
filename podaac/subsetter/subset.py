@@ -682,11 +682,9 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
 
     def build_cond(str_timestamp, compare):
         timestamp = translate_timestamp(str_timestamp)
-
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.datetime64)):
             timestamp = pd.to_datetime(timestamp)
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.timedelta64)):
-
             if is_time_mjd(dataset, time_var_name):
                 # mjd when timedelta based on
                 mjd_datetime = datetime_from_mjd(dataset, time_var_name)
@@ -699,6 +697,10 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
                 epoch_time_var_name = get_time_epoch_var(dataset, time_var_name)
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
+
+        if np.issubdtype(dataset[time_var_name].dtype, np.dtype(float)):
+            start_date = np.datetime64(dataset[time_var_name].attrs['Units'][-10:])
+            timestamp = (np.datetime64(timestamp) - start_date).astype('timedelta64[s]').astype('float')
 
         return compare(dataset[time_var_name], timestamp)
 
@@ -768,6 +770,11 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
                     var for var in dataset.data_vars.keys()
                     if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
                 ])
+            else:
+                group_vars.extend([
+                    var for var in dataset.data_vars.keys()
+                    if var not in group_vars and not var.startswith(tuple(lat_var_prefix))
+                    ])
 
         else:
             group_vars = list(dataset.keys())
@@ -1182,7 +1189,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         'mask_and_scale': False,
         'decode_times': False
     }
-
     if min_time or max_time:
         args['decode_times'] = True
 
@@ -1190,7 +1196,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
@@ -1213,8 +1218,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                 and var_name not in lon_var_names
                 and var_name not in time_var_names
             ]
-            dataset = dataset.drop_vars(vars_to_drop)
 
+            dataset = dataset.drop_vars(vars_to_drop)
         if shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
@@ -1231,6 +1236,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                 min_time=min_time,
                 max_time=max_time
             )
+
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
