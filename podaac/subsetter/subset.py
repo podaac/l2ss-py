@@ -699,7 +699,11 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(float)):
-            start_date = np.datetime64(dataset[time_var_name].attrs['Units'][-10:])
+            if 'TAI' in dataset[time_var_name].attrs['Title']:
+                start_date = np.datetime64('1993-01-01')
+            else:
+                raise ValueError('Start date for conversion was not determined')
+
             timestamp = (np.datetime64(timestamp) - start_date).astype('timedelta64[s]').astype('float')
 
         return compare(dataset[time_var_name], timestamp)
