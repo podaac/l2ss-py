@@ -220,7 +220,6 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 result.geometry = bbox_to_geometry(result.bbox)
 
             # Return the STAC record
-
             return result
         finally:
             # Clean up any intermediate resources
