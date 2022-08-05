@@ -34,6 +34,27 @@ from podaac.subsetter.subset import SERVICE_NAME
 
 DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
 
+def np_to_regular(obj):
+    """
+    Convert an np object into basic python objects
+
+    Parameters
+    ----------
+    obj : np.array, np.int, np.float
+
+    Returns
+    -------
+    list, int or float, obj
+    """
+
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
 
 def podaac_to_harmony_bbox(bbox):
     """
@@ -50,7 +71,13 @@ def podaac_to_harmony_bbox(bbox):
     array, int or float
         Harmony bbox
     """
-    return [bbox[0][0], bbox[1][0], bbox[0][1], bbox[1][1]]
+    bbox00 = np_to_regular(bbox[0][0])
+    bbox10 = np_to_regular(bbox[1][0])
+    bbox01 = np_to_regular(bbox[0][1])
+    bbox11 = np_to_regular(bbox[1][1])
+
+    return_box = [bbox00, bbox10, bbox01, bbox11]
+    return return_box
 
 
 def harmony_to_podaac_bbox(bbox):
@@ -192,6 +219,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 result.geometry = bbox_to_geometry(result.bbox)
 
             # Return the STAC record
+
             return result
         finally:
             # Clean up any intermediate resources
