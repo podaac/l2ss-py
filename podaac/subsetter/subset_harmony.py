@@ -34,6 +34,7 @@ from podaac.subsetter.subset import SERVICE_NAME
 
 DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
 
+
 def np_to_regular(obj):
     """
     Convert an np object into basic python objects
