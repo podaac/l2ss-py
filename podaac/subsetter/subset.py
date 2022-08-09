@@ -514,7 +514,6 @@ def compute_time_variable_name(dataset, lat_var):
 
     # Filter variables with 'time' in the name to avoid extra work
     time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
-
     for var_name in time_vars:
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
@@ -526,6 +525,17 @@ def compute_time_variable_name(dataset, lat_var):
             return var_name
 
     raise ValueError('Unable to determine time variable')
+
+
+def compute_utc_name(dataset):
+    """
+    Get the name of the utc variable if it is there to determine origine time
+    """
+    for var_name in list(dataset.data_vars.keys()):
+        if 'utc' in var_name.lower():
+            return var_name
+
+    return None
 
 
 def get_time_epoch_var(dataset, time_var_name):
@@ -652,7 +662,7 @@ def datetime_from_mjd(dataset, time_var_name):
     return None
 
 
-def build_temporal_cond(min_time, max_time, dataset, time_var_name):
+def build_temporal_cond(min_time, max_time, dataset, time_var_name, utc_start):
     """
     Build the temporal condition used in the xarray 'where' call which
     drops data not in the given bounds. If the data in the time var is
@@ -680,13 +690,12 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
         is essentially a noop.
     """
 
-    def build_cond(str_timestamp, compare):
+    def build_cond(str_timestamp, compare, utc_start):
         timestamp = translate_timestamp(str_timestamp)
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.datetime64)):
             timestamp = pd.to_datetime(timestamp)
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.timedelta64)):
             if is_time_mjd(dataset, time_var_name):
-                # mjd when timedelta based on
                 mjd_datetime = datetime_from_mjd(dataset, time_var_name)
                 if mjd_datetime is None:
                     raise ValueError('Unable to get datetime from dataset to calculate time delta')
@@ -699,22 +708,35 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(float)):
-            if 'TAI' in dataset[time_var_name].attrs['Title']:
-                start_date = np.datetime64('1993-01-01')
-            else:
-                raise ValueError('Start date for conversion was not determined')
+            start_date = None
+            for i in list(dataset[time_var_name].attrs):
+                attr_string = str(dataset[time_var_name].attrs[i])
+                if 'TAI93' in attr_string:
+                    start_date = np.datetime64('1993-01-01')
+                    continue
 
-            timestamp = (np.datetime64(timestamp) - start_date).astype('timedelta64[s]').astype('float')
+            if not start_date:
+                if utc_start.dtype != object:
+                    start_date = datetime.datetime(utc_start.values[0], utc_start.values[1], utc_start.values[2],
+                                                   utc_start.values[3], utc_start.values[4], utc_start.values[5])
+                    seconds = np.array(dataset[time_var_name])[0]
+                    start_date = start_date - datetime.timedelta(seconds=seconds)
+                    start_date = start_date.replace(second=0, microsecond=0, minute=0,
+                                                    hour=start_date.hour)+datetime.timedelta(hours=start_date.minute//30)
+                else:
+                    raise ValueError('Start date for conversion was not determined')
+
+            timestamp = (np.datetime64(timestamp) - np.datetime64(start_date)).astype('timedelta64[s]').astype('float')
 
         return compare(dataset[time_var_name], timestamp)
 
     temporal_conds = []
     if min_time:
         comparison_op = operator.ge
-        temporal_conds.append(build_cond(min_time, comparison_op))
+        temporal_conds.append(build_cond(min_time, comparison_op, utc_start))
     if max_time:
         comparison_op = operator.le
-        temporal_conds.append(build_cond(max_time, comparison_op))
+        temporal_conds.append(build_cond(max_time, comparison_op, utc_start))
     temporal_cond = True
     if min_time or max_time:
         temporal_cond = functools.reduce(lambda cond_a, cond_b: cond_a & cond_b, temporal_conds)
@@ -722,7 +744,7 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
 
 
 def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, variables=None, bbox=None, cut=True,
-                     min_time=None, max_time=None):
+                     min_time=None, max_time=None, utc_start=None):
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -786,7 +808,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
         group_dataset = dataset[group_vars]
 
         # Calculate temporal conditions
-        temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+        temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name, utc_start)
 
         group_dataset = xre.where(
             group_dataset,
@@ -1088,7 +1110,7 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
-def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None):
+def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None, utc_var_name=None):
     """
     Retrieve coordinate variables for this dataset. If coordinate
     variables are provided, use those, Otherwise, attempt to determine
@@ -1114,13 +1136,16 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
                 dataset, dataset[lat_var_name]
             ) for lat_var_name in lat_var_names
         ]
-    return lat_var_names, lon_var_names, time_var_names
+    if not utc_var_name:
+        utc_var_name = compute_utc_name(dataset)
+
+    return lat_var_names, lon_var_names, time_var_names, utc_var_name
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
-           lat_var_names=None, lon_var_names=None, time_var_names=None):
+           lat_var_names=None, lon_var_names=None, time_var_names=None, utc_var_name=None):
     """
     Subset a given NetCDF file given a bounding box
 
@@ -1173,7 +1198,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
 
     if file_extension == 'he5':
         nc_dataset, has_groups = h5file_transform(file_to_subset)
-
     else:
         # Open dataset with netCDF4 first, so we can get group info
         nc_dataset = nc.Dataset(file_to_subset, mode='r')
@@ -1200,17 +1224,21 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
+        lat_var_names, lon_var_names, time_var_names, utc_var_name = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
             lon_var_names=lon_var_names,
-            time_var_names=time_var_names
+            time_var_names=time_var_names,
+            utc_var_name=utc_var_name
         )
+        if utc_var_name:
+            utc_start = dataset[utc_var_name][0]
+        else:
+            utc_start = None
 
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
-
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
@@ -1238,7 +1266,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,
-                max_time=max_time
+                max_time=max_time,
+                utc_start=utc_start
             )
 
         else:
