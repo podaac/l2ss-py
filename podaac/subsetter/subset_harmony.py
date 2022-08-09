@@ -35,28 +35,6 @@ from podaac.subsetter.subset import SERVICE_NAME
 DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
 
 
-def np_to_regular(obj):
-    """
-    Convert an np object into basic python objects
-
-    Parameters
-    ----------
-    obj : np.array, np.int, np.float
-
-    Returns
-    -------
-    list, int or float, obj
-    """
-
-    if isinstance(obj, np.integer):
-        return int(obj)
-    if isinstance(obj, np.floating):
-        return float(obj)
-    if isinstance(obj, np.ndarray):
-        return obj.tolist()
-    return obj
-
-
 def podaac_to_harmony_bbox(bbox):
     """
     Convert PO.DAAC bbox ((west, east), (south, north))
@@ -72,12 +50,8 @@ def podaac_to_harmony_bbox(bbox):
     array, int or float
         Harmony bbox
     """
-    bbox00 = np_to_regular(bbox[0][0])
-    bbox10 = np_to_regular(bbox[1][0])
-    bbox01 = np_to_regular(bbox[0][1])
-    bbox11 = np_to_regular(bbox[1][1])
 
-    return_box = [bbox00, bbox10, bbox01, bbox11]
+    return_box = [bbox.item(0), bbox.item(2), bbox.item(1), bbox.item(3)]
     return return_box
 
 
