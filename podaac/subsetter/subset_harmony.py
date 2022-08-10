@@ -50,7 +50,9 @@ def podaac_to_harmony_bbox(bbox):
     array, int or float
         Harmony bbox
     """
-    return [bbox[0][0], bbox[1][0], bbox[0][1], bbox[1][1]]
+
+    return_box = [bbox.item(0), bbox.item(2), bbox.item(1), bbox.item(3)]
+    return return_box
 
 
 def harmony_to_podaac_bbox(bbox):

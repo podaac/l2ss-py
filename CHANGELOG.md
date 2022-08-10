@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/105](https://github.com/podaac/l2ss-py/issues/105): Added function to convert np object to python native objects.
 ### Security
 
 ## [2.0.0]
