@@ -537,7 +537,6 @@ def compute_utc_name(dataset):
             return var_name
 
     return None
-    #raise ValueError("Can't determine timeUTC variable")
 
 
 def get_time_epoch_var(dataset, time_var_name):
@@ -720,7 +719,6 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
             if not start_date:
                 utc_var_name = compute_utc_name(dataset)
                 utc_start = dataset[utc_var_name][0]
-                
                 if utc_start.dtype != object:
                     start_date = datetime.datetime(utc_start.values[0], utc_start.values[1], utc_start.values[2],
                                                    utc_start.values[3], utc_start.values[4], utc_start.values[5])
@@ -1143,7 +1141,7 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
             ) for lat_var_name in lat_var_names
         ]
         time_var_names.append(compute_utc_name(dataset))
-        time_var_names = list(dict.fromkeys([x for x in time_var_names if x is not None])) # remove Nones and any duplicates
+        time_var_names = list(dict.fromkeys([x for x in time_var_names if x is not None]))  # remove Nones and any duplicates
 
     return lat_var_names, lon_var_names, time_var_names
 
@@ -1235,10 +1233,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             lat_var_names=lat_var_names,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
-            #utc_var_name=utc_var_name
         )
-        print (time_var_names)
-        #raise Exception
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
@@ -1270,7 +1265,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                 cut=cut,
                 min_time=min_time,
                 max_time=max_time
-                #utc_start=utc_start
             )
 
         else:

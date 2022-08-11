@@ -150,6 +150,7 @@ class TestSubsetter(unittest.TestCase):
 
             in_ds.close()
             out_ds.close()
+            
 
     def test_subset_bbox(self):
         """
@@ -1648,7 +1649,7 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
-        
+            
 
     def test_temporal_he5file_subset(self):
         """
@@ -1658,9 +1659,7 @@ class TestSubsetter(unittest.TestCase):
         
         OMI_file_names = ['OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5',
                           'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5']
-        
         OMI_copy_file = 'OMI_copy_testing_2.he5'
-        raise Exception
         for i in OMI_file_names:
             shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', i),
                             os.path.join(self.subset_output_dir, OMI_copy_file))
@@ -1688,11 +1687,8 @@ class TestSubsetter(unittest.TestCase):
                     lon_var_names=None,
                     time_var_names=None
                 )
-                print (i)
                 if 'BRO' in i:
-                    print (1)
                     assert any('utc' in x.lower() for x in time_var_names)
-                    raise Exception
 
                 datasets = subset.subset_with_bbox(
                     dataset=dataset,
@@ -1714,7 +1710,6 @@ class TestSubsetter(unittest.TestCase):
                 # test that the output granule was subsetted with time
                 assert input_max > output_max
                 assert input_min < output_min
-        raise Exception
     
 
     def test_temporal_subset_lines(self):
