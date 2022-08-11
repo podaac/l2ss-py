@@ -514,15 +514,38 @@ def compute_time_variable_name(dataset, lat_var):
 
     # Filter variables with 'time' in the name to avoid extra work
     time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
+    var_names = []
     for var_name in time_vars:
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
-            return var_name
+            utc_name = compute_utc_name(dataset)
+            if utc_name == None:
+                return [var_name]
+            else:
+                return [var_name, utc_name]
+            #var_names.append(var_name)
+    #if len(var_names)>0:
+    #    return var_names
     for var_name in list(dataset.data_vars.keys()):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
-            return var_name
+            utc_name = compute_utc_name(dataset)
+            if utc_name == None:
+                return [var_name]
+            else:
+                return [var_name, utc_name]
+            #var_names.append(var_name)
+    #if len(var_names)>0:
+    #    return var_names
     for var_name in list(dataset.data_vars.keys()):
         if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
-            return var_name
+            utc_name = compute_utc_name(dataset)
+            if utc_name == None:
+                return [var_name]
+            else:
+                return [var_name, utc_name]
+            
+            #var_names.append(var_name)
+    #if len(var_name)>0:
+    #    return var_names
 
     raise ValueError('Unable to determine time variable')
 
@@ -536,6 +559,7 @@ def compute_utc_name(dataset):
             return var_name
 
     return None
+    #raise ValueError("Can't determine timeUTC variable")
 
 
 def get_time_epoch_var(dataset, time_var_name):
@@ -662,7 +686,7 @@ def datetime_from_mjd(dataset, time_var_name):
     return None
 
 
-def build_temporal_cond(min_time, max_time, dataset, time_var_name, utc_start):
+def build_temporal_cond(min_time, max_time, dataset, time_var_name):
     """
     Build the temporal condition used in the xarray 'where' call which
     drops data not in the given bounds. If the data in the time var is
@@ -690,7 +714,7 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name, utc_start):
         is essentially a noop.
     """
 
-    def build_cond(str_timestamp, compare, utc_start):
+    def build_cond(str_timestamp, compare):
         timestamp = translate_timestamp(str_timestamp)
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.datetime64)):
             timestamp = pd.to_datetime(timestamp)
@@ -716,6 +740,9 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name, utc_start):
                     continue
 
             if not start_date:
+                utc_var_name = compute_utc_name(dataset)
+                utc_start = dataset[utc_var_name][0]
+                
                 if utc_start.dtype != object:
                     start_date = datetime.datetime(utc_start.values[0], utc_start.values[1], utc_start.values[2],
                                                    utc_start.values[3], utc_start.values[4], utc_start.values[5])
@@ -733,10 +760,10 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name, utc_start):
     temporal_conds = []
     if min_time:
         comparison_op = operator.ge
-        temporal_conds.append(build_cond(min_time, comparison_op, utc_start))
+        temporal_conds.append(build_cond(min_time, comparison_op))
     if max_time:
         comparison_op = operator.le
-        temporal_conds.append(build_cond(max_time, comparison_op, utc_start))
+        temporal_conds.append(build_cond(max_time, comparison_op))
     temporal_cond = True
     if min_time or max_time:
         temporal_cond = functools.reduce(lambda cond_a, cond_b: cond_a & cond_b, temporal_conds)
@@ -744,7 +771,7 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name, utc_start):
 
 
 def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, variables=None, bbox=None, cut=True,
-                     min_time=None, max_time=None, utc_start=None):
+                     min_time=None, max_time=None):
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -808,7 +835,7 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
         group_dataset = dataset[group_vars]
 
         # Calculate temporal conditions
-        temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name, utc_start)
+        temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
 
         group_dataset = xre.where(
             group_dataset,
@@ -1110,7 +1137,7 @@ def h5file_transform(finput):
     return nc_dataset, has_groups
 
 
-def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None, utc_var_name=None):
+def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None):
     """
     Retrieve coordinate variables for this dataset. If coordinate
     variables are provided, use those, Otherwise, attempt to determine
@@ -1128,24 +1155,26 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
     time_var_names : list
         List of time coordinate variables.
     """
+    time_var_names = []
     if not lat_var_names or not lon_var_names:
         lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
     if not time_var_names:
-        time_var_names = [
+        time_var_names.extend([
             compute_time_variable_name(
                 dataset, dataset[lat_var_name]
             ) for lat_var_name in lat_var_names
-        ]
-    if not utc_var_name:
-        utc_var_name = compute_utc_name(dataset)
+        ][0])
 
-    return lat_var_names, lon_var_names, time_var_names, utc_var_name
+    #if not utc_var_name:
+        #utc_var_name = compute_utc_name(dataset)
+
+    return lat_var_names, lon_var_names, time_var_names#, utc_var_name
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
-           lat_var_names=None, lon_var_names=None, time_var_names=None, utc_var_name=None):
+           lat_var_names=None, lon_var_names=None, time_var_names=None):
     """
     Subset a given NetCDF file given a bounding box
 
@@ -1224,17 +1253,13 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        lat_var_names, lon_var_names, time_var_names, utc_var_name = get_coordinate_variable_names(
+        lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
             lon_var_names=lon_var_names,
-            time_var_names=time_var_names,
-            utc_var_name=utc_var_name
+            time_var_names=time_var_names
+            #utc_var_name=utc_var_name
         )
-        if utc_var_name:
-            utc_start = dataset[utc_var_name][0]
-        else:
-            utc_start = None
 
         chunks = calculate_chunks(dataset)
         if chunks:
@@ -1266,8 +1291,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,
-                max_time=max_time,
-                utc_start=utc_start
+                max_time=max_time
+                #utc_start=utc_start
             )
 
         else:
