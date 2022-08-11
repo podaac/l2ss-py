@@ -562,6 +562,7 @@ class TestSubsetter(unittest.TestCase):
             )
 
             # Get coord variables
+            time_var_name = []
             lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(in_ds)
             lat_var_name = lat_var_names[0]
             lon_var_name = lon_var_names[0]
@@ -1217,10 +1218,11 @@ class TestSubsetter(unittest.TestCase):
                 'mask_and_scale': False,
                 'decode_times': True
             }
-
+            time_var_names = []
             ds = xr.open_dataset(os.path.join(self.test_data_dir, test_file), **args)
             lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
             time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
+
             assert time_var_name is not None
             assert 'time' in time_var_name
 
@@ -1388,6 +1390,7 @@ class TestSubsetter(unittest.TestCase):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
         ) as dataset:
+            time_var_names = []
             lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
             lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
             time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
@@ -1402,7 +1405,7 @@ class TestSubsetter(unittest.TestCase):
             indexed_cond = cond.isel(**indexers)
             indexed_ds = dataset.isel(**indexers)
             new_dataset = indexed_ds.where(indexed_cond)
-
+            
             assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
@@ -1645,18 +1648,19 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
+        
 
     def test_temporal_he5file_subset(self):
         """
         Test that both a temporal subset can be executed for he5 files in the OMISO2
-        collection
+        collection. Also test that the UTC time variable is present for OMI_BRO
         """
         
         OMI_file_names = ['OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5',
                           'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5']
         
         OMI_copy_file = 'OMI_copy_testing_2.he5'
-
+        raise Exception
         for i in OMI_file_names:
             shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', i),
                             os.path.join(self.subset_output_dir, OMI_copy_file))
@@ -1678,18 +1682,17 @@ class TestSubsetter(unittest.TestCase):
                     xr.backends.NetCDF4DataStore(nc_dataset),
                     **args
             ) as dataset:
-                lat_var_names, lon_var_names, time_var_names, utc_var_name = subset.get_coordinate_variable_names(
+                lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
                     dataset=dataset,
                     lat_var_names=None,
                     lon_var_names=None,
-                    time_var_names=None,
-                    utc_var_name=None
+                    time_var_names=None
                 )
-
-                if utc_var_name:
-                    utc_start = dataset[utc_var_name][0]
-                else:
-                    utc_start = None
+                print (i)
+                if 'BRO' in i:
+                    print (1)
+                    assert any('utc' in x.lower() for x in time_var_names)
+                    raise Exception
 
                 datasets = subset.subset_with_bbox(
                     dataset=dataset,
@@ -1700,8 +1703,7 @@ class TestSubsetter(unittest.TestCase):
                     bbox=bbox,
                     cut=None,
                     min_time=min_time,
-                    max_time=max_time,
-                    utc_start=utc_start
+                    max_time=max_time
                 )
                 output_max = np.max(datasets[0][time_var_names[0]].values)
                 input_max = np.max(nc_dataset[time_var_names[0]])
@@ -1712,6 +1714,8 @@ class TestSubsetter(unittest.TestCase):
                 # test that the output granule was subsetted with time
                 assert input_max > output_max
                 assert input_min < output_min
+        raise Exception
+    
 
     def test_temporal_subset_lines(self):
         bbox = np.array(((-180, 180), (-90, 90)))
@@ -1777,7 +1781,7 @@ class TestSubsetter(unittest.TestCase):
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
         ) as dataset:
-
+            time_var_names = []
             lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
             time_var_names = [
                 subset.compute_time_variable_name(
@@ -1839,12 +1843,11 @@ class TestSubsetter(unittest.TestCase):
         actual_times = ['time']
 
         # When none are passed in, variables are computed manually
-        lats, lons, times,utc_var_name = subset.get_coordinate_variable_names(
+        lats, lons, times = subset.get_coordinate_variable_names(
             dataset,
             lat_var_names=None,
             lon_var_names=None,
-            time_var_names=None,
-            utc_var_name=None
+            time_var_names=None
         )
 
         assert lats == actual_lats
@@ -1855,38 +1858,33 @@ class TestSubsetter(unittest.TestCase):
         # This case is a bit different because the lat values are used to
         # compute the time variable so we can't pass in dummy values.
 
-        lats, lons, times, utc_var_name = subset.get_coordinate_variable_names(
+        lats, lons, times = subset.get_coordinate_variable_names(
             dataset,
             lat_var_names=actual_lats,
             lon_var_names=dummy_lons,
             time_var_names=None,
-            utc_var_name=None
         )
 
         assert lats == actual_lats
         assert lons == dummy_lons
         assert times == actual_times
-
         # When only time is passed in, lats and lons are computed manually
-        lats, lons, times, utc_var_name = subset.get_coordinate_variable_names(
+        lats, lons, times = subset.get_coordinate_variable_names(
             dataset,
             lat_var_names=None,
             lon_var_names=None,
-            time_var_names=dummy_times,
-            utc_var_name=None
+            time_var_names=dummy_times
         )
-
         assert lats == actual_lats
         assert lons == actual_lons
         assert times == dummy_times
 
         # When time, lats, and lons are passed in, nothing is computed manually
-        lats, lons, times, utc_var_name = subset.get_coordinate_variable_names(
+        lats, lons, times = subset.get_coordinate_variable_names(
             dataset,
             lat_var_names=dummy_lats,
             lon_var_names=dummy_lons,
-            time_var_names=dummy_times,
-            utc_var_name=None
+            time_var_names=dummy_times
         )
 
         assert lats == dummy_lats

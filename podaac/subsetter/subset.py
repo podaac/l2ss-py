@@ -514,38 +514,16 @@ def compute_time_variable_name(dataset, lat_var):
 
     # Filter variables with 'time' in the name to avoid extra work
     time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
-    var_names = []
+
     for var_name in time_vars:
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
-            utc_name = compute_utc_name(dataset)
-            if utc_name == None:
-                return [var_name]
-            else:
-                return [var_name, utc_name]
-            #var_names.append(var_name)
-    #if len(var_names)>0:
-    #    return var_names
+            return var_name
     for var_name in list(dataset.data_vars.keys()):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
-            utc_name = compute_utc_name(dataset)
-            if utc_name == None:
-                return [var_name]
-            else:
-                return [var_name, utc_name]
-            #var_names.append(var_name)
-    #if len(var_names)>0:
-    #    return var_names
+            return var_name
     for var_name in list(dataset.data_vars.keys()):
         if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
-            utc_name = compute_utc_name(dataset)
-            if utc_name == None:
-                return [var_name]
-            else:
-                return [var_name, utc_name]
-            
-            #var_names.append(var_name)
-    #if len(var_name)>0:
-    #    return var_names
+            return var_name
 
     raise ValueError('Unable to determine time variable')
 
@@ -1155,20 +1133,19 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
     time_var_names : list
         List of time coordinate variables.
     """
-    time_var_names = []
+
     if not lat_var_names or not lon_var_names:
         lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
     if not time_var_names:
-        time_var_names.extend([
+        time_var_names = [
             compute_time_variable_name(
                 dataset, dataset[lat_var_name]
             ) for lat_var_name in lat_var_names
-        ][0])
+        ]
+        time_var_names.append(compute_utc_name(dataset))
+        time_var_names = list(dict.fromkeys([x for x in time_var_names if x is not None])) # remove Nones and any duplicates
 
-    #if not utc_var_name:
-        #utc_var_name = compute_utc_name(dataset)
-
-    return lat_var_names, lon_var_names, time_var_names#, utc_var_name
+    return lat_var_names, lon_var_names, time_var_names
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,
@@ -1260,7 +1237,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             time_var_names=time_var_names
             #utc_var_name=utc_var_name
         )
-
+        print (time_var_names)
+        #raise Exception
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
