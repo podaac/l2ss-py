@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issue/93](https://github.com/podaac/l2ss-py/issues/93): Added input argument to cmr updater to disable association removal
 ### Changed 
 ### Deprecated 
 ### Removed
