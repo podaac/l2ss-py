@@ -708,29 +708,6 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
-        if np.issubdtype(dataset[time_var_name].dtype, np.dtype(float)):
-            start_date = None
-            for i in list(dataset[time_var_name].attrs):
-                attr_string = str(dataset[time_var_name].attrs[i])
-                if 'TAI93' in attr_string:
-                    start_date = np.datetime64('1993-01-01')
-                    continue
-
-            if not start_date:
-                utc_var_name = compute_utc_name(dataset)
-                utc_start = dataset[utc_var_name][0]
-                if utc_start.dtype != object:
-                    start_date = datetime.datetime(utc_start.values[0], utc_start.values[1], utc_start.values[2],
-                                                   utc_start.values[3], utc_start.values[4], utc_start.values[5])
-                    seconds = np.array(dataset[time_var_name])[0]
-                    start_date = start_date - datetime.timedelta(seconds=seconds)
-                    start_date = start_date.replace(second=0, microsecond=0, minute=0,
-                                                    hour=start_date.hour)+datetime.timedelta(hours=start_date.minute//30)
-                else:
-                    raise ValueError('Start date for conversion was not determined')
-
-            timestamp = (np.datetime64(timestamp) - np.datetime64(start_date)).astype('timedelta64[s]').astype('float')
-
         return compare(dataset[time_var_name], timestamp)
 
     temporal_conds = []
@@ -1146,6 +1123,27 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
     return lat_var_names, lon_var_names, time_var_names
 
 
+def convert_to_datetime(dataset, time_vars):
+    """
+    converts the time variable to datetime if xarray decode times
+    """
+    for var in time_vars:
+        start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f") if any(['TAI93' in str(dataset[var].attrs[attribute_name])
+                                                                                                          for attribute_name in dataset[var].attrs]) else None
+
+        if np.issubdtype(dataset[var].dtype, np.dtype(float)):
+            if start_date:
+                dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
+            else:
+                utc_var_name = compute_utc_name(dataset)
+                if utc_var_name:
+                    dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
+        else:
+            pass
+
+    return dataset
+
+
 def subset(file_to_subset, bbox, output_file, variables=None,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
@@ -1234,6 +1232,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
+        if min_time or max_time:
+            dataset = convert_to_datetime(dataset, time_var_names)
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
@@ -1296,7 +1296,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                         } for var_name in time_var_names
                         if 'units' in nc_dataset.variables[var_name].__dict__
                     }
-
                 for var in dataset.data_vars:
                     if var not in encoding:
                         encoding[var] = compression

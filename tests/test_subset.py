@@ -30,6 +30,7 @@ import importlib_metadata
 import netCDF4 as nc
 import h5py
 import numpy as np
+#import datetime
 import pandas as pd
 import pytest
 import xarray as xr
@@ -1653,8 +1654,7 @@ class TestSubsetter(unittest.TestCase):
 
     def test_temporal_he5file_subset(self):
         """
-        Test that both a temporal subset can be executed for he5 files in the OMISO2
-        collection. Also test that the UTC time variable is present for OMI_BRO
+        Test that the time type changes to datetime for subsetting
         """
         
         OMI_file_names = ['OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5',
@@ -1690,26 +1690,10 @@ class TestSubsetter(unittest.TestCase):
                 if 'BRO' in i:
                     assert any('utc' in x.lower() for x in time_var_names)
 
-                datasets = subset.subset_with_bbox(
-                    dataset=dataset,
-                    lat_var_names=lat_var_names,
-                    lon_var_names=lon_var_names,
-                    time_var_names=time_var_names,
-                    variables=None,
-                    bbox=bbox,
-                    cut=None,
-                    min_time=min_time,
-                    max_time=max_time
-                )
-                output_max = np.max(datasets[0][time_var_names[0]].values)
-                input_max = np.max(nc_dataset[time_var_names[0]])
+                    
+                dataset = subset.convert_to_datetime(dataset, time_var_names)
 
-                output_min = np.min(datasets[0][time_var_names[0]].values)
-                input_min = np.min(nc_dataset[time_var_names[0]])
-
-                # test that the output granule was subsetted with time
-                assert input_max > output_max
-                assert input_min < output_min
+                assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
     
 
     def test_temporal_subset_lines(self):
