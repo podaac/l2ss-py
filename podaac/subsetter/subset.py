@@ -1129,7 +1129,7 @@ def convert_to_datetime(dataset, time_vars):
     """
     for var in time_vars:
         start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f") if any('TAI93' in str(dataset[var].attrs[attribute_name])
-                                                                                                          for attribute_name in dataset[var].attrs) else None
+                                                                                                         for attribute_name in dataset[var].attrs) else None
 
         if np.issubdtype(dataset[var].dtype, np.dtype(float)):
             # adjust the time values from the start date
