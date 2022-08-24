@@ -533,7 +533,7 @@ def compute_utc_name(dataset):
     Get the name of the utc variable if it is there to determine origine time
     """
     for var_name in list(dataset.data_vars.keys()):
-        if 'utc' in var_name.lower():
+        if 'utc' in var_name.lower() and 'time' in var_name.lower():
             return var_name
 
     return None
