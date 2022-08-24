@@ -1128,12 +1128,14 @@ def convert_to_datetime(dataset, time_vars):
     converts the time variable to datetime if xarray decode times
     """
     for var in time_vars:
-        start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f") if any(['TAI93' in str(dataset[var].attrs[attribute_name])
-                                                                                                          for attribute_name in dataset[var].attrs]) else None
+        start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f") if any('TAI93' in str(dataset[var].attrs[attribute_name])
+                                                                                                          for attribute_name in dataset[var].attrs) else None
 
         if np.issubdtype(dataset[var].dtype, np.dtype(float)):
+            # adjust the time values from the start date
             if start_date:
                 dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
+            # copy the values from the utc time variable to the time variable
             else:
                 utc_var_name = compute_utc_name(dataset)
                 if utc_var_name:
