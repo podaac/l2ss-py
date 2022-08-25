@@ -1009,17 +1009,21 @@ def _rename_variables(dataset, base_dataset):
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
-
+        print (variable)
+        #print (dataset.variables[var_name].values)
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
         ):
-            # Use xarray datetime encoder
+            print (dataset.variables[var_name].values)
+            #raise Exception
             cf_dt_coder = xr.coding.times.CFDatetimeCoder()
+            print (cf_dt_coder())
+            raise Exception
             encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
             variable = encoded_var
-
+            
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
@@ -1038,7 +1042,7 @@ def _rename_variables(dataset, base_dataset):
         # Copy data
         var_group.variables[new_var_name].set_auto_maskandscale(False)
         var_group.variables[new_var_name][:] = variable.data
-
+        #print (var_group.variables[new_var_name])
 
 def h5file_transform(finput):
     """
@@ -1125,7 +1129,7 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
 
 def convert_to_datetime(dataset, time_vars):
     """
-    converts the time variable to datetime if xarray decode times
+    converts the time variable to datetime if xarray doesn't decode times
     """
     for var in time_vars:
         start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f") if any('TAI93' in str(dataset[var].attrs[attribute_name])
