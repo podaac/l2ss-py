@@ -1009,21 +1009,16 @@ def _rename_variables(dataset, base_dataset):
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
-        print (variable)
-        #print (dataset.variables[var_name].values)
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
         ):
-            print (dataset.variables[var_name].values)
-            #raise Exception
+
             cf_dt_coder = xr.coding.times.CFDatetimeCoder()
-            print (cf_dt_coder())
-            raise Exception
             encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
             variable = encoded_var
-            
+
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
@@ -1042,7 +1037,7 @@ def _rename_variables(dataset, base_dataset):
         # Copy data
         var_group.variables[new_var_name].set_auto_maskandscale(False)
         var_group.variables[new_var_name][:] = variable.data
-        #print (var_group.variables[new_var_name])
+
 
 def h5file_transform(finput):
     """
