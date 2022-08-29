@@ -528,6 +528,17 @@ def compute_time_variable_name(dataset, lat_var):
     raise ValueError('Unable to determine time variable')
 
 
+def compute_utc_name(dataset):
+    """
+    Get the name of the utc variable if it is there to determine origine time
+    """
+    for var_name in list(dataset.data_vars.keys()):
+        if 'utc' in var_name.lower() and 'time' in var_name.lower():
+            return var_name
+
+    return None
+
+
 def get_time_epoch_var(dataset, time_var_name):
     """
     Get the name of the epoch time var. This is only needed in the case
@@ -686,7 +697,6 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
             timestamp = pd.to_datetime(timestamp)
         if np.issubdtype(dataset[time_var_name].dtype, np.dtype(np.timedelta64)):
             if is_time_mjd(dataset, time_var_name):
-                # mjd when timedelta based on
                 mjd_datetime = datetime_from_mjd(dataset, time_var_name)
                 if mjd_datetime is None:
                     raise ValueError('Unable to get datetime from dataset to calculate time delta')
@@ -697,10 +707,6 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
                 epoch_time_var_name = get_time_epoch_var(dataset, time_var_name)
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
-
-        if np.issubdtype(dataset[time_var_name].dtype, np.dtype(float)):
-            start_date = np.datetime64(dataset[time_var_name].attrs['Units'][-10:])
-            timestamp = (np.datetime64(timestamp) - start_date).astype('timedelta64[s]').astype('float')
 
         return compare(dataset[time_var_name], timestamp)
 
@@ -1003,13 +1009,12 @@ def _rename_variables(dataset, base_dataset):
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
-
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
         ):
-            # Use xarray datetime encoder
+
             cf_dt_coder = xr.coding.times.CFDatetimeCoder()
             encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
             variable = encoded_var
@@ -1102,6 +1107,7 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
     time_var_names : list
         List of time coordinate variables.
     """
+
     if not lat_var_names or not lon_var_names:
         lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
     if not time_var_names:
@@ -1110,7 +1116,33 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
                 dataset, dataset[lat_var_name]
             ) for lat_var_name in lat_var_names
         ]
+        time_var_names.append(compute_utc_name(dataset))
+        time_var_names = list(dict.fromkeys([x for x in time_var_names if x is not None]))  # remove Nones and any duplicates
+
     return lat_var_names, lon_var_names, time_var_names
+
+
+def convert_to_datetime(dataset, time_vars):
+    """
+    converts the time variable to datetime if xarray doesn't decode times
+    """
+    for var in time_vars:
+        start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f") if any('TAI93' in str(dataset[var].attrs[attribute_name])
+                                                                                                         for attribute_name in dataset[var].attrs) else None
+
+        if np.issubdtype(dataset[var].dtype, np.dtype(float)):
+            # adjust the time values from the start date
+            if start_date:
+                dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
+            # copy the values from the utc time variable to the time variable
+            else:
+                utc_var_name = compute_utc_name(dataset)
+                if utc_var_name:
+                    dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
+        else:
+            pass
+
+    return dataset
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,
@@ -1169,7 +1201,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
 
     if file_extension == 'he5':
         nc_dataset, has_groups = h5file_transform(file_to_subset)
-
     else:
         # Open dataset with netCDF4 first, so we can get group info
         nc_dataset = nc.Dataset(file_to_subset, mode='r')
@@ -1202,11 +1233,11 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
-
+        if min_time or max_time:
+            dataset = convert_to_datetime(dataset, time_var_names)
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
-
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
@@ -1266,7 +1297,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                         } for var_name in time_var_names
                         if 'units' in nc_dataset.variables[var_name].__dict__
                     }
-
                 for var in dataset.data_vars:
                     if var not in encoding:
                         encoding[var] = compression

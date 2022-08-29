@@ -6,8 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+- [issue/106](https://github.com/podaac/l2ss-py/issues/106): he5 temporal subsetting for determining start time. Find start time in units attributes or work back from first UTC time.
 - [issue/93](https://github.com/podaac/l2ss-py/issues/93): Added input argument to cmr updater to disable association removal
-### Changed 
 ### Deprecated 
 ### Removed
 ### Fixed

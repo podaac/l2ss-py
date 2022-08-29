@@ -150,6 +150,7 @@ class TestSubsetter(unittest.TestCase):
 
             in_ds.close()
             out_ds.close()
+            
 
     def test_subset_bbox(self):
         """
@@ -562,6 +563,7 @@ class TestSubsetter(unittest.TestCase):
             )
 
             # Get coord variables
+            time_var_name = []
             lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(in_ds)
             lat_var_name = lat_var_names[0]
             lon_var_name = lon_var_names[0]
@@ -1217,10 +1219,11 @@ class TestSubsetter(unittest.TestCase):
                 'mask_and_scale': False,
                 'decode_times': True
             }
-
+            time_var_names = []
             ds = xr.open_dataset(os.path.join(self.test_data_dir, test_file), **args)
             lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
             time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
+
             assert time_var_name is not None
             assert 'time' in time_var_name
 
@@ -1290,7 +1293,7 @@ class TestSubsetter(unittest.TestCase):
         Check that the OMI variables are conserved when no variable are specified
         the data field and lat/lon are in different groups
         """
-        omi_dir = join(self.test_data_dir, 'OMSO2')
+        omi_dir = join(self.test_data_dir, 'OMI')
         omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
 
         bbox = np.array(((-180, 90), (-90, 90)))
@@ -1388,6 +1391,7 @@ class TestSubsetter(unittest.TestCase):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
         ) as dataset:
+            time_var_names = []
             lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
             lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
             time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
@@ -1402,7 +1406,7 @@ class TestSubsetter(unittest.TestCase):
             indexed_cond = cond.isel(**indexers)
             indexed_ds = dataset.isel(**indexers)
             new_dataset = indexed_ds.where(indexed_cond)
-
+            
             assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
@@ -1431,10 +1435,10 @@ class TestSubsetter(unittest.TestCase):
         formatted dataset for h5py files
         """
         OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
-        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', OMI_file_name),
                         os.path.join(self.subset_output_dir, OMI_file_name))
 
-        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name), 'r')
+        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMI', OMI_file_name), 'r')
 
         entry_lst = []
         # Get root level objects
@@ -1645,62 +1649,51 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
+            
 
-    def test_temporal__he5file_subset(self):
+    def test_temporal_he5file_subset(self):
         """
-        Test that both a temporal subset can be executed for he5 files in the OMI
-        collections
+        Test that the time type changes to datetime for subsetting
         """
         
-        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+        OMI_file_names = ['OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5',
+                          'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5']
         OMI_copy_file = 'OMI_copy_testing_2.he5'
-        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', OMI_file_name),
-                        os.path.join(self.subset_output_dir, OMI_copy_file))
-        min_time='2020-01-16T12:30:00Z'
-        max_time='2020-01-16T12:40:00Z'
-        bbox = np.array(((-180, 180), (-90, 90)))
-        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_copy_file))
+        for i in OMI_file_names:
+            shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', i),
+                            os.path.join(self.subset_output_dir, OMI_copy_file))
+            min_time='2020-01-16T12:30:00Z'
+            max_time='2020-01-16T12:40:00Z'
+            bbox = np.array(((-180, 180), (-90, 90)))
+            nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_copy_file))
 
-        args = {
-            'decode_coords': False,
-            'mask_and_scale': False,
-            'decode_times': False
-        }
+            args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
 
-        if min_time or max_time:
-            args['decode_times'] = True  
+            if min_time or max_time:
+                args['decode_times'] = True  
 
-        with xr.open_dataset(
-                xr.backends.NetCDF4DataStore(nc_dataset),
-                **args
-        ) as dataset:
-            lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
-                dataset=dataset,
-                lat_var_names=None,
-                lon_var_names=None,
-                time_var_names=None
-            )
+            with xr.open_dataset(
+                    xr.backends.NetCDF4DataStore(nc_dataset),
+                    **args
+            ) as dataset:
+                lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+                    dataset=dataset,
+                    lat_var_names=None,
+                    lon_var_names=None,
+                    time_var_names=None
+                )
+                if 'BRO' in i:
+                    assert any('utc' in x.lower() for x in time_var_names)
 
-            datasets = subset.subset_with_bbox(
-                dataset=dataset,
-                lat_var_names=lat_var_names,
-                lon_var_names=lon_var_names,
-                time_var_names=time_var_names,
-                variables=None,
-                bbox=bbox,
-                cut=None,
-                min_time=min_time,
-                max_time=max_time
-            )
-            output_max = np.max(datasets[0][time_var_names[0]].values)
-            input_max = np.max(nc_dataset[time_var_names[0]])
+                    
+                dataset = subset.convert_to_datetime(dataset, time_var_names)
 
-            output_min = np.min(datasets[0][time_var_names[0]].values)
-            input_min = np.min(nc_dataset[time_var_names[0]])
-
-            # test that the output granule was subsetted with time
-            assert input_max > output_max
-            assert input_min < output_min
+                assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
+    
 
     def test_temporal_subset_lines(self):
         bbox = np.array(((-180, 180), (-90, 90)))
@@ -1751,7 +1744,7 @@ class TestSubsetter(unittest.TestCase):
         """
         omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
 
-        shutil.copyfile(os.path.join(self.test_data_dir, 'OMSO2', omi_file),
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', omi_file),
                         os.path.join(self.subset_output_dir, omi_file))
 
         nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
@@ -1766,7 +1759,7 @@ class TestSubsetter(unittest.TestCase):
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
         ) as dataset:
-
+            time_var_names = []
             lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
             time_var_names = [
                 subset.compute_time_variable_name(
@@ -1847,13 +1840,12 @@ class TestSubsetter(unittest.TestCase):
             dataset,
             lat_var_names=actual_lats,
             lon_var_names=dummy_lons,
-            time_var_names=None
+            time_var_names=None,
         )
 
         assert lats == actual_lats
         assert lons == dummy_lons
         assert times == actual_times
-
         # When only time is passed in, lats and lons are computed manually
         lats, lons, times = subset.get_coordinate_variable_names(
             dataset,
@@ -1861,7 +1853,6 @@ class TestSubsetter(unittest.TestCase):
             lon_var_names=None,
             time_var_names=dummy_times
         )
-
         assert lats == actual_lats
         assert lons == actual_lons
         assert times == dummy_times
