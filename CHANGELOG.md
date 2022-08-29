@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README
+
 ## [2.1.0]
 ### Added
 ### Changed

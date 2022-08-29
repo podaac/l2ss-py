@@ -16,6 +16,14 @@ Harmony service for subsetting L2 data. l2ss-py supports:
 
 If you would like to contribute to l2ss-py, refer to the [contribution document](CONTRIBUTING.md).
 
+## Initial setup, with poetry
+
+1. Follow the instructions for installing `poetry` [here](https://python-poetry.org/docs/).
+2. Install l2ss-py, with its dependencies, by running the following from the repository directory:
+
+```
+poetry install
+```
 
 ## How to test l2ss-py locally
 
