@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [2.1.0]
 ### Added
 ### Changed
 - [issue/106](https://github.com/podaac/l2ss-py/issues/106): he5 temporal subsetting for determining start time. Find start time in units attributes or work back from first UTC time.
