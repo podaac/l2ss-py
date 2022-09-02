@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README
+### Fixed
+- [issue/113](https://github.com/podaac/l2ss-py/issues/113): Added extra line of logic for timedelta data types in xarray_enhancements to handle SNDR collections. SNDR file added for cases with these variable types.
 
 ## [2.1.0]
 ### Added
