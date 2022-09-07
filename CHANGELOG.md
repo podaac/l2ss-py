@@ -6,10 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1]
+### Changed
+- [issue/113](https://github.com/podaac/l2ss-py/issues/113): SNDR collections use `timedelta` as data type, added extra line of logic to handle this datatype in xarray_enhancements. SNDR file added for test cases with these variable types.
+
 ## [2.1.0]
 ### Added
 ### Changed
-- [issue/113](https://github.com/podaac/l2ss-py/issues/113): SNDR collections use `timedelta` as data type, added extra line of logic to handle this datatype in xarray_enhancements. SNDR file added for test cases with these variable types.
 - [issue/106](https://github.com/podaac/l2ss-py/issues/106): he5 temporal subsetting for determining start time. Find start time in units attributes or work back from first UTC time.
 - [issue/93](https://github.com/podaac/l2ss-py/issues/93): Added input argument to cmr updater to disable association removal
 ### Deprecated 
