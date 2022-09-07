@@ -128,7 +128,7 @@ jobs:
           git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
           git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
-        uses: podaac/cmr-umm-updater@0.3.0-alpha.5
+        uses: podaac/cmr-umm-updater@0.3.0-alpha.6
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
