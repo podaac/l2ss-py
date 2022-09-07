@@ -25,6 +25,10 @@ If you would like to contribute to l2ss-py, refer to the [contribution document]
 poetry install
 ```
 
+***Note:*** l2ss-py can be installed as above and run without any dependency on `harmony`. 
+However, to additionally test the harmony adapter layer, 
+extra dependencies can be installed with `poetry install -E harmony`.
+
 ## How to test l2ss-py locally
 
 ### Unit tests
@@ -40,6 +44,11 @@ You can generate coverage reports as follows:
 ```
 poetry run pytest --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=html -m "not aws and not integration" tests/
 ```
+
+***Note:*** The majority of the tests execute core functionality of l2ss-py without ever interacting with the harmony python modules. 
+The `test_subset_harmony` tests, however, are explicitly for testing the harmony adapter layer 
+and do require the harmony optional dependencies be installed, 
+as described above with the `-E harmony` argument.
 
 ### l2ss-py script
 
