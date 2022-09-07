@@ -1016,7 +1016,6 @@ def _rename_variables(dataset, base_dataset, start_date):
         ):
             if start_date:
                 dataset.variables[var_name].values = (dataset.variables[var_name].values - np.datetime64(start_date))/np.timedelta64(1, 's')
-                #print (type(dataset.variables[var_name].values[0]))
                 variable = dataset.variables[var_name]
             else:
                 cf_dt_coder = xr.coding.times.CFDatetimeCoder()
@@ -1139,14 +1138,13 @@ def convert_to_datetime(dataset, time_vars):
             if start_date:
                 dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
                 return dataset, start_date
-            # copy the values from the utc time variable to the time variable
-            else:
-                utc_var_name = compute_utc_name(dataset)
-                if utc_var_name:
-                    start_seconds = dataset[var].values[0]
-                    dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
-                    start_date = dataset[var].values[0] - np.timedelta64(int(start_seconds), 's')
-                    return dataset, start_date
+
+            utc_var_name = compute_utc_name(dataset)
+            if utc_var_name:
+                start_seconds = dataset[var].values[0]
+                dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
+                start_date = dataset[var].values[0] - np.timedelta64(int(start_seconds), 's')
+                return dataset, start_date
 
         else:
             pass
