@@ -128,7 +128,7 @@ jobs:
           git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
           git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
-        uses: podaac/cmr-umm-updater@0.2.3
+        uses: podaac/cmr-umm-updater@0.3.0
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
@@ -223,6 +223,6 @@ jobs:
             --sarif-file-output=docker.sarif
       - name: Upload result to GitHub Code Scanning
         if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
-        uses: github/codeql-action/upload-sarif@v1
+        uses: github/codeql-action/upload-sarif@v2
         with:
           sarif_file: ./

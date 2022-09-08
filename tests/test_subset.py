@@ -1267,7 +1267,7 @@ class TestSubsetter(unittest.TestCase):
         these files have variables with duplicate dimensions
         """
         SNDR_dir = join(self.test_data_dir, 'SNDR')
-        sndr_file = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
+        sndr_file = 'SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc'
 
         bbox = np.array(((-180, 90), (-90, 90)))
         output_file = "{}_{}".format(self._testMethodName, sndr_file)
@@ -1279,6 +1279,8 @@ class TestSubsetter(unittest.TestCase):
             file_to_subset=join(self.subset_output_dir, sndr_file),
             bbox=bbox,
             output_file=join(self.subset_output_dir, output_file),
+            min_time='2021-02-24T00:50:20Z',
+            max_time='2021-02-24T01:09:55Z'
         )
         # check if the box_test is
 

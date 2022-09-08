@@ -241,6 +241,8 @@ def where(dataset, cond, cut):
             fill_value = new_dataset[variable_name].attrs.get('_FillValue')
             if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
                 fill_value = np.datetime64('nat')
+            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
+                fill_value = np.timedelta64('nat')
             new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
             if original_type != new_type:
                 new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
