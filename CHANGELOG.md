@@ -5,13 +5,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-
+### Added
 ### Changed
 - [issue/115](https://github.com/podaac/l2ss-py/issues/115): Added notes to README about installing "extra" harmony dependencies to avoid test suite fails. 
-- [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README
+- [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README	
+### Deprecated 
+### Removed
 ### Fixed
-- [issue/110](https://github.com/podaac/l2ss-py/issues/110): Get the start date in convert_times and reconvert times into original type in _recombine groups method.	
-- [issue/113](https://github.com/podaac/l2ss-py/issues/113): Added extra line of logic for timedelta data types in xarray_enhancements to handle SNDR collections. SNDR file added for cases with these variable types.
+- [issue/110](https://github.com/podaac/l2ss-py/issues/110): Get the start date in convert_times and reconvert times into original type in _recombine groups method.
+### Security
+
+## [2.1.1]
+### Changed
+- [issue/113](https://github.com/podaac/l2ss-py/issues/113): SNDR collections use `timedelta` as data type, added extra line of logic to handle this datatype in xarray_enhancements. SNDR file added for test cases with these variable types.
 
 ## [2.1.0]
 ### Added
@@ -35,8 +41,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking Change** [issue/99](https://github.com/podaac/l2ss-py/issues/99): Removed support for python 3.7
 ### Fixed
 - [issue/95](https://github.com/podaac/l2ss-py/issues/95): Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
-
 ### Security
+
+
 ## [1.5.0]
 ### Added
 - Added Shapefile option to UMM-S entry
