@@ -266,8 +266,8 @@ def calculate_chunks(dataset):
                  if dataset.dims[dim] > 4000
                  and len(dataset.dims) > 1}
     else:
-        chunk = {dim: 500 for dim in dataset.dims
-                 if dataset.dims[dim] > 500}
+        chunk = {dim: 50 for dim in dataset.dims
+                 if dataset.dims[dim] > 50}
 
     return chunk
 
@@ -522,6 +522,8 @@ def compute_time_variable_name(dataset, lat_var):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
+        if len(dataset[var_name].squeeze().dims) == 0:
+            continue
         if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
