@@ -8,18 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 - [issue/115](https://github.com/podaac/l2ss-py/issues/115): Added notes to README about installing "extra" harmony dependencies to avoid test suite fails. 
-- [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README
+- [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README	
 ### Deprecated 
 ### Removed
 ### Fixed
 - [issue/119](https://github.com/podaac/l2ss-py/issues/119): Add extra line for variables without any dimensions after a squeeze in compute_time_vars():	
+- [issue/110](https://github.com/podaac/l2ss-py/issues/110): Get the start date in convert_times and reconvert times into original type in _recombine groups method.
 ### Security
-
 
 ## [2.1.1]
 ### Changed
 - [issue/113](https://github.com/podaac/l2ss-py/issues/113): SNDR collections use `timedelta` as data type, added extra line of logic to handle this datatype in xarray_enhancements. SNDR file added for test cases with these variable types.
-
 
 ## [2.1.0]
 ### Added
