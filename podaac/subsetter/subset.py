@@ -266,8 +266,8 @@ def calculate_chunks(dataset):
                  if dataset.dims[dim] > 4000
                  and len(dataset.dims) > 1}
     else:
-        chunk = {dim: 50 for dim in dataset.dims
-                 if dataset.dims[dim] > 50}
+        chunk = {dim: 500 for dim in dataset.dims
+                 if dataset.dims[dim] > 500}
 
     return chunk
 
