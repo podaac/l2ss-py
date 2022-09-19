@@ -522,6 +522,8 @@ def compute_time_variable_name(dataset, lat_var):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
+        if len(dataset[var_name].squeeze().dims) == 0:
+            continue
         if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 

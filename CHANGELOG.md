@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/119](https://github.com/podaac/l2ss-py/issues/119): Add extra line for variables without any dimensions after a squeeze in compute_time_vars():	
 - [issue/110](https://github.com/podaac/l2ss-py/issues/110): Get the start date in convert_times and reconvert times into original type in _recombine groups method.
 ### Security
 
