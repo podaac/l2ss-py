@@ -24,17 +24,18 @@ def remove_duplicate_dims(nc_dataset):
     is changed to the original name.
     """
     dup_vars = {}
+    dup_new_varnames = []
     for var_name, var in nc_dataset.variables.items():
         dim_list = list(var.dimensions)
         if len(set(dim_list)) != len(dim_list):  # get true if var.dimensions has a duplicate
             dup_vars[var_name] = var  # populate dictionary with variables with vars with dup dims
     for dup_var_name, dup_var in dup_vars.items():
         dim_list = list(dup_var.dimensions)  # list of original dimensions of variable with dup dims
-        # get the dimensions that is duplicated
+        # get the dimensions that are duplicated
         dim_dup = [item for item, count in collections.Counter(dim_list).items() if count > 1][0]
         dim_dup_new = dim_dup+'_1'
-
         var_name_new = dup_var_name+'_1'
+        dup_new_varnames.append(var_name_new)
 
         # create new dimension by copying from the duplicated dimension
 
@@ -61,6 +62,21 @@ def remove_duplicate_dims(nc_dataset):
                 data[var_name_new].setncattr(attrname, nc_dataset.variables[dup_var_name].getncattr(attrname))
                 data[var_name_new][:] = nc_dataset.variables[dup_var_name][:]
         del nc_dataset.variables[dup_var_name]
-        nc_dataset.renameVariable(var_name_new, dup_var_name)
 
-    return nc_dataset
+    # return the variables that will need to be renamed: Rename method is still an issue per https://github.com/Unidata/netcdf-c/issues/1672
+    return nc_dataset, dup_new_varnames
+
+
+def rename_dup_vars(dataset, rename_vars):
+    """
+    NetCDF4 rename function raises and HDF error for variable in S5P files with duplicate dimensions
+    This method will use xarray to rename the variables
+    """
+
+    for i in rename_vars:
+        original_name = i[:-2]
+        dataset = dataset.rename({i: original_name})
+        
+    return dataset
+
+
