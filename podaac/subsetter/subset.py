@@ -1237,8 +1237,6 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             **args
     ) as dataset:
         dataset = dc.rename_dup_vars(dataset, rename_vars)
-        #print (list(dataset.data_vars.keys()))
-        #raise Exception
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
