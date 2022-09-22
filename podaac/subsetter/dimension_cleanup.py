@@ -72,11 +72,8 @@ def rename_dup_vars(dataset, rename_vars):
     NetCDF4 rename function raises and HDF error for variable in S5P files with duplicate dimensions
     This method will use xarray to rename the variables
     """
-
     for i in rename_vars:
         original_name = i[:-2]
         dataset = dataset.rename({i: original_name})
-        
+
     return dataset
-
-
