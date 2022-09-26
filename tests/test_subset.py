@@ -1289,6 +1289,33 @@ class TestSubsetter(unittest.TestCase):
 
         for var_name, variable in in_nc.variables.items():
             assert in_nc[var_name].shape == out_nc[var_name].shape
+
+    def test_duplicate_dims_tropomi(self):
+        """
+        Check if SNDR Climcaps files run successfully even though
+        these files have variables with duplicate dimensions
+        """
+        TROP_dir = join(self.test_data_dir, 'tropomi')
+        trop_file = 'S5P_OFFL_L2__AER_LH_20210704T005246_20210704T023416_19290_02_020200_20210708T023111.nc'
+
+        bbox = np.array(((-180, 180), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, trop_file)
+        shutil.copyfile(
+            os.path.join(TROP_dir, trop_file),
+            os.path.join(self.subset_output_dir, trop_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, trop_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file)
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(TROP_dir, trop_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables.items():
+            assert variable.shape == out_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables[var_name].shape
             
 
     def test_omi_novars_subset(self):

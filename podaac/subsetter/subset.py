@@ -1219,7 +1219,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
 
-    nc_dataset = dc.remove_duplicate_dims(nc_dataset)
+    nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
@@ -1236,6 +1236,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
+        dataset = dc.rename_dup_vars(dataset, rename_vars)
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
