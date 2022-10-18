@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+## [2.2.0]
+### Added
+### Changed
 - [issue/115](https://github.com/podaac/l2ss-py/issues/115): Added notes to README about installing "extra" harmony dependencies to avoid test suite fails. 
 - [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README
 - [issue/122](https://github.com/podaac/l2ss-py/issues/122): Changed renaming of duplicate dimension from netcdf4 to xarray per issues in the netcdf.rename function. https://github.com/Unidata/netcdf-c/issues/1672 	
