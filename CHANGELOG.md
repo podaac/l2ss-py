@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+## [2.2.0]
+### Added
+### Changed
 - [issue/115](https://github.com/podaac/l2ss-py/issues/115): Added notes to README about installing "extra" harmony dependencies to avoid test suite fails. 
 - [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README
 - [issue/122](https://github.com/podaac/l2ss-py/issues/122): Changed renaming of duplicate dimension from netcdf4 to xarray per issues in the netcdf.rename function. https://github.com/Unidata/netcdf-c/issues/1672 	
@@ -32,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/105](https://github.com/podaac/l2ss-py/issues/105): Added function to convert np object to python native objects.
 ### Security
 
+
 ## [2.0.0]
 ### Added
 - [issue/98](https://github.com/podaac/l2ss-py/issues/98): Added logic to handle time decoding for he5 tai93 files. Changed the min and max inputs to tai93 format and compared to the time format in the file
@@ -43,6 +52,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking Change** [issue/99](https://github.com/podaac/l2ss-py/issues/99): Removed support for python 3.7
 ### Fixed
 - [issue/95](https://github.com/podaac/l2ss-py/issues/95): Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
+
 ### Security
 
 
