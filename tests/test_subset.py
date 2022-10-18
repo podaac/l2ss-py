@@ -1290,6 +1290,34 @@ class TestSubsetter(unittest.TestCase):
         for var_name, variable in in_nc.variables.items():
             assert in_nc[var_name].shape == out_nc[var_name].shape
 
+    def test_duplicate_dims_tropomi(self):
+        """
+        Check if SNDR Climcaps files run successfully even though
+        these files have variables with duplicate dimensions
+        """
+        TROP_dir = join(self.test_data_dir, 'tropomi')
+        trop_file = 'S5P_OFFL_L2__AER_LH_20210704T005246_20210704T023416_19290_02_020200_20210708T023111.nc'
+
+        bbox = np.array(((-180, 180), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, trop_file)
+        shutil.copyfile(
+            os.path.join(TROP_dir, trop_file),
+            os.path.join(self.subset_output_dir, trop_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, trop_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file)
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(TROP_dir, trop_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables.items():
+            assert variable.shape == out_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables[var_name].shape
+            
+
     def test_omi_novars_subset(self):
         """
         Check that the OMI variables are conserved when no variable are specified
@@ -1314,8 +1342,9 @@ class TestSubsetter(unittest.TestCase):
         in_nc = nc.Dataset(join(omi_dir, omi_file))
         out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
 
-        for var_name, variable in in_nc.variables.items():
-            assert in_nc[var_name].shape == out_nc[var_name].shape
+        for var_name, variable in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables.items():
+            assert in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables[var_name].shape == \
+                out_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables[var_name].shape
 
 
     def test_root_group(self):
@@ -1691,12 +1720,58 @@ class TestSubsetter(unittest.TestCase):
                 if 'BRO' in i:
                     assert any('utc' in x.lower() for x in time_var_names)
 
-                    
-                dataset = subset.convert_to_datetime(dataset, time_var_names)
-
+                dataset, start_date = subset.convert_to_datetime(dataset, time_var_names)
                 assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
-    
 
+
+    def test_he5_timeattrs_output(self):
+        """Test that the time attributes in the output match the attributes of the input for OMI test files"""
+
+        omi_dir = join(self.test_data_dir, 'OMI')
+        omi_file = 'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'
+        omi_file_input = 'input'+omi_file
+        bbox = np.array(((-180, 90), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, omi_file)
+        shutil.copyfile(
+            os.path.join(omi_dir, omi_file),
+            os.path.join(self.subset_output_dir, omi_file)
+        )
+        shutil.copyfile(
+            os.path.join(omi_dir, omi_file),
+            os.path.join(self.subset_output_dir, omi_file_input)
+        )
+        
+        min_time='2020-01-16T12:30:00Z'
+        max_time='2020-01-16T12:40:00Z'
+        bbox = np.array(((-180, 180), (-90, 90)))
+        nc_dataset_input = nc.Dataset(os.path.join(self.subset_output_dir, omi_file_input))
+        incut_set = nc_dataset_input.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups['Geolocation Fields']
+        xr_dataset_input = xr.open_dataset(xr.backends.NetCDF4DataStore(incut_set))
+        inattrs =  xr_dataset_input['Time'].attrs
+        
+        subset.subset(
+            file_to_subset=os.path.join(self.subset_output_dir, omi_file),
+            bbox=bbox,
+            output_file=os.path.join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        output_ncdataset = nc.Dataset(os.path.join(self.subset_output_dir, output_file))
+        outcut_set = output_ncdataset.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups['Geolocation Fields']
+        xrout_dataset = xr.open_dataset(xr.backends.NetCDF4DataStore(outcut_set))
+        outattrs = xrout_dataset['Time'].attrs
+
+        for key in inattrs.keys():
+            if isinstance(inattrs[key], np.ndarray):
+                if np.array_equal(inattrs[key],outattrs[key]):
+                    pass
+                else:
+                    raise AssertionError('Attributes for {} do not equal each other'.format(key))
+            else:
+                assert inattrs[key] == outattrs[key]
+                
+        
     def test_temporal_subset_lines(self):
         bbox = np.array(((-180, 180), (-90, 90)))
         file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'

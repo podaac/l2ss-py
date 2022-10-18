@@ -5,6 +5,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+## [2.2.0]
+### Added
+### Changed
+- [issue/115](https://github.com/podaac/l2ss-py/issues/115): Added notes to README about installing "extra" harmony dependencies to avoid test suite fails. 
+- [issue/85](https://github.com/podaac/l2ss-py/issues/85): Added initial poetry setup guidance to the README
+- [issue/122](https://github.com/podaac/l2ss-py/issues/122): Changed renaming of duplicate dimension from netcdf4 to xarray per issues in the netcdf.rename function. https://github.com/Unidata/netcdf-c/issues/1672 	
+### Deprecated 
+### Removed
+### Fixed
+- [issue/119](https://github.com/podaac/l2ss-py/issues/119): Add extra line for variables without any dimensions after a squeeze in compute_time_vars():	
+- [issue/110](https://github.com/podaac/l2ss-py/issues/110): Get the start date in convert_times and reconvert times into original type in _recombine groups method.
+### Security
 
 ## [2.1.1]
 ### Changed
@@ -32,8 +51,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking Change** [issue/99](https://github.com/podaac/l2ss-py/issues/99): Removed support for python 3.7
 ### Fixed
 - [issue/95](https://github.com/podaac/l2ss-py/issues/95): Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
-
 ### Security
+
+
 ## [1.5.0]
 ### Added
 - Added Shapefile option to UMM-S entry

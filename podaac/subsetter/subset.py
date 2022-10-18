@@ -522,6 +522,8 @@ def compute_time_variable_name(dataset, lat_var):
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
+        if len(dataset[var_name].squeeze().dims) == 0:
+            continue
         if 'time' in var_name.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
@@ -946,7 +948,7 @@ def transform_grouped_dataset(nc_dataset, file_to_subset):
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets, output_file):  # pylint: disable=too-many-branches
+def recombine_grouped_datasets(datasets, output_file, start_date):  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
@@ -978,7 +980,7 @@ def recombine_grouped_datasets(datasets, output_file):  # pylint: disable=too-ma
             dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
 
         # Rename variables
-        _rename_variables(dataset, base_dataset)
+        _rename_variables(dataset, base_dataset, start_date)
 
     # Remove group vars from base dataset
     for var_name in list(base_dataset.variables.keys()):
@@ -1003,7 +1005,7 @@ def _get_nested_group(dataset, group_path):
     return nested_group
 
 
-def _rename_variables(dataset, base_dataset):
+def _rename_variables(dataset, base_dataset, start_date):
     for var_name in list(dataset.variables.keys()):
         new_var_name = var_name.split(GROUP_DELIM)[-1]
         var_group = _get_nested_group(base_dataset, var_name)
@@ -1014,10 +1016,13 @@ def _rename_variables(dataset, base_dataset):
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
         ):
-
-            cf_dt_coder = xr.coding.times.CFDatetimeCoder()
-            encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
-            variable = encoded_var
+            if start_date:
+                dataset.variables[var_name].values = (dataset.variables[var_name].values - np.datetime64(start_date))/np.timedelta64(1, 's')
+                variable = dataset.variables[var_name]
+            else:
+                cf_dt_coder = xr.coding.times.CFDatetimeCoder()
+                encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
+                variable = encoded_var
 
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
@@ -1134,15 +1139,19 @@ def convert_to_datetime(dataset, time_vars):
             # adjust the time values from the start date
             if start_date:
                 dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
-            # copy the values from the utc time variable to the time variable
-            else:
-                utc_var_name = compute_utc_name(dataset)
-                if utc_var_name:
-                    dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
+                return dataset, start_date
+
+            utc_var_name = compute_utc_name(dataset)
+            if utc_var_name:
+                start_seconds = dataset[var].values[0]
+                dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
+                start_date = dataset[var].values[0] - np.timedelta64(int(start_seconds), 's')
+                return dataset, start_date
+
         else:
             pass
 
-    return dataset
+    return dataset, start_date
 
 
 def subset(file_to_subset, bbox, output_file, variables=None,
@@ -1210,7 +1219,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
 
-    nc_dataset = dc.remove_duplicate_dims(nc_dataset)
+    nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
@@ -1227,14 +1236,16 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
+        dataset = dc.rename_dup_vars(dataset, rename_vars)
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
+        start_date = None
         if min_time or max_time:
-            dataset = convert_to_datetime(dataset, time_var_names)
+            dataset, start_date = convert_to_datetime(dataset, time_var_names)
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
@@ -1306,7 +1317,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
                 dataset.load().to_netcdf(output_file, 'w', encoding=encoding)
 
         if has_groups:
-            recombine_grouped_datasets(datasets, output_file)
+            recombine_grouped_datasets(datasets, output_file, start_date)
             # Check if the spatial bounds are all 'None'. This means the
             # subset result is empty.
             if any(bound is None for bound in spatial_bounds):
