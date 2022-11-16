@@ -1154,10 +1154,10 @@ def convert_to_datetime(dataset, time_vars):
     return dataset, start_date
 
 
-def subset(file_to_subset, bbox, output_file, variables=None,
+def subset(file_to_subset, bbox, output_file, variables=(),
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
-           lat_var_names=None, lon_var_names=None, time_var_names=None):
+           lat_var_names=(), lon_var_names=(), time_var_names=()):
     """
     Subset a given NetCDF file given a bounding box
 
@@ -1190,6 +1190,9 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         ISO timestamp representing the upper bound of the temporal
         subset to be performed. If this value is not provided, the
         granule will not be subset temporally on the upper bound.
+    origin_source : str
+        Original location or filename of data to be used in "derived from"
+        history element.
     lat_var_names : list
         List of variables that represent the latitude coordinate
         variables for this granule. This list will only contain more
@@ -1221,8 +1224,12 @@ def subset(file_to_subset, bbox, output_file, variables=None,
 
     nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
 
-    if variables:
+    if has_groups:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
+        lat_var_names = [x.replace('/', GROUP_DELIM) for x in lat_var_names]
+        lon_var_names = [x.replace('/', GROUP_DELIM) for x in lon_var_names]
+        time_var_names = [x.replace('/', GROUP_DELIM) for x in time_var_names]
+
 
     args = {
         'decode_coords': False,
