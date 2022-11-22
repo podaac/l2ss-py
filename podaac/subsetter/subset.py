@@ -19,6 +19,7 @@ Functions related to subsetting a NetCDF file.
 """
 
 import datetime
+import dateutil
 import functools
 import json
 import operator
@@ -26,6 +27,7 @@ import os
 from shutil import copy
 
 import cf_xarray as cfxr
+import cftime
 import geopandas as gpd
 import h5py
 import importlib_metadata
@@ -34,6 +36,7 @@ import netCDF4 as nc
 import numpy as np
 import pandas as pd
 import xarray as xr
+import xarray.coding.times
 from shapely.geometry import Point
 from shapely.ops import transform
 
@@ -1220,6 +1223,20 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
 
     nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
+
+    try:
+        time_test = nc_dataset['time'].units
+        dateutil.parser.parse(time_test)
+    except dateutil.parser._parser.ParserError:
+        orig_decode_cf_datetime = xarray.coding.times.decode_cf_datetime
+        def decode_cf_datetime(num_dates, units, calendar=None, use_cftime=None):
+            if cftime is not None:
+                reference_time = cftime.num2date(0, units, calendar)
+                units = f"{units.split('since')[0]} since {reference_time}"
+            return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
+        xarray.coding.times.decode_cf_datetime = decode_cf_datetime
+    except Exception as ex:
+        pass
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
