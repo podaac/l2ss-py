@@ -25,6 +25,7 @@ import operator
 import os
 from shutil import copy
 import dateutil
+from dateutil import parser
 
 import cf_xarray as cfxr
 import cftime
@@ -1224,22 +1225,17 @@ def subset(file_to_subset, bbox, output_file, variables=None,
 
     nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
 
-    try:
-        time_test = nc_dataset['time'].units
-        dateutil.parser.parse(time_test)
-    except dateutil.parser._parser.ParserError:
-        orig_decode_cf_datetime = xarray.coding.times.decode_cf_datetime
+    orig_decode_cf_datetime = xarray.coding.times.decode_cf_datetime
 
-        def decode_cf_datetime(num_dates, units, calendar=None, use_cftime=None):
-            if cftime is not None:
-                reference_time = cftime.num2date(0, units, calendar)
-                units = f"{units.split('since')[0]} since {reference_time}"
+    def decode_cf_datetime(num_dates, units, calendar=None, use_cftime=None):
+        try:
+            parser.parse(units.split('since')[-1])
             return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
-        xarray.coding.times.decode_cf_datetime = decode_cf_datetime
-    except IndexError:
-        pass
-    except AttributeError:
-        pass
+        except dateutil.parser._parser.ParserError:
+            reference_time = cftime.num2date(0, units, calendar)
+            units = f"{units.split('since')[0]} since {reference_time}"
+            return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
+    xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
