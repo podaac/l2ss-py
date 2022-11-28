@@ -36,6 +36,7 @@ import xarray as xr
 from jsonschema import validate
 from shapely.geometry import Point
 
+from podaac.subsetter import group_handling as gh
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
@@ -886,7 +887,7 @@ class TestSubsetter(unittest.TestCase):
                         os.path.join(self.subset_output_dir, s6_file_name))
 
         nc_ds = nc.Dataset(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name))
-        nc_ds_transformed = subset.transform_grouped_dataset(
+        nc_ds_transformed = gh.transform_grouped_dataset(
             nc.Dataset(os.path.join(self.subset_output_dir, s6_file_name), 'r'),
             os.path.join(self.subset_output_dir, s6_file_name)
         )
@@ -1361,16 +1362,16 @@ class TestSubsetter(unittest.TestCase):
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
+        nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
         ) as dataset:
             var_list = list(dataset.variables)
-            assert (var_list[0][0:2] == subset.GROUP_DELIM)
+            assert (var_list[0][0:2] == gh.GROUP_DELIM)
             group_lst = []
             for var_name in dataset.variables.keys(): #need logic if there is data in the top level not in a group
-                group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
+                group_lst.append('/'.join(var_name.split(gh.GROUP_DELIM)[:-1]))
             group_lst = ['/' if group=='' else group for group in group_lst]
             groups = set(group_lst)
             expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
@@ -1392,7 +1393,7 @@ class TestSubsetter(unittest.TestCase):
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
+        nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1417,7 +1418,7 @@ class TestSubsetter(unittest.TestCase):
                 'mask_and_scale': False,
                 'decode_times': False
             }
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
+        nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
         with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1484,7 +1485,7 @@ class TestSubsetter(unittest.TestCase):
                         entry_lst.append(entry_str + "/" + group_keys)
                     key_lst.append(entry_str + "/" + group_keys)
 
-        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+        nc_dataset, has_groups = gh.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
 
         nc_vars_flattened = list(nc_dataset.variables.keys())
         for i in range(len(entry_lst)): # go through all the datasets in h5py file
@@ -1511,32 +1512,33 @@ class TestSubsetter(unittest.TestCase):
 
         # Get variable dimensions from input dataset
         in_var_dims = {
-            var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            var_name: [dim.split(gh.GROUP_DELIM)[-1] for dim in var.dimensions]
             for var_name, var in in_nc.groups['PRODUCT'].variables.items()
         }
         
         # Get variables from METADATA group
         in_var_dims.update(
             {
-                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                var_name: [dim.split(gh.GROUP_DELIM)[-1] for dim in var.dimensions]
                 for var_name, var in in_nc.groups['METADATA'].groups['QA_STATISTICS'].variables.items()
             }
         )
         # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
         in_var_dims.update(
             {
-                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                var_name: [dim.split(gh.GROUP_DELIM)[-1] for dim in var.dimensions]
                 for var_name, var in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
             }
         )
 
-        out_nc = subset.transform_grouped_dataset(
+        out_nc = gh.transform_grouped_dataset(
             in_nc, os.path.join(self.subset_output_dir, tropomi_file_name)
         )
 
         # Get variable dimensions from output dataset
         out_var_dims = {
-            var_name.split(subset.GROUP_DELIM)[-1]: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            var_name.split(gh.GROUP_DELIM)[-1]: [dim.split(
+                gh.GROUP_DELIM)[-1] for dim in var.dimensions]
             for var_name, var in out_nc.variables.items()
         }
 
@@ -1602,7 +1604,7 @@ class TestSubsetter(unittest.TestCase):
 
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file), mode='r')
 
-        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
+        nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
 
         args = {
             'decode_coords': False,
@@ -1696,7 +1698,7 @@ class TestSubsetter(unittest.TestCase):
             min_time='2020-01-16T12:30:00Z'
             max_time='2020-01-16T12:40:00Z'
             bbox = np.array(((-180, 180), (-90, 90)))
-            nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_copy_file))
+            nc_dataset, has_groups = gh.h5file_transform(os.path.join(self.subset_output_dir, OMI_copy_file))
 
             args = {
                 'decode_coords': False,
@@ -1824,7 +1826,7 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', omi_file),
                         os.path.join(self.subset_output_dir, omi_file))
 
-        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
+        nc_dataset, has_groups = gh.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
 
         args = {
             'decode_coords': False,
