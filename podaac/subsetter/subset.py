@@ -1173,7 +1173,7 @@ def override_decode_cf_datetime():
         try:
             parser.parse(units.split('since')[-1])
             return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
-        except dateutil.parser._parser.ParserError:
+        except dateutil.parser._parser.ParserError:  # pylint: disable=protected-access
             reference_time = cftime.num2date(0, units, calendar)
             units = f"{units.split('since')[0]} since {reference_time}"
             return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
