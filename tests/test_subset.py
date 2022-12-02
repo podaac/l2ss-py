@@ -850,6 +850,1101 @@ class TestSubsetter(unittest.TestCase):
         var_listout = list(out_nc.groups['Retrieval'].variables.keys())
         assert ('water_height' in var_listout)
 
+    def test_variable_subset_s6(self):
+        """
+        multiple variable subset of variables in different groups in oco3
+        """
+
+        s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        output_file_name = 's6_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
+                        os.path.join(self.subset_output_dir, s6_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+        variables = ['/data_01/ku/range_ocean_mle3_rms', '/data_20/ku/range_ocean']
+        subset.subset(
+            file_to_subset=join(self.subset_output_dir, s6_file_name),
+            bbox=bbox,
+            variables=variables,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+        
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
+        var_listout =list(out_nc.groups['data_01'].groups['ku'].variables.keys())
+        var_listout.extend(list(out_nc.groups['data_20'].groups['ku'].variables.keys()))
+        assert ('range_ocean_mle3_rms' in var_listout)
+        assert ('range_ocean' in var_listout)
+
+
+    def test_transform_grouped_dataset(self):
+        """
+        Test that the transformation function results in a correctly
+        formatted dataset.
+        """
+        s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
+                        os.path.join(self.subset_output_dir, s6_file_name))
+
+        nc_ds = nc.Dataset(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name))
+        nc_ds_transformed = subset.transform_grouped_dataset(
+            nc.Dataset(os.path.join(self.subset_output_dir, s6_file_name), 'r'),
+            os.path.join(self.subset_output_dir, s6_file_name)
+        )
+
+        # The original ds has groups
+        assert nc_ds.groups
+
+        # There should be no groups in the new ds
+        assert not nc_ds_transformed.groups
+
+        # The original ds has no variables in the root group
+        assert not nc_ds.variables
+
+        # The new ds has variables in the root group
+        assert nc_ds_transformed.variables
+
+        # Each var in the new ds should map to a variable in the old ds
+        for var_name, var in nc_ds_transformed.variables.items():
+            path = var_name.strip('__').split('__')
+
+            group = nc_ds[path[0]]
+            for g in path[1:-1]:
+                group = group[g]
+            assert var_name.strip('__').split('__')[-1] in group.variables.keys()
+
+
+    def test_group_subset(self):
+        """
+        Ensure a subset function can be run on a granule that contains
+        groups without errors, and that the subsetted data is within
+        the given spatial bounds.
+        """
+        s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        s6_output_file_name = 'SS_S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        # Copy S6 file to temp dir
+        shutil.copyfile(
+            os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
+            os.path.join(self.subset_output_dir, s6_file_name)
+        )
+
+        # Make sure it runs without errors
+        bbox = np.array(((150, 180), (-90, -50)))
+        bounds = subset.subset(
+            file_to_subset=os.path.join(self.subset_output_dir, s6_file_name),
+            bbox=bbox,
+            output_file=os.path.join(self.subset_output_dir, s6_output_file_name)
+        )
+
+        # Check that bounds are within requested bbox
+        assert bounds[0][0] >= bbox[0][0]
+        assert bounds[0][1] <= bbox[0][1]
+        assert bounds[1][0] >= bbox[1][0]
+        assert bounds[1][1] <= bbox[1][1]
+
+    def test_json_history_metadata_append(self):
+        """
+        Tests that the json history metadata header is appended to when it
+        already exists. First we create a fake json_history header for input file.
+        """
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
+        input_file_subset = join(self.subset_output_dir, "int_{}".format(output_file))
+
+        fake_history = [
+            {
+                "date_time": "2021-05-10T14:30:24.553263",
+                "derived_from": basename(input_file_subset),
+                "program": SERVICE_NAME,
+                "version": importlib_metadata.distribution(SERVICE_NAME).version,
+                "parameters": "bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True",
+                "program_ref": "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD",
+                "$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+            }
+        ]
+
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
+        in_nc.attrs['history_json'] = json.dumps(fake_history)
+        in_nc.to_netcdf(join(self.subset_output_dir, 'int_{}'.format(output_file)), 'w')
+
+        subset.subset(
+            file_to_subset=input_file_subset,
+            bbox=np.array(((-180, 180), (-90.0, 90))),
+            output_file=join(self.subset_output_dir, output_file)
+        )
+
+        out_nc = xr.open_dataset(join(self.subset_output_dir, output_file))
+
+        history_json = json.loads(out_nc.attrs['history_json'])
+        assert len(history_json) == 2
+
+        is_valid_shema = validate(instance=history_json, schema=self.history_json_schema)
+        assert is_valid_shema is None
+
+        for history in history_json:
+            assert "date_time" in history
+            assert history.get('program') == SERVICE_NAME
+            assert history.get('derived_from') == basename(input_file_subset)
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
+            assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
+            assert history.get(
+                'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
+            assert history.get(
+                '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+
+    def test_json_history_metadata_create(self):
+        """
+        Tests that the json history metadata header is created when it does
+        not exist. All test granules does not contain this header.
+        """
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
+
+        # Remove the 'history' metadata from the granule
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
+        in_nc.to_netcdf(join(self.subset_output_dir, 'int_{}'.format(output_file)), 'w')
+
+        input_file_subset = join(self.subset_output_dir, "int_{}".format(output_file))
+        subset.subset(
+            file_to_subset=input_file_subset,
+            bbox=np.array(((-180, 180), (-90.0, 90))),
+            output_file=join(self.subset_output_dir, output_file)
+        )
+
+        out_nc = xr.open_dataset(join(self.subset_output_dir, output_file))
+
+        history_json = json.loads(out_nc.attrs['history_json'])
+        assert len(history_json) == 1
+
+        is_valid_shema = validate(instance=history_json, schema=self.history_json_schema)
+        assert is_valid_shema is None
+
+        for history in history_json:
+            assert "date_time" in history
+            assert history.get('program') == SERVICE_NAME
+            assert history.get('derived_from') == basename(input_file_subset)
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
+            assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
+            assert history.get(
+                'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
+            assert history.get(
+                '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+
+    def test_json_history_metadata_create_origin_source(self):
+        """
+        Tests that the json history metadata header is created when it does
+        not exist. All test granules does not contain this header.
+        """
+        test_file = next(filter(
+            lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
+            , self.test_files))
+        output_file = "{}_{}".format(self._testMethodName, test_file)
+
+        # Remove the 'history' metadata from the granule
+        in_nc = xr.open_dataset(join(self.test_data_dir, test_file))
+        in_nc.to_netcdf(join(self.subset_output_dir, 'int_{}'.format(output_file)), 'w')
+
+        input_file_subset = join(self.subset_output_dir, "int_{}".format(output_file))
+        subset.subset(
+            file_to_subset=input_file_subset,
+            bbox=np.array(((-180, 180), (-90.0, 90))),
+            output_file=join(self.subset_output_dir, output_file),
+            origin_source="fake_original_file.nc"
+        )
+
+        out_nc = xr.open_dataset(join(self.subset_output_dir, output_file))
+
+        history_json = json.loads(out_nc.attrs['history_json'])
+        assert len(history_json) == 1
+
+        is_valid_shema = validate(instance=history_json, schema=self.history_json_schema)
+        assert is_valid_shema is None
+
+        for history in history_json:
+            assert "date_time" in history
+            assert history.get('program') == SERVICE_NAME
+            assert history.get('derived_from') == "fake_original_file.nc"
+            assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
+            assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
+            assert history.get(
+                'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
+            assert history.get(
+                '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+
+    def test_temporal_subset_ascat(self):
+        """
+        Test that a temporal subset results in a granule that only
+        contains times within the given bounds.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2015-07-02T09:00:00'
+        max_time = '2015-07-02T10:00:00'
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        in_ds = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_times=False,
+                                 decode_coords=False)
+
+        # Check that 'time' types match
+        assert in_ds.time.dtype == out_ds.time.dtype
+
+        in_ds.close()
+        out_ds.close()
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_coords=False)
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        # All dates should be within the given temporal bounds.
+        assert (out_ds.time >= pd.to_datetime(start_dt)).all()
+        assert (out_ds.time <= pd.to_datetime(end_dt)).all()
+
+    def test_temporal_subset_modis_a(self):
+        """
+        Test that a temporal subset results in a granule that only
+        contains times within the given bounds.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'MODIS_A-JPL-L2P-v2014.0.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2019-08-05T06:57:00'
+        max_time = '2019-08-05T06:58:00'
+        # Actual min is 2019-08-05T06:55:01.000000000
+        # Actual max is 2019-08-05T06:59:57.000000000
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        in_ds = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_times=False,
+                                 decode_coords=False)
+
+        # Check that 'time' types match
+        assert in_ds.time.dtype == out_ds.time.dtype
+
+        in_ds.close()
+        out_ds.close()
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_coords=False)
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        epoch_dt = out_ds['time'].values[0]
+
+        # All timedelta + epoch should be within the given temporal bounds.
+        assert out_ds.sst_dtime.min() + epoch_dt >= np.datetime64(start_dt)
+        assert out_ds.sst_dtime.min() + epoch_dt <= np.datetime64(end_dt)
+
+    def test_temporal_subset_s6(self):
+        """
+        Test that a temporal subset results in a granule that only
+        contains times within the given bounds.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        # Copy S6 file to temp dir
+        shutil.copyfile(
+            os.path.join(self.test_data_dir, 'sentinel_6', file),
+            os.path.join(self.subset_output_dir, file)
+        )
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2020-12-07T01:20:00'
+        max_time = '2020-12-07T01:25:00'
+        # Actual min is 2020-12-07T01:15:01.000000000
+        # Actual max is 2020-12-07T01:30:23.000000000
+
+        subset.subset(
+            file_to_subset=join(self.subset_output_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_coords=False,
+            group='data_01'
+        )
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        # All dates should be within the given temporal bounds.
+        assert (out_ds.time >= pd.to_datetime(start_dt)).all()
+        assert (out_ds.time <= pd.to_datetime(end_dt)).all()
+
+    def test_get_time_variable_name(self):
+        for test_file in self.test_files:
+            args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': True
+            }
+            time_var_names = []
+            ds = xr.open_dataset(os.path.join(self.test_data_dir, test_file), **args)
+            lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
+            time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
+
+            assert time_var_name is not None
+            assert 'time' in time_var_name
+
+    def test_subset_jason(self):
+        bbox = np.array(((-180, 0), (-90, 90)))
+        file = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = "2002-01-15T06:07:06Z"
+        max_time = "2002-01-15T06:30:16Z"
+
+        subset.subset(
+            file_to_subset=os.path.join(self.test_data_dir, file),
+            bbox=bbox,
+            min_time=min_time,
+            max_time=max_time,
+            output_file=os.path.join(self.subset_output_dir, output_file)
+        )
+
+    def test_subset_size(self):
+
+        for file in self.test_files:
+            bbox = np.array(((-180, 0), (-30, 90)))
+            output_file = "{}_{}".format(self._testMethodName, file)
+            input_file_path = os.path.join(self.test_data_dir, file)
+            output_file_path = os.path.join(self.subset_output_dir, output_file)
+
+            subset.subset(
+                file_to_subset=input_file_path,
+                bbox=bbox,
+                output_file=output_file_path
+            )
+
+            original_file_size = os.path.getsize(input_file_path)
+            subset_file_size = os.path.getsize(output_file_path)
+
+            assert subset_file_size < original_file_size
+
+    def test_duplicate_dims_sndr(self):
+        """
+        Check if SNDR Climcaps files run successfully even though
+        these files have variables with duplicate dimensions
+        """
+        SNDR_dir = join(self.test_data_dir, 'SNDR')
+        sndr_file = 'SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc'
+
+        bbox = np.array(((-180, 90), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, sndr_file)
+        shutil.copyfile(
+            os.path.join(SNDR_dir, sndr_file),
+            os.path.join(self.subset_output_dir, sndr_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, sndr_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time='2021-02-24T00:50:20Z',
+            max_time='2021-02-24T01:09:55Z'
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(SNDR_dir, sndr_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.variables.items():
+            assert in_nc[var_name].shape == out_nc[var_name].shape
+
+    def test_duplicate_dims_tropomi(self):
+        """
+        Check if SNDR Climcaps files run successfully even though
+        these files have variables with duplicate dimensions
+        """
+        TROP_dir = join(self.test_data_dir, 'tropomi')
+        trop_file = 'S5P_OFFL_L2__AER_LH_20210704T005246_20210704T023416_19290_02_020200_20210708T023111.nc'
+
+        bbox = np.array(((-180, 180), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, trop_file)
+        shutil.copyfile(
+            os.path.join(TROP_dir, trop_file),
+            os.path.join(self.subset_output_dir, trop_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, trop_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file)
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(TROP_dir, trop_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables.items():
+            assert variable.shape == out_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables[var_name].shape
+            
+
+    def test_omi_novars_subset(self):
+        """
+        Check that the OMI variables are conserved when no variable are specified
+        the data field and lat/lon are in different groups
+        """
+        omi_dir = join(self.test_data_dir, 'OMI')
+        omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+
+        bbox = np.array(((-180, 90), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, omi_file)
+        shutil.copyfile(
+            os.path.join(omi_dir, omi_file),
+            os.path.join(self.subset_output_dir, omi_file)
+        )
+        box_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, omi_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+        )
+        # check if the box_test is
+
+        in_nc = nc.Dataset(join(omi_dir, omi_file))
+        out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
+
+        for var_name, variable in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables.items():
+            assert in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables[var_name].shape == \
+                out_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables[var_name].shape
+
+
+    def test_root_group(self):
+        """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
+
+        sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'SNDR', sndr_file_name),
+                        os.path.join(self.subset_output_dir, sndr_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            var_list = list(dataset.variables)
+            assert (var_list[0][0:2] == subset.GROUP_DELIM)
+            group_lst = []
+            for var_name in dataset.variables.keys(): #need logic if there is data in the top level not in a group
+                group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
+            group_lst = ['/' if group=='' else group for group in group_lst]
+            groups = set(group_lst)
+            expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
+            assert (groups == expected_group)
+
+    def test_get_time_squeeze(self):
+        """test builtin squeeze method on the lat and time variables so 
+        when the two have the same shape with a time and delta time in
+        the tropomi product granuales the get_time_variable_name returns delta time as well"""
+
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
+            time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
+            lat_dims = dataset[lat_var_name].squeeze().dims
+            time_dims = dataset[time_var_name].squeeze().dims
+            assert (lat_dims == time_dims)
+
+    def test_get_indexers_nd(self):
+        """test that the time coordinate is not included in the indexers. Also test that the dimensions are the same for
+           a global box subset"""
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
+        with xr.open_dataset(
+            xr.backends.NetCDF4DataStore(nc_dataset),
+            **args
+        ) as dataset:
+            time_var_names = []
+            lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
+            lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
+            time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
+            oper = operator.and_
+
+            cond = oper(
+                (dataset[lon_var_name] >= -180),
+                (dataset[lon_var_name] <= 180)
+                ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
+
+            indexers = xre.get_indexers_from_nd(cond, True)
+            indexed_cond = cond.isel(**indexers)
+            indexed_ds = dataset.isel(**indexers)
+            new_dataset = indexed_ds.where(indexed_cond)
+            
+            assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
+            assert (new_dataset.dims == dataset.dims)
+
+    def test_variable_type_string_oco2(self):
+        """Code passes a ceating a variable that is type object in oco2 file"""
+
+        oco2_file_name = 'oco2_LtCO2_190201_B10206Ar_200729175909s.nc4'
+        output_file_name = 'oco2_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
+                        os.path.join(self.subset_output_dir, oco2_file_name))
+        bbox = np.array(((-180,180),(-90.0,90)))
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, 'OCO2',oco2_file_name),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file_name),
+        )
+
+        in_nc = xr.open_dataset(join(self.test_data_dir, 'OCO2',oco2_file_name))
+        out_nc = xr.open_dataset(join(self.subset_output_dir, output_file_name))
+        assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
+
+    def test_transform_h5py_dataset(self):
+        """
+        Test that the transformation function results in a correctly
+        formatted dataset for h5py files
+        """
+        OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', OMI_file_name),
+                        os.path.join(self.subset_output_dir, OMI_file_name))
+
+        h5_ds = h5py.File(os.path.join(self.test_data_dir, 'OMI', OMI_file_name), 'r')
+
+        entry_lst = []
+        # Get root level objects
+        key_lst = list(h5_ds.keys())
+        
+        # Go through every level of the file to fill out the remaining objects
+        for entry_str in key_lst:
+            # If object is a group, add it to the loop list
+            if (isinstance(h5_ds[entry_str],h5py.Group)):
+                for group_keys in list(h5_ds[entry_str].keys()):
+                    if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
+                        entry_lst.append(entry_str + "/" + group_keys)
+                    key_lst.append(entry_str + "/" + group_keys)
+
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
+
+        nc_vars_flattened = list(nc_dataset.variables.keys())
+        for i in range(len(entry_lst)): # go through all the datasets in h5py file
+            input_variable = '__'+entry_lst[i].replace('/', '__')
+            output_variable = nc_vars_flattened[i]
+            assert (input_variable == output_variable)
+
+        nc_dataset.close()
+        h5_ds.close()
+
+
+    def test_variable_dims_matched_tropomi(self):
+        """
+        Code must match the dimensions for each variable rather than
+        assume all dimensions in a group are the same
+        """
+
+        tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
+        output_file_name = 'tropomi_test_out.nc'
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file_name),
+                        os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        in_nc = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
+
+        # Get variable dimensions from input dataset
+        in_var_dims = {
+            var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            for var_name, var in in_nc.groups['PRODUCT'].variables.items()
+        }
+        
+        # Get variables from METADATA group
+        in_var_dims.update(
+            {
+                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                for var_name, var in in_nc.groups['METADATA'].groups['QA_STATISTICS'].variables.items()
+            }
+        )
+        # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
+        in_var_dims.update(
+            {
+                var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+                for var_name, var in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
+            }
+        )
+
+        out_nc = subset.transform_grouped_dataset(
+            in_nc, os.path.join(self.subset_output_dir, tropomi_file_name)
+        )
+
+        # Get variable dimensions from output dataset
+        out_var_dims = {
+            var_name.split(subset.GROUP_DELIM)[-1]: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            for var_name, var in out_nc.variables.items()
+        }
+
+        self.assertDictEqual(in_var_dims, out_var_dims)
+
+
+    def test_temporal_merged_topex(self):
+        """
+        Test that a temporal subset results in a granule that only
+        contains times within the given bounds.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'Merged_TOPEX_Jason_OSTM_Jason-3_Cycle_002.V4_2.nc'
+        # Copy S6 file to temp dir
+        shutil.copyfile(
+            os.path.join(self.test_data_dir, file),
+            os.path.join(self.subset_output_dir, file)
+        )
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '1992-01-01T00:00:00'
+        max_time = '1992-11-01T00:00:00'
+        # Actual min is 2020-12-07T01:15:01.000000000
+        # Actual max is 2020-12-07T01:30:23.000000000
+
+        subset.subset(
+            file_to_subset=join(self.subset_output_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_coords=False
+        )
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        # delta time from the MJD of this data collection
+        mjd_dt = np.datetime64("1992-01-01")
+        start_delta_dt = np.datetime64(start_dt) - mjd_dt
+        end_delta_dt = np.datetime64(end_dt) - mjd_dt
+
+        # All dates should be within the given temporal bounds.
+        assert (out_ds.time.values >= start_delta_dt).all()
+        assert (out_ds.time.values <= end_delta_dt).all()
+
+    def test_get_time_epoch_var(self):
+        """
+        Test that get_time_epoch_var method returns the 'time' variable for the tropomi CH4 granule"
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        tropomi_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file),
+                        os.path.join(self.subset_output_dir, tropomi_file))
+
+
+        nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file), mode='r')
+
+        nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+
+            lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
+            time_var_names = [
+                subset.compute_time_variable_name(
+                    dataset, dataset[lat_var_name]
+                ) for lat_var_name in lat_var_names
+            ]
+            epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
+            
+            assert epoch_time_var.split('__')[-1] == 'time'
+
+    def test_temporal_variable_subset(self):
+        """
+        Test that both a temporal and variable subset can be executed
+        on a granule, and that all of the data within that granule is
+        subsetted as expected.
+        """
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2015-07-02T09:00:00'
+        max_time = '2015-07-02T10:00:00'
+        variables = [
+            'wind_speed',
+            'wind_dir'
+        ]
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time,
+            variables=variables
+        )
+
+        in_ds = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_times=False,
+                                 decode_coords=False)
+
+        # Check that 'time' types match
+        assert in_ds.time.dtype == out_ds.time.dtype
+
+        in_ds.close()
+        out_ds.close()
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+                                 decode_coords=False)
+
+        start_dt = subset.translate_timestamp(min_time)
+        end_dt = subset.translate_timestamp(max_time)
+
+        # All dates should be within the given temporal bounds.
+        assert (out_ds.time >= pd.to_datetime(start_dt)).all()
+        assert (out_ds.time <= pd.to_datetime(end_dt)).all()
+
+        # Only coordinate variables and variables requested in variable
+        # subset should be present.
+        assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
+            
+
+    def test_temporal_he5file_subset(self):
+        """
+        Test that the time type changes to datetime for subsetting
+        """
+        
+        OMI_file_names = ['OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5',
+                          'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5']
+        OMI_copy_file = 'OMI_copy_testing_2.he5'
+        for i in OMI_file_names:
+            shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', i),
+                            os.path.join(self.subset_output_dir, OMI_copy_file))
+            min_time='2020-01-16T12:30:00Z'
+            max_time='2020-01-16T12:40:00Z'
+            bbox = np.array(((-180, 180), (-90, 90)))
+            nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, OMI_copy_file))
+
+            args = {
+                'decode_coords': False,
+                'mask_and_scale': False,
+                'decode_times': False
+            }
+
+            if min_time or max_time:
+                args['decode_times'] = True  
+
+            with xr.open_dataset(
+                    xr.backends.NetCDF4DataStore(nc_dataset),
+                    **args
+            ) as dataset:
+                lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+                    dataset=dataset,
+                    lat_var_names=None,
+                    lon_var_names=None,
+                    time_var_names=None
+                )
+                if 'BRO' in i:
+                    assert any('utc' in x.lower() for x in time_var_names)
+
+                dataset, start_date = subset.convert_to_datetime(dataset, time_var_names)
+                assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
+
+
+    def test_he5_timeattrs_output(self):
+        """Test that the time attributes in the output match the attributes of the input for OMI test files"""
+
+        omi_dir = join(self.test_data_dir, 'OMI')
+        omi_file = 'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'
+        omi_file_input = 'input'+omi_file
+        bbox = np.array(((-180, 90), (-90, 90)))
+        output_file = "{}_{}".format(self._testMethodName, omi_file)
+        shutil.copyfile(
+            os.path.join(omi_dir, omi_file),
+            os.path.join(self.subset_output_dir, omi_file)
+        )
+        shutil.copyfile(
+            os.path.join(omi_dir, omi_file),
+            os.path.join(self.subset_output_dir, omi_file_input)
+        )
+        
+        min_time='2020-01-16T12:30:00Z'
+        max_time='2020-01-16T12:40:00Z'
+        bbox = np.array(((-180, 180), (-90, 90)))
+        nc_dataset_input = nc.Dataset(os.path.join(self.subset_output_dir, omi_file_input))
+        incut_set = nc_dataset_input.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups['Geolocation Fields']
+        xr_dataset_input = xr.open_dataset(xr.backends.NetCDF4DataStore(incut_set))
+        inattrs =  xr_dataset_input['Time'].attrs
+        
+        subset.subset(
+            file_to_subset=os.path.join(self.subset_output_dir, omi_file),
+            bbox=bbox,
+            output_file=os.path.join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        output_ncdataset = nc.Dataset(os.path.join(self.subset_output_dir, output_file))
+        outcut_set = output_ncdataset.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups['Geolocation Fields']
+        xrout_dataset = xr.open_dataset(xr.backends.NetCDF4DataStore(outcut_set))
+        outattrs = xrout_dataset['Time'].attrs
+
+        for key in inattrs.keys():
+            if isinstance(inattrs[key], np.ndarray):
+                if np.array_equal(inattrs[key],outattrs[key]):
+                    pass
+                else:
+                    raise AssertionError('Attributes for {} do not equal each other'.format(key))
+            else:
+                assert inattrs[key] == outattrs[key]
+                
+        
+    def test_temporal_subset_lines(self):
+        bbox = np.array(((-180, 180), (-90, 90)))
+        file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2012-11-11T23:59:10'
+        max_time = '2012-11-12T00:20:10'
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_times=False,
+            decode_coords=False
+        )
+
+        assert ds.time.dims != ds.latitude.dims
+
+    def test_grouped_empty_subset(self):
+        """
+        Test that an empty subset of a grouped dataset returns 'None'
+        spatial bounds.
+        """
+        bbox = np.array(((-10, 10), (-10, 10)))
+        file = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', file),
+                        os.path.join(self.subset_output_dir, file))
+
+        spatial_bounds = subset.subset(
+            file_to_subset=join(self.subset_output_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file)
+        )
+
+        assert spatial_bounds is None
+
+    def test_get_time_OMI(self):
+        """
+        Test that code get time variables for OMI .he5 files"
+        """
+        omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
+
+        shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', omi_file),
+                        os.path.join(self.subset_output_dir, omi_file))
+
+        nc_dataset, has_groups = subset.h5file_transform(os.path.join(self.subset_output_dir, omi_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+            time_var_names = []
+            lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
+            time_var_names = [
+                subset.compute_time_variable_name(
+                    dataset, dataset[lat_var_name]
+                ) for lat_var_name in lat_var_names
+            ]
+            assert "Time" in time_var_names[0]
+            assert "Latitude" in lat_var_names[0]
+
+
+    def test_empty_temporal_subset(self):
+        """
+        Test the edge case where a subsetted empty granule
+        (due to bbox) is temporally subset, which causes the encoding
+        step to fail due to size '1' data for each dimension.
+        """
+        #  37.707:38.484
+        bbox = np.array(((37.707, 38.484), (-13.265, -12.812)))
+        file = '20190927000500-JPL-L2P_GHRSST-SSTskin-MODIS_A-D-v02.0-fv01.0.nc'
+        output_file = "{}_{}".format(self._testMethodName, file)
+        min_time = '2019-09-01'
+        max_time = '2019-09-30'
+
+        subset.subset(
+            file_to_subset=join(self.test_data_dir, file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
+
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        ds = xr.open_dataset(
+            join(self.subset_output_dir, output_file),
+            decode_coords=False
+        )
+
+        assert all(dim_size == 1 for dim_size in ds.dims.values())
+
+    def test_passed_coords(self):
+        """
+        Ensure the coordinates passed in to the subsetter are
+        utilized and not manually calculated.
+        """
+        file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
+
+        dataset = xr.open_dataset(join(self.test_data_dir, file),
+                                decode_times=False,
+                                decode_coords=False)
+
+        dummy_lats = ['dummy_lat']
+        dummy_lons = ['dummy_lon']
+        dummy_times = ['dummy_time']
+
+        actual_lats = ['lat']
+        actual_lons = ['lon']
+        actual_times = ['time']
+
+        # When none are passed in, variables are computed manually
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=None,
+            lon_var_names=None,
+            time_var_names=None
+        )
+
+        assert lats == actual_lats
+        assert lons == actual_lons
+        assert times == actual_times
+
+        # When lats or lons are passed in, only time is computed manually
+        # This case is a bit different because the lat values are used to
+        # compute the time variable so we can't pass in dummy values.
+
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=actual_lats,
+            lon_var_names=dummy_lons,
+            time_var_names=None,
+        )
+
+        assert lats == actual_lats
+        assert lons == dummy_lons
+        assert times == actual_times
+        # When only time is passed in, lats and lons are computed manually
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=None,
+            lon_var_names=None,
+            time_var_names=dummy_times
+        )
+        assert lats == actual_lats
+        assert lons == actual_lons
+        assert times == dummy_times
+
+        # When time, lats, and lons are passed in, nothing is computed manually
+        lats, lons, times = subset.get_coordinate_variable_names(
+            dataset,
+            lat_var_names=dummy_lats,
+            lon_var_names=dummy_lons,
+            time_var_names=dummy_times
+        )
+
+        assert lats == dummy_lats
+        assert lons == dummy_lons
+        assert times == dummy_times
+
     def test_var_subsetting_tropomi(self):
         """
         Check that variable subsetting is the same if a leading slash is included
