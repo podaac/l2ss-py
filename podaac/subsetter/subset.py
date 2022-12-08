@@ -930,6 +930,26 @@ def convert_to_datetime(dataset, time_vars):
     return dataset, start_date
 
 
+def open_as_nc_dataset(filepath: str) -> tuple[nc.Dataset, list, bool]:
+    """Open netcdf file, and flatten groups if they exist."""
+    file_extension = filepath.split('.')[-1]
+
+    if file_extension == 'he5':
+        nc_dataset, has_groups = h5file_transform(filepath)
+    else:
+        # Open dataset with netCDF4 first, so we can get group info
+        nc_dataset = nc.Dataset(filepath, mode='r')
+        has_groups = bool(nc_dataset.groups)
+
+        # If dataset has groups, transform to work with xarray
+        if has_groups:
+            nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
+
+    nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
+
+    return nc_dataset, rename_vars, has_groups
+
+
 def subset(file_to_subset, bbox, output_file, variables=None,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
@@ -982,20 +1002,7 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
     """
-    file_extension = file_to_subset.split('.')[-1]
-
-    if file_extension == 'he5':
-        nc_dataset, has_groups = h5file_transform(file_to_subset)
-    else:
-        # Open dataset with netCDF4 first, so we can get group info
-        nc_dataset = nc.Dataset(file_to_subset, mode='r')
-        has_groups = bool(nc_dataset.groups)
-
-        # If dataset has groups, transform to work with xarray
-        if has_groups:
-            nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
-
-    nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
+    nc_dataset, rename_vars, has_groups = open_as_nc_dataset(file_to_subset)
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
