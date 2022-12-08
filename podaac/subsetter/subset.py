@@ -489,7 +489,7 @@ def compute_time_variable_name(dataset, lat_var):
 
     Parameters
     ----------
-    dataset : xr.Dataset:
+    dataset : xr.Dataset
         xarray dataset to find time variable from
     lat_var : xr.Variable
         Lat variable for this dataset
