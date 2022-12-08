@@ -1233,11 +1233,8 @@ class TestSubsetter(unittest.TestCase):
             }
             time_var_names = []
             ds, rename_vars, _ = subset.open_as_nc_dataset(os.path.join(self.test_data_dir, test_file))
-            ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds),
-                                 decode_times=False,
-                                 decode_coords=False,
-                                 mask_and_scale=False)
-            # ds = xr.open_dataset(os.path.join(self.test_data_dir, test_file), **args)
+            ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
+
             lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
             time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
 
