@@ -170,10 +170,18 @@ class TestSubsetter(unittest.TestCase):
                 output_file=join(self.subset_output_dir, output_file)
             )
 
-            out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+            file_to_subset = join(self.subset_output_dir, output_file)
+
+            out_ds, rename_vars, _ = subset.open_as_nc_dataset(file_to_subset)
+            out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                                      decode_times=False,
                                      decode_coords=False,
                                      mask_and_scale=False)
+
+            # out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+            #                          decode_times=False,
+            #                          decode_coords=False,
+            #                          mask_and_scale=False)
 
             lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(out_ds)
 
@@ -555,6 +563,7 @@ class TestSubsetter(unittest.TestCase):
 
             excluded_variables = list(set(variable[0] for variable in in_ds.data_vars.items())
                                       - set(included_variables))
+            in_ds.close()
 
             subset.subset(
                 file_to_subset=join(self.test_data_dir, file),
@@ -563,6 +572,14 @@ class TestSubsetter(unittest.TestCase):
                 variables=included_variables
             )
 
+            in_ds, rename_vars, _ = subset.open_as_nc_dataset(join(self.test_data_dir, file))
+            in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
+                                     decode_times=False,
+                                     decode_coords=False)
+
+            # in_ds = xr.open_dataset(join(self.test_data_dir, file),
+            #                         decode_times=False,
+            #                         decode_coords=False)
             # Get coord variables
             time_var_name = []
             lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(in_ds)
@@ -1221,7 +1238,12 @@ class TestSubsetter(unittest.TestCase):
                 'decode_times': True
             }
             time_var_names = []
-            ds = xr.open_dataset(os.path.join(self.test_data_dir, test_file), **args)
+            ds, rename_vars, _ = subset.open_as_nc_dataset(os.path.join(self.test_data_dir, test_file))
+            ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds),
+                                 decode_times=False,
+                                 decode_coords=False,
+                                 mask_and_scale=False)
+            # ds = xr.open_dataset(os.path.join(self.test_data_dir, test_file), **args)
             lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
             time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
 
