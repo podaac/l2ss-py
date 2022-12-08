@@ -24,6 +24,7 @@ def transform_grouped_dataset(nc_dataset, file_to_subset):
     ----------
     nc_dataset : nc.Dataset
         netCDF4 Dataset that contains groups
+    file_to_subset : str
 
     Returns
     -------
