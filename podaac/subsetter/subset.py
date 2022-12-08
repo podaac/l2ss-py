@@ -24,8 +24,11 @@ import json
 import operator
 import os
 from shutil import copy
+import dateutil
+from dateutil import parser
 
 import cf_xarray as cfxr
+import cftime
 import geopandas as gpd
 import h5py
 import importlib_metadata
@@ -34,6 +37,7 @@ import netCDF4 as nc
 import numpy as np
 import pandas as pd
 import xarray as xr
+import xarray.coding.times
 from shapely.geometry import Point
 from shapely.ops import transform
 
@@ -1154,6 +1158,29 @@ def convert_to_datetime(dataset, time_vars):
     return dataset, start_date
 
 
+def override_decode_cf_datetime():
+    """
+    WARNING !!! REMOVE AT EARLIEST XARRAY FIX, this is a override to xarray override_decode_cf_datetime function.
+    xarray has problems decoding time units with format `seconds since 2000-1-1 0:0:0 0`, this solves by testing
+    the unit to see if its parsable, if it is use original function, if not format unit into a parsable format.
+
+    https://github.com/pydata/xarray/issues/7210
+    """
+
+    orig_decode_cf_datetime = xarray.coding.times.decode_cf_datetime
+
+    def decode_cf_datetime(num_dates, units, calendar=None, use_cftime=None):
+        try:
+            parser.parse(units.split('since')[-1])
+            return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
+        except dateutil.parser.ParserError:
+            reference_time = cftime.num2date(0, units, calendar)
+            units = f"{units.split('since')[0]} since {reference_time}"
+            return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
+
+    xarray.coding.times.decode_cf_datetime = decode_cf_datetime
+
+
 def subset(file_to_subset, bbox, output_file, variables=None,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
@@ -1220,6 +1247,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
             nc_dataset = transform_grouped_dataset(nc_dataset, file_to_subset)
 
     nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
+
+    override_decode_cf_datetime()
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]

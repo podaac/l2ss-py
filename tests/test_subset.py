@@ -1945,3 +1945,38 @@ class TestSubsetter(unittest.TestCase):
         assert lats == dummy_lats
         assert lons == dummy_lons
         assert times == dummy_times
+
+    def test_bad_time_unit(self):
+
+        fill_val = -99999.0
+        time_vals = np.random.rand(10)
+        time_vals[0] = fill_val
+        time_vals[-1] = fill_val
+
+        data_vars = {
+            'foo': (['x'], np.random.rand(10)),
+            'time': (
+                ['x'],
+                time_vals,
+                {
+                    'units': 'seconds since 2000-1-1 0:0:0 0',
+                    '_FillValue': fill_val,
+                    'standard_name': 'time',
+                    'calendar': 'standard'
+                }
+            ),
+        }
+
+        ds = xr.Dataset(
+            data_vars=data_vars,
+            coords={'x': (['x'], np.arange(10))}
+        )
+
+        nc_out_location = join(self.subset_output_dir, "bad_time.nc")
+        ds.to_netcdf(nc_out_location)
+
+        subset.override_decode_cf_datetime()
+
+        ds_test = xr.open_dataset(nc_out_location)
+        ds_test.close()
+
