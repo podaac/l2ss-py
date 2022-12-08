@@ -554,9 +554,13 @@ class TestSubsetter(unittest.TestCase):
         for file in self.test_files:
             output_file = "{}_{}".format(self._testMethodName, file)
 
-            in_ds = xr.open_dataset(join(self.test_data_dir, file),
-                                    decode_times=False,
-                                    decode_coords=False)
+            in_ds, rename_vars, _ = subset.open_as_nc_dataset(join(self.test_data_dir, file))
+            in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
+                                     decode_times=False,
+                                     decode_coords=False)
+            # in_ds = xr.open_dataset(join(self.test_data_dir, file),
+            #                         decode_times=False,
+            #                         decode_coords=False)
 
             included_variables = set([variable[0] for variable in in_ds.data_vars.items()][::2])
             included_variables = list(included_variables)
@@ -599,9 +603,13 @@ class TestSubsetter(unittest.TestCase):
             if time_var_name in excluded_variables:
                 excluded_variables.remove(time_var_name)
 
-            out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+            out_ds, rename_vars, _ = subset.open_as_nc_dataset(join(self.subset_output_dir, output_file))
+            out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                                      decode_times=False,
                                      decode_coords=False)
+            # out_ds = xr.open_dataset(join(self.subset_output_dir, output_file),
+            #                          decode_times=False,
+            #                          decode_coords=False)
 
             out_vars = [out_var for out_var in out_ds.data_vars.keys()]
             out_vars.extend(out_ds.coords.keys())
