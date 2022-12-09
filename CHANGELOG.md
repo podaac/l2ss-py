@@ -12,6 +12,7 @@ for variables to not have leading slash in the front
 ### Deprecated 
 ### Removed
 ### Fixed
+- PODAAC-5065: integration with SMAP_RSS_L2_SSS_V5, fix way xarray open granules that have `seconds since 2000-1-1 0:0:0 0` as a time unit.
 ### Security
 
 ## [2.2.0]

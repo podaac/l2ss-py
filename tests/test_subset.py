@@ -1945,6 +1945,7 @@ class TestSubsetter(unittest.TestCase):
         assert lons == dummy_lons
         assert times == dummy_times
 
+<<<<<<< HEAD
     def test_var_subsetting_tropomi(self):
         """
         Check that variable subsetting is the same if a leading slash is included
@@ -1981,4 +1982,39 @@ class TestSubsetter(unittest.TestCase):
         noslash_dataset = nc.Dataset(join(self.subset_output_dir, output_file_noslash))
 
         assert list(slash_dataset.groups['PRODUCT'].variables) == list(noslash_dataset.groups['PRODUCT'].variables)
+=======
+    def test_bad_time_unit(self):
+
+        fill_val = -99999.0
+        time_vals = np.random.rand(10)
+        time_vals[0] = fill_val
+        time_vals[-1] = fill_val
+
+        data_vars = {
+            'foo': (['x'], np.random.rand(10)),
+            'time': (
+                ['x'],
+                time_vals,
+                {
+                    'units': 'seconds since 2000-1-1 0:0:0 0',
+                    '_FillValue': fill_val,
+                    'standard_name': 'time',
+                    'calendar': 'standard'
+                }
+            ),
+        }
+
+        ds = xr.Dataset(
+            data_vars=data_vars,
+            coords={'x': (['x'], np.arange(10))}
+        )
+
+        nc_out_location = join(self.subset_output_dir, "bad_time.nc")
+        ds.to_netcdf(nc_out_location)
+
+        subset.override_decode_cf_datetime()
+
+        ds_test = xr.open_dataset(nc_out_location)
+        ds_test.close()
+>>>>>>> develop
 
