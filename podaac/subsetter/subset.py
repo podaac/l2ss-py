@@ -1252,6 +1252,8 @@ def subset(file_to_subset, bbox, output_file, variables=None,
 
     if variables:
         variables = [x.replace('/', GROUP_DELIM) for x in variables]
+        if has_groups:
+            variables = [GROUP_DELIM + x if not x.startswith(GROUP_DELIM) else x for x in variables]
 
     args = {
         'decode_coords': False,
