@@ -23,9 +23,9 @@ import functools
 import json
 import operator
 import os
+from typing import Tuple
 import dateutil
 from dateutil import parser
-from typing import Tuple
 
 import cf_xarray as cfxr
 import cftime
