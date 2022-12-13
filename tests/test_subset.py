@@ -46,6 +46,7 @@ from shapely.geometry import Point
 from unittest import TestCase
 
 from podaac.subsetter import subset
+from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter import dimension_cleanup as dc
@@ -175,13 +176,15 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
     # pylint: disable=too-many-locals
     bbox = np.array(((-180, 90), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
+    subset_output_file = join(subset_output_dir, output_file)
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
-        output_file=join(subset_output_dir, output_file)
+        output_file=subset_output_file
     )
 
-    out_ds = xr.open_dataset(join(subset_output_dir, output_file),
+    out_ds, rename_vars, _ = subset.open_as_nc_dataset(subset_output_file)
+    out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False,
                              mask_and_scale=False)
@@ -546,50 +549,42 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
 
-    in_ds = xr.open_dataset(join(data_dir, test_file),
+    in_ds, rename_vars, _ = subset.open_as_nc_dataset(join(data_dir, test_file))
+    in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
 
+    # Get coord variables, they are always present in the result
+    lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(in_ds)
+    lat_var_name = lat_var_names[0]
+    lon_var_name = lon_var_names[0]
+    time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name])
+    coordinate_variables = [lat_var_name, lon_var_name, time_var_name]
+
+    # Include every other variable in the subset
     included_variables = set([variable[0] for variable in in_ds.data_vars.items()][::2])
     included_variables = list(included_variables)
 
+    # All other variables should be dropped
     excluded_variables = list(set(variable[0] for variable in in_ds.data_vars.items())
-                              - set(included_variables))
+                              - set(included_variables) - set(coordinate_variables))
 
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
         output_file=join(subset_output_dir, output_file),
-        variables=included_variables
+        variables=[var.replace(GROUP_DELIM, '/') for var in included_variables]
     )
 
-    # Get coord variables
-    time_var_name = []
-    lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(in_ds)
-    lat_var_name = lat_var_names[0]
-    lon_var_name = lon_var_names[0]
-    time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name])
-
-    included_variables.append(lat_var_name)
-    included_variables.append(lon_var_name)
-    included_variables.append(time_var_name)
-    included_variables.extend(in_ds.coords.keys())
-
-    if lat_var_name in excluded_variables:
-        excluded_variables.remove(lat_var_name)
-    if lon_var_name in excluded_variables:
-        excluded_variables.remove(lon_var_name)
-    if time_var_name in excluded_variables:
-        excluded_variables.remove(time_var_name)
-
-    out_ds = xr.open_dataset(join(subset_output_dir, output_file),
+    out_ds, rename_vars, _ = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
+    out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False)
 
     out_vars = [out_var for out_var in out_ds.data_vars.keys()]
     out_vars.extend(out_ds.coords.keys())
 
-    assert set(out_vars) == set(included_variables)
+    assert set(out_vars) == set(included_variables + coordinate_variables)
     assert set(out_vars).isdisjoint(excluded_variables)
 
     in_ds.close()
@@ -1233,8 +1228,9 @@ def test_get_time_variable_name(test_file, data_dir, subset_output_dir):
         'mask_and_scale': False,
         'decode_times': True
     }
-    time_var_names = []
-    ds = xr.open_dataset(os.path.join(data_dir, test_file), **args)
+    ds, rename_vars, _ = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
+    ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
+
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
     time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
 
