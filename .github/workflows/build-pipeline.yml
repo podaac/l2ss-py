@@ -4,7 +4,7 @@ name: Build
 on:
   # Triggers the workflow on push events
   push:
-    branches: [ develop, release/**, main, feature/** ]
+    branches: [ develop, release/**, main, feature/**, issue/**, issues/**, dependabot/** ]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -36,7 +36,10 @@ jobs:
           echo "pyproject_name=$(poetry version | awk '{print $1}')" >> $GITHUB_ENV
       - name: Bump pre-alpha version
         # If triggered by push to a feature branch
-        if: ${{ startsWith(github.ref, 'refs/heads/feature/') }}
+        if: |
+          ${{ startsWith(github.ref, 'refs/heads/issue') }}      ||
+          ${{ startsWith(github.ref, 'refs/heads/dependabot/') }} ||
+          ${{ startsWith(github.ref, 'refs/heads/feature/') }}
         run: |
           new_ver="${{ steps.get-version.outputs.current_version }}+$(git rev-parse --short ${GITHUB_SHA})"
           poetry version $new_ver
@@ -160,6 +163,7 @@ jobs:
           name: python-artifact
           path: dist/*
       - name: Publish to test.pypi.org
+        id: pypi-test-publish
         if: |
           github.ref == 'refs/heads/develop' ||
           startsWith(github.ref, 'refs/heads/release')
@@ -170,19 +174,24 @@ jobs:
           poetry publish -r testpypi
       - name: Publish to pypi.org
         if: ${{ github.ref == 'refs/heads/main' }}
+        id: pypi-publish
         env:
           POETRY_PYPI_TOKEN_PYPI: ${{secrets.POETRY_PYPI_TOKEN_PYPI}}
         run: |
           poetry publish
       - name: Log in to the Container registry
-        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        if: |
+          steps.pypi-test-publish.conclusion == 'success' ||
+          steps.pypi-publish.conclusion == 'success'
         uses: docker/login-action@v1
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata (tags, labels) for Docker
-        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        if: |
+          steps.pypi-test-publish.conclusion == 'success' ||
+          steps.pypi-publish.conclusion == 'success'
         id: meta
         uses: docker/metadata-action@v4
         with:
@@ -191,12 +200,16 @@ jobs:
             type=semver,pattern={{version}},value=${{ env.software_version }}
             type=raw,value=${{ env.venue }}
       - name: Wait for package
-        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        if: |
+          steps.pypi-test-publish.conclusion == 'success' ||
+          steps.pypi-publish.conclusion == 'success'
         run: |
           pip install tenacity
           ${GITHUB_WORKSPACE}/.github/workflows/wait-for-pypi.py ${{env.pyproject_name}}[harmony]==${{ env.software_version }}
       - name: Build and push Docker image
-        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        if: |
+          steps.pypi-test-publish.conclusion == 'success' ||
+          steps.pypi-publish.conclusion == 'success'
         uses: docker/build-push-action@v3
         with:
           context: .
@@ -208,7 +221,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
       - name: Run Snyk on Docker Image
-        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
+        if: |
+          steps.pypi-test-publish.conclusion == 'success' ||
+          steps.pypi-publish.conclusion == 'success'
         # Snyk can be used to break the build when it detects vulnerabilities.
         # In this case we want to upload the issues to GitHub Code Scanning
         continue-on-error: true
