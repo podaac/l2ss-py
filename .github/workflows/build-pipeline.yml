@@ -184,7 +184,7 @@ jobs:
       - name: Extract metadata (tags, labels) for Docker
         if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
         id: meta
-        uses: docker/metadata-action@v3
+        uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -197,7 +197,7 @@ jobs:
           ${GITHUB_WORKSPACE}/.github/workflows/wait-for-pypi.py ${{env.pyproject_name}}[harmony]==${{ env.software_version }}
       - name: Build and push Docker image
         if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           file: docker/Dockerfile
@@ -216,13 +216,6 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }}
+          image: ${{ steps.meta.outputs.tags[0] }}
           args: >
             --severity-threshold=high
-            --file=./docker/Dockerfile
-            --sarif-file-output=docker.sarif
-      - name: Upload result to GitHub Code Scanning
-        if: ${{ !startsWith(github.ref, 'refs/heads/feature') }}
-        uses: github/codeql-action/upload-sarif@v2
-        with:
-          sarif_file: ./
