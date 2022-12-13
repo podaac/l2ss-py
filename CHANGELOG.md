@@ -6,10 +6,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issue/126](https://github.com/podaac/l2ss-py/issues/126): Added flexibility to variable subsetting
+for variables to not have leading slash in the front
 ### Changed
 ### Deprecated 
 ### Removed
 ### Fixed
+- PODAAC-5065: integration with SMAP_RSS_L2_SSS_V5, fix way xarray open granules that have `seconds since 2000-1-1 0:0:0 0` as a time unit.
 ### Security
 
 ## [2.2.0]
