@@ -23,9 +23,9 @@ import functools
 import json
 import operator
 import os
-from shutil import copy
 import dateutil
 from dateutil import parser
+from typing import Tuple
 
 import cf_xarray as cfxr
 import cftime
@@ -935,7 +935,7 @@ def convert_to_datetime(dataset, time_vars):
     return dataset, start_date
 
 
-def open_as_nc_dataset(filepath: str) -> tuple[nc.Dataset, list, bool]:
+def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, list, bool]:
     """Open netcdf file, and flatten groups if they exist."""
     file_extension = filepath.split('.')[-1]
 
