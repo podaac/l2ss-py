@@ -13,6 +13,7 @@ for variables to not have leading slash in the front
 ### Removed
 ### Fixed
 - PODAAC-5065: integration with SMAP_RSS_L2_SSS_V5, fix way xarray open granules that have `seconds since 2000-1-1 0:0:0 0` as a time unit.
+- [issue/127](https://github.com/podaac/l2ss-py/issues/127): Fixed bug when subsetting variables in grouped datasets. Variable names passed to `subset` will now have `/` replaced by `GROUP_DELIM` so they can be located in flattened datasets 
 ### Security
 
 ## [2.2.0]
