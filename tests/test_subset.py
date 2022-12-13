@@ -862,7 +862,6 @@ class TestSubsetter(unittest.TestCase):
         var_listout = list(out_nc.groups['Retrieval'].variables.keys())
         assert ('water_height' in var_listout)
 
-
     def test_variable_subset_s6(self):
         """
         multiple variable subset of variables in different groups in oco3
@@ -1960,3 +1959,74 @@ class TestSubsetter(unittest.TestCase):
         assert lats == dummy_lats
         assert lons == dummy_lons
         assert times == dummy_times
+
+    def test_var_subsetting_tropomi(self):
+        """
+        Check that variable subsetting is the same if a leading slash is included
+        """
+        TROP_dir = join(self.test_data_dir, 'tropomi')
+        trop_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
+        variable_slash = ['/PRODUCT/methane_mixing_ratio']
+        variable_noslash = ['PRODUCT/methane_mixing_ratio']
+        bbox = np.array(((-180, 180), (-90, 90)))
+        output_file_slash = "{}_{}".format(self._testMethodName, trop_file)
+        output_file_noslash = "{}_noslash_{}".format(self._testMethodName, trop_file)
+        shutil.copyfile(
+            os.path.join(TROP_dir, trop_file),
+            os.path.join(self.subset_output_dir, trop_file)
+        )
+        shutil.copyfile(
+            os.path.join(TROP_dir, trop_file),
+            os.path.join(self.subset_output_dir,'slashtest'+trop_file)
+        )
+        slash_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, trop_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file_slash),
+            variables = variable_slash
+        )
+        noslash_test = subset.subset(
+            file_to_subset=join(self.subset_output_dir, 'slashtest'+trop_file),
+            bbox=bbox,
+            output_file=join(self.subset_output_dir, output_file_noslash),
+            variables = variable_noslash
+        )
+
+        slash_dataset = nc.Dataset(join(self.subset_output_dir, output_file_slash))
+        noslash_dataset = nc.Dataset(join(self.subset_output_dir, output_file_noslash))
+
+        assert list(slash_dataset.groups['PRODUCT'].variables) == list(noslash_dataset.groups['PRODUCT'].variables)
+    def test_bad_time_unit(self):
+
+        fill_val = -99999.0
+        time_vals = np.random.rand(10)
+        time_vals[0] = fill_val
+        time_vals[-1] = fill_val
+
+        data_vars = {
+            'foo': (['x'], np.random.rand(10)),
+            'time': (
+                ['x'],
+                time_vals,
+                {
+                    'units': 'seconds since 2000-1-1 0:0:0 0',
+                    '_FillValue': fill_val,
+                    'standard_name': 'time',
+                    'calendar': 'standard'
+                }
+            ),
+        }
+
+        ds = xr.Dataset(
+            data_vars=data_vars,
+            coords={'x': (['x'], np.arange(10))}
+        )
+
+        nc_out_location = join(self.subset_output_dir, "bad_time.nc")
+        ds.to_netcdf(nc_out_location)
+
+        subset.override_decode_cf_datetime()
+
+        ds_test = xr.open_dataset(nc_out_location)
+        ds_test.close()
+
