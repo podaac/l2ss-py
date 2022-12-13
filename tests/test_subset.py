@@ -553,21 +553,20 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
+    # Non-data vars are by default included in the result
+    non_data_vars = set(in_ds.variables.keys()) - set(in_ds.data_vars.keys())
 
-    # Get coord variables, they are always present in the result
-    lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(in_ds)
-    lat_var_name = lat_var_names[0]
-    lon_var_name = lon_var_names[0]
-    time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name])
-    coordinate_variables = [lat_var_name, lon_var_name, time_var_name]
+    # Coordinate variables are always included in the result
+    lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(in_ds)
+    coordinate_variables = lat_var_names + lon_var_names + time_var_names
 
-    # Include every other variable in the subset
+    # Pick some variable to include in the result
     included_variables = set([variable[0] for variable in in_ds.data_vars.items()][::2])
     included_variables = list(included_variables)
 
-    # All other variables should be dropped
-    excluded_variables = list(set(variable[0] for variable in in_ds.data_vars.items())
-                              - set(included_variables) - set(coordinate_variables))
+    # All other data variables should be dropped
+    expected_excluded_variables = list(set(variable[0] for variable in in_ds.data_vars.items())
+                                       - set(included_variables) - set(coordinate_variables))
 
     subset.subset(
         file_to_subset=join(data_dir, test_file),
@@ -581,11 +580,10 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
                              decode_times=False,
                              decode_coords=False)
 
-    out_vars = [out_var for out_var in out_ds.data_vars.keys()]
-    out_vars.extend(out_ds.coords.keys())
+    out_vars = [out_var for out_var in out_ds.variables.keys()]
 
-    assert set(out_vars) == set(included_variables + coordinate_variables)
-    assert set(out_vars).isdisjoint(excluded_variables)
+    assert set(out_vars) == set(included_variables + coordinate_variables).union(non_data_vars)
+    assert set(out_vars).isdisjoint(expected_excluded_variables)
 
     in_ds.close()
     out_ds.close()
@@ -2016,7 +2014,6 @@ def test_var_subsetting_tropomi(data_dir, subset_output_dir, request):
 
 
 def test_bad_time_unit(subset_output_dir):
-
     fill_val = -99999.0
     time_vals = np.random.rand(10)
     time_vals[0] = fill_val
