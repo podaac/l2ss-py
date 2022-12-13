@@ -1015,8 +1015,8 @@ def subset(file_to_subset, bbox, output_file, variables=(),
         subset to be performed. If this value is not provided, the
         granule will not be subset temporally on the upper bound.
     origin_source : str
-        The original granule source prior to this subset operation to
-        be used for provenance information.
+        Original location or filename of data to be used in "derived from"
+        history element.
     lat_var_names : list
         List of variables that represent the latitude coordinate
         variables for this granule. This list will only contain more
