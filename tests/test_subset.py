@@ -151,7 +151,6 @@ class TestSubsetter(unittest.TestCase):
 
             in_ds.close()
             out_ds.close()
-            
 
     def test_subset_bbox(self):
         """
@@ -339,7 +338,6 @@ class TestSubsetter(unittest.TestCase):
                 assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
 
             assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
-
 
     def test_bbox_conversion(self):
         """
@@ -849,15 +847,15 @@ class TestSubsetter(unittest.TestCase):
         output_file_name = 'oco2_test_out.nc'
         shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
                         os.path.join(self.subset_output_dir, oco2_file_name))
-        bbox = np.array(((-180,180),(-90.0,90)))
-        variables = ['/xco2','/xco2_quality_flag','/Retrieval/water_height','/sounding_id']
+        bbox = np.array(((-180, 180), (-90.0, 90)))
+        variables = ['/xco2', '/xco2_quality_flag', '/Retrieval/water_height', '/sounding_id']
         subset.subset(
-            file_to_subset=join(self.test_data_dir, 'OCO2',oco2_file_name),
+            file_to_subset=join(self.test_data_dir, 'OCO2', oco2_file_name),
             bbox=bbox,
             variables=variables,
             output_file=join(self.subset_output_dir, output_file_name),
         )
-        
+
         out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
         var_listout = list(out_nc.groups['Retrieval'].variables.keys())
         assert ('water_height' in var_listout)
@@ -871,7 +869,7 @@ class TestSubsetter(unittest.TestCase):
         output_file_name = 's6_test_out.nc'
         shutil.copyfile(os.path.join(self.test_data_dir, 'sentinel_6', s6_file_name),
                         os.path.join(self.subset_output_dir, s6_file_name))
-        bbox = np.array(((-180,180),(-90.0,90)))
+        bbox = np.array(((-180, 180), (-90.0, 90)))
         variables = ['/data_01/ku/range_ocean_mle3_rms', '/data_20/ku/range_ocean']
         subset.subset(
             file_to_subset=join(self.subset_output_dir, s6_file_name),
@@ -879,13 +877,12 @@ class TestSubsetter(unittest.TestCase):
             variables=variables,
             output_file=join(self.subset_output_dir, output_file_name),
         )
-        
+
         out_nc = nc.Dataset(join(self.subset_output_dir, output_file_name))
-        var_listout =list(out_nc.groups['data_01'].groups['ku'].variables.keys())
+        var_listout = list(out_nc.groups['data_01'].groups['ku'].variables.keys())
         var_listout.extend(list(out_nc.groups['data_20'].groups['ku'].variables.keys()))
         assert ('range_ocean_mle3_rms' in var_listout)
         assert ('range_ocean' in var_listout)
-
 
     def test_transform_grouped_dataset(self):
         """
@@ -922,7 +919,6 @@ class TestSubsetter(unittest.TestCase):
             for g in path[1:-1]:
                 group = group[g]
             assert var_name.strip('__').split('__')[-1] in group.variables.keys()
-
 
     def test_group_subset(self):
         """
@@ -1327,9 +1323,10 @@ class TestSubsetter(unittest.TestCase):
         in_nc = nc.Dataset(join(TROP_dir, trop_file))
         out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
 
-        for var_name, variable in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables.items():
-            assert variable.shape == out_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables[var_name].shape
-            
+        for var_name, variable in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups[
+            'DETAILED_RESULTS'].variables.items():
+            assert variable.shape == \
+                   out_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables[var_name].shape
 
     def test_omi_novars_subset(self):
         """
@@ -1355,10 +1352,12 @@ class TestSubsetter(unittest.TestCase):
         in_nc = nc.Dataset(join(omi_dir, omi_file))
         out_nc = nc.Dataset(join(self.subset_output_dir, output_file))
 
-        for var_name, variable in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables.items():
-            assert in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables[var_name].shape == \
-                out_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups['Geolocation Fields'].variables[var_name].shape
-
+        for var_name, variable in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
+            'Geolocation Fields'].variables.items():
+            assert in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
+                       'Geolocation Fields'].variables[var_name].shape == \
+                   out_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
+                       'Geolocation Fields'].variables[var_name].shape
 
     def test_root_group(self):
         """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
@@ -1370,21 +1369,21 @@ class TestSubsetter(unittest.TestCase):
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, sndr_file_name))
 
         args = {
-                'decode_coords': False,
-                'mask_and_scale': False,
-                'decode_times': False
-            }
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
         nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, sndr_file_name))
         with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
         ) as dataset:
             var_list = list(dataset.variables)
             assert (var_list[0][0:2] == gh.GROUP_DELIM)
             group_lst = []
-            for var_name in dataset.variables.keys(): #need logic if there is data in the top level not in a group
+            for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
                 group_lst.append('/'.join(var_name.split(gh.GROUP_DELIM)[:-1]))
-            group_lst = ['/' if group=='' else group for group in group_lst]
+            group_lst = ['/' if group == '' else group for group in group_lst]
             groups = set(group_lst)
             expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
             assert (groups == expected_group)
@@ -1401,14 +1400,14 @@ class TestSubsetter(unittest.TestCase):
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
 
         args = {
-                'decode_coords': False,
-                'mask_and_scale': False,
-                'decode_times': False
-            }
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
         nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
         with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
         ) as dataset:
             lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
             time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
@@ -1426,14 +1425,14 @@ class TestSubsetter(unittest.TestCase):
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file_name))
 
         args = {
-                'decode_coords': False,
-                'mask_and_scale': False,
-                'decode_times': False
-            }
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': False
+        }
         nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file_name))
         with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
         ) as dataset:
             time_var_names = []
             lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
@@ -1444,14 +1443,14 @@ class TestSubsetter(unittest.TestCase):
             cond = oper(
                 (dataset[lon_var_name] >= -180),
                 (dataset[lon_var_name] <= 180)
-                ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
+            ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
 
             indexers = xre.get_indexers_from_nd(cond, True)
             indexed_cond = cond.isel(**indexers)
             indexed_ds = dataset.isel(**indexers)
             new_dataset = indexed_ds.where(indexed_cond)
-            
-            assert ((time_var_name not in indexers.keys()) == True) #time can't be in the index
+
+            assert ((time_var_name not in indexers.keys()) == True)  # time can't be in the index
             assert (new_dataset.dims == dataset.dims)
 
     def test_variable_type_string_oco2(self):
@@ -1461,15 +1460,15 @@ class TestSubsetter(unittest.TestCase):
         output_file_name = 'oco2_test_out.nc'
         shutil.copyfile(os.path.join(self.test_data_dir, 'OCO2', oco2_file_name),
                         os.path.join(self.subset_output_dir, oco2_file_name))
-        bbox = np.array(((-180,180),(-90.0,90)))
+        bbox = np.array(((-180, 180), (-90.0, 90)))
 
         subset.subset(
-            file_to_subset=join(self.test_data_dir, 'OCO2',oco2_file_name),
+            file_to_subset=join(self.test_data_dir, 'OCO2', oco2_file_name),
             bbox=bbox,
             output_file=join(self.subset_output_dir, output_file_name),
         )
 
-        in_nc = xr.open_dataset(join(self.test_data_dir, 'OCO2',oco2_file_name))
+        in_nc = xr.open_dataset(join(self.test_data_dir, 'OCO2', oco2_file_name))
         out_nc = xr.open_dataset(join(self.subset_output_dir, output_file_name))
         assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
 
@@ -1487,11 +1486,11 @@ class TestSubsetter(unittest.TestCase):
         entry_lst = []
         # Get root level objects
         key_lst = list(h5_ds.keys())
-        
+
         # Go through every level of the file to fill out the remaining objects
         for entry_str in key_lst:
             # If object is a group, add it to the loop list
-            if (isinstance(h5_ds[entry_str],h5py.Group)):
+            if (isinstance(h5_ds[entry_str], h5py.Group)):
                 for group_keys in list(h5_ds[entry_str].keys()):
                     if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
                         entry_lst.append(entry_str + "/" + group_keys)
@@ -1500,14 +1499,13 @@ class TestSubsetter(unittest.TestCase):
         nc_dataset, has_groups = gh.h5file_transform(os.path.join(self.subset_output_dir, OMI_file_name))
 
         nc_vars_flattened = list(nc_dataset.variables.keys())
-        for i in range(len(entry_lst)): # go through all the datasets in h5py file
-            input_variable = '__'+entry_lst[i].replace('/', '__')
+        for i in range(len(entry_lst)):  # go through all the datasets in h5py file
+            input_variable = '__' + entry_lst[i].replace('/', '__')
             output_variable = nc_vars_flattened[i]
             assert (input_variable == output_variable)
 
         nc_dataset.close()
         h5_ds.close()
-
 
     def test_variable_dims_matched_tropomi(self):
         """
@@ -1527,7 +1525,7 @@ class TestSubsetter(unittest.TestCase):
             var_name: [dim.split(gh.GROUP_DELIM)[-1] for dim in var.dimensions]
             for var_name, var in in_nc.groups['PRODUCT'].variables.items()
         }
-        
+
         # Get variables from METADATA group
         in_var_dims.update(
             {
@@ -1539,7 +1537,8 @@ class TestSubsetter(unittest.TestCase):
         in_var_dims.update(
             {
                 var_name: [dim.split(gh.GROUP_DELIM)[-1] for dim in var.dimensions]
-                for var_name, var in in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
+                for var_name, var in
+                in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
             }
         )
 
@@ -1555,7 +1554,6 @@ class TestSubsetter(unittest.TestCase):
         }
 
         self.assertDictEqual(in_var_dims, out_var_dims)
-
 
     def test_temporal_merged_topex(self):
         """
@@ -1613,7 +1611,6 @@ class TestSubsetter(unittest.TestCase):
         shutil.copyfile(os.path.join(self.test_data_dir, 'tropomi', tropomi_file),
                         os.path.join(self.subset_output_dir, tropomi_file))
 
-
         nc_dataset = nc.Dataset(os.path.join(self.subset_output_dir, tropomi_file), mode='r')
 
         nc_dataset = gh.transform_grouped_dataset(nc_dataset, os.path.join(self.subset_output_dir, tropomi_file))
@@ -1628,7 +1625,6 @@ class TestSubsetter(unittest.TestCase):
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
         ) as dataset:
-
             lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
             time_var_names = [
                 subset.compute_time_variable_name(
@@ -1636,7 +1632,7 @@ class TestSubsetter(unittest.TestCase):
                 ) for lat_var_name in lat_var_names
             ]
             epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
-            
+
             assert epoch_time_var.split('__')[-1] == 'time'
 
     def test_temporal_variable_subset(self):
@@ -1694,21 +1690,20 @@ class TestSubsetter(unittest.TestCase):
         # Only coordinate variables and variables requested in variable
         # subset should be present.
         assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
-            
 
     def test_temporal_he5file_subset(self):
         """
         Test that the time type changes to datetime for subsetting
         """
-        
+
         OMI_file_names = ['OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5',
                           'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5']
         OMI_copy_file = 'OMI_copy_testing_2.he5'
         for i in OMI_file_names:
             shutil.copyfile(os.path.join(self.test_data_dir, 'OMI', i),
                             os.path.join(self.subset_output_dir, OMI_copy_file))
-            min_time='2020-01-16T12:30:00Z'
-            max_time='2020-01-16T12:40:00Z'
+            min_time = '2020-01-16T12:30:00Z'
+            max_time = '2020-01-16T12:40:00Z'
             bbox = np.array(((-180, 180), (-90, 90)))
             nc_dataset, has_groups = gh.h5file_transform(os.path.join(self.subset_output_dir, OMI_copy_file))
 
@@ -1719,7 +1714,7 @@ class TestSubsetter(unittest.TestCase):
             }
 
             if min_time or max_time:
-                args['decode_times'] = True  
+                args['decode_times'] = True
 
             with xr.open_dataset(
                     xr.backends.NetCDF4DataStore(nc_dataset),
@@ -1737,13 +1732,12 @@ class TestSubsetter(unittest.TestCase):
                 dataset, start_date = subset.convert_to_datetime(dataset, time_var_names)
                 assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
-
     def test_he5_timeattrs_output(self):
         """Test that the time attributes in the output match the attributes of the input for OMI test files"""
 
         omi_dir = join(self.test_data_dir, 'OMI')
         omi_file = 'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'
-        omi_file_input = 'input'+omi_file
+        omi_file_input = 'input' + omi_file
         bbox = np.array(((-180, 90), (-90, 90)))
         output_file = "{}_{}".format(self._testMethodName, omi_file)
         shutil.copyfile(
@@ -1754,15 +1748,16 @@ class TestSubsetter(unittest.TestCase):
             os.path.join(omi_dir, omi_file),
             os.path.join(self.subset_output_dir, omi_file_input)
         )
-        
-        min_time='2020-01-16T12:30:00Z'
-        max_time='2020-01-16T12:40:00Z'
+
+        min_time = '2020-01-16T12:30:00Z'
+        max_time = '2020-01-16T12:40:00Z'
         bbox = np.array(((-180, 180), (-90, 90)))
         nc_dataset_input = nc.Dataset(os.path.join(self.subset_output_dir, omi_file_input))
-        incut_set = nc_dataset_input.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups['Geolocation Fields']
+        incut_set = nc_dataset_input.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups[
+            'Geolocation Fields']
         xr_dataset_input = xr.open_dataset(xr.backends.NetCDF4DataStore(incut_set))
-        inattrs =  xr_dataset_input['Time'].attrs
-        
+        inattrs = xr_dataset_input['Time'].attrs
+
         subset.subset(
             file_to_subset=os.path.join(self.subset_output_dir, omi_file),
             bbox=bbox,
@@ -1772,20 +1767,20 @@ class TestSubsetter(unittest.TestCase):
         )
 
         output_ncdataset = nc.Dataset(os.path.join(self.subset_output_dir, output_file))
-        outcut_set = output_ncdataset.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups['Geolocation Fields']
+        outcut_set = output_ncdataset.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups[
+            'Geolocation Fields']
         xrout_dataset = xr.open_dataset(xr.backends.NetCDF4DataStore(outcut_set))
         outattrs = xrout_dataset['Time'].attrs
 
         for key in inattrs.keys():
             if isinstance(inattrs[key], np.ndarray):
-                if np.array_equal(inattrs[key],outattrs[key]):
+                if np.array_equal(inattrs[key], outattrs[key]):
                     pass
                 else:
                     raise AssertionError('Attributes for {} do not equal each other'.format(key))
             else:
                 assert inattrs[key] == outattrs[key]
-                
-        
+
     def test_temporal_subset_lines(self):
         bbox = np.array(((-180, 180), (-90, 90)))
         file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
@@ -1860,7 +1855,6 @@ class TestSubsetter(unittest.TestCase):
             assert "Time" in time_var_names[0]
             assert "Latitude" in lat_var_names[0]
 
-
     def test_empty_temporal_subset(self):
         """
         Test the edge case where a subsetted empty granule
@@ -1900,8 +1894,8 @@ class TestSubsetter(unittest.TestCase):
         file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
 
         dataset = xr.open_dataset(join(self.test_data_dir, file),
-                                decode_times=False,
-                                decode_coords=False)
+                                  decode_times=False,
+                                  decode_coords=False)
 
         dummy_lats = ['dummy_lat']
         dummy_lons = ['dummy_lon']
@@ -1964,7 +1958,7 @@ class TestSubsetter(unittest.TestCase):
         """
         Check that variable subsetting is the same if a leading slash is included
         """
-        TROP_dir = join(self.test_data_dir, 'tropomi')
+        trop_dir = join(self.test_data_dir, 'tropomi')
         trop_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
         variable_slash = ['/PRODUCT/methane_mixing_ratio']
         variable_noslash = ['PRODUCT/methane_mixing_ratio']
@@ -1972,30 +1966,31 @@ class TestSubsetter(unittest.TestCase):
         output_file_slash = "{}_{}".format(self._testMethodName, trop_file)
         output_file_noslash = "{}_noslash_{}".format(self._testMethodName, trop_file)
         shutil.copyfile(
-            os.path.join(TROP_dir, trop_file),
+            os.path.join(trop_dir, trop_file),
             os.path.join(self.subset_output_dir, trop_file)
         )
         shutil.copyfile(
-            os.path.join(TROP_dir, trop_file),
-            os.path.join(self.subset_output_dir,'slashtest'+trop_file)
+            os.path.join(trop_dir, trop_file),
+            os.path.join(self.subset_output_dir, 'slashtest' + trop_file)
         )
-        slash_test = subset.subset(
+        subset.subset(
             file_to_subset=join(self.subset_output_dir, trop_file),
             bbox=bbox,
             output_file=join(self.subset_output_dir, output_file_slash),
-            variables = variable_slash
+            variables=variable_slash
         )
-        noslash_test = subset.subset(
-            file_to_subset=join(self.subset_output_dir, 'slashtest'+trop_file),
+        subset.subset(
+            file_to_subset=join(self.subset_output_dir, 'slashtest' + trop_file),
             bbox=bbox,
             output_file=join(self.subset_output_dir, output_file_noslash),
-            variables = variable_noslash
+            variables=variable_noslash
         )
 
         slash_dataset = nc.Dataset(join(self.subset_output_dir, output_file_slash))
         noslash_dataset = nc.Dataset(join(self.subset_output_dir, output_file_noslash))
 
         assert list(slash_dataset.groups['PRODUCT'].variables) == list(noslash_dataset.groups['PRODUCT'].variables)
+
     def test_bad_time_unit(self):
 
         fill_val = -99999.0
@@ -2029,4 +2024,3 @@ class TestSubsetter(unittest.TestCase):
 
         ds_test = xr.open_dataset(nc_out_location)
         ds_test.close()
-

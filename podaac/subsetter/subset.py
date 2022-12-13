@@ -978,10 +978,10 @@ def override_decode_cf_datetime():
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
-def subset(file_to_subset, bbox, output_file, variables=None,
+def subset(file_to_subset, bbox, output_file, variables=(),
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
-           lat_var_names=None, lon_var_names=None, time_var_names=None):
+           lat_var_names=(), lon_var_names=(), time_var_names=()):
     """
     Subset a given NetCDF file given a bounding box
 
@@ -1014,6 +1014,9 @@ def subset(file_to_subset, bbox, output_file, variables=None,
         ISO timestamp representing the upper bound of the temporal
         subset to be performed. If this value is not provided, the
         granule will not be subset temporally on the upper bound.
+    origin_source : str
+        The original granule source prior to this subset operation to
+        be used for provenance information.
     lat_var_names : list
         List of variables that represent the latitude coordinate
         variables for this granule. This list will only contain more
@@ -1034,10 +1037,17 @@ def subset(file_to_subset, bbox, output_file, variables=None,
 
     override_decode_cf_datetime()
 
-    if variables:
-        variables = [x.replace('/', GROUP_DELIM) for x in variables]
-        if has_groups:
-            variables = [GROUP_DELIM + x if not x.startswith(GROUP_DELIM) else x for x in variables]
+    if has_groups:
+        # Make sure all variables start with '/'
+        variables = ['/' + var if not var.startswith('/') else var for var in variables]
+        lat_var_names = ['/' + var if not var.startswith('/') else var for var in lat_var_names]
+        lon_var_names = ['/' + var if not var.startswith('/') else var for var in lon_var_names]
+        time_var_names = ['/' + var if not var.startswith('/') else var for var in time_var_names]
+        # Replace all '/' with GROUP_DELIM
+        variables = [var.replace('/', GROUP_DELIM) for var in variables]
+        lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
+        lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
+        time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
 
     args = {
         'decode_coords': False,
