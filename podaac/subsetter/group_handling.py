@@ -1,3 +1,9 @@
+"""
+group_handling.py
+
+Functions for converting multidimensional data structures
+ between a group hierarchy and a flat structure
+"""
 from shutil import copy
 
 import h5py
