@@ -14,8 +14,11 @@ Functions which improve upon existing netCDF4 library existing functions
 
 import collections
 
+import netCDF4 as nc
+import xarray as xr
 
-def remove_duplicate_dims(nc_dataset):
+
+def remove_duplicate_dims(nc_dataset: nc.Dataset) -> tuple[nc.Dataset, list[str]]:
     """
     xarray cannot read netCDF4 datasets with duplicate dimensions.
     Function goes through a dataset to catch any variables with duplicate dimensions.
@@ -67,7 +70,7 @@ def remove_duplicate_dims(nc_dataset):
     return nc_dataset, dup_new_varnames
 
 
-def rename_dup_vars(dataset, rename_vars):
+def rename_dup_vars(dataset: xr.Dataset, rename_vars: list[str]) -> xr.Dataset:
     """
     NetCDF4 rename function raises and HDF error for variable in S5P files with duplicate dimensions
     This method will use xarray to rename the variables
