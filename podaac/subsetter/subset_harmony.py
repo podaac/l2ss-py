@@ -49,6 +49,7 @@ def podaac_to_harmony_bbox(bbox):
     -------
     array, int or float
         Harmony bbox
+    TODO - fix this docstring type and the type hint to match code (currently returning a list)
     """
 
     return_box = [bbox.item(0), bbox.item(2), bbox.item(1), bbox.item(3)]

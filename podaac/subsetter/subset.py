@@ -181,7 +181,7 @@ def set_json_history(dataset, cut, file_to_subset, bbox=None, shapefile=None,
         The requested bounding box
     shapefile : str
         Name of the shapefile to include in the version history
-
+    TODO: add docstring and type hint for `origin_source` parameter.
     """
 
     params = f'cut={cut}'
@@ -752,11 +752,13 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
         ISO timestamp of min temporal bound
     max_time : str
         ISO timestamp of max temporal bound
+    TODO: add docstring and type hint for `variables` parameter.
 
     Returns
     -------
     np.array
         Spatial bounds of Dataset after subset operation
+    TODO - fix this docstring type and the type hint to match code (currently returning a list[xr.Dataset])
     """
     lon_bounds, lat_bounds = convert_bbox(bbox, dataset, lat_var_names[0], lon_var_names[0])
     # condition should be 'or' instead of 'and' when bbox lon_min > lon_max
@@ -829,10 +831,13 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, c
         Absolute path to the shapefile used to subset the given dataset
     cut : bool
         True if scanline should be cut.
+    TODO: add docstring and type hint for `chunks` parameter.
+
     Returns
     -------
     np.array
         Spatial bounds of Dataset after shapefile subset operation
+    TODO - fix this docstring type and the type hint to match code (currently returning a xr.Dataset)
     """
     shapefile_df = gpd.read_file(shapefile)
 
@@ -892,6 +897,10 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
         List of longitude coordinate variables.
     time_var_names : list
         List of time coordinate variables.
+
+    Returns
+    -------
+    TODO: add return type docstring and type hint.
     """
 
     if not lat_var_names or not lon_var_names:

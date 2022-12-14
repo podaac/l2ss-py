@@ -105,6 +105,7 @@ def recombine_grouped_datasets(datasets, output_file, start_date):  # pylint: di
         List of xarray datasets to be combined
     output_file : str
         Name of the output file to write the resulting NetCDF file to.
+    TODO: add docstring and type hint for `start_date` parameter.
     """
 
     base_dataset = nc.Dataset(output_file, mode='w')
