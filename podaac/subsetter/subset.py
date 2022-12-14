@@ -173,12 +173,12 @@ def set_json_history(dataset, cut, file_to_subset, bbox=None, shapefile=None,
     ----------
     dataset : xarray.Dataset
         The dataset to change the header of
-    bbox : np.ndarray
-        The requested bounding box
-    file_to_subset : string
-        The filepath of the file which was used to subset
     cut : boolean
         True to cut the scanline
+    file_to_subset : string
+        The filepath of the file which was used to subset
+    bbox : np.ndarray
+        The requested bounding box
     shapefile : str
         Name of the shapefile to include in the version history
 
@@ -226,10 +226,10 @@ def set_version_history(dataset, cut, bbox=None, shapefile=None):
     ----------
     dataset : xarray.Dataset
         The dataset to change the header of
-    bbox : np.ndarray
-        The requested bounding box
     cut : boolean
         True to cut the scanline
+    bbox : np.ndarray
+        The requested bounding box
     shapefile : str
         Name of the shapefile to include in the version history
 
@@ -989,16 +989,14 @@ def subset(file_to_subset, bbox, output_file, variables=(),
     ----------
     file_to_subset : string
         The location of the file which will be subset
-    output_file : string
-        The file path for the output of the subsetting operation.
     bbox : np.ndarray
         The chosen bounding box. This is a tuple of tuples formatted
         as such: ((west, east), (south, north)). The assumption is that
         the valid range is ((-180, 180), (-90, 90)). This will be
         transformed as appropriate if the actual longitude range is
         0-360.
-    shapefile : str
-        Name of local shapefile used to subset given file.
+    output_file : string
+        The file path for the output of the subsetting operation.
     variables : list, str, optional
         List of variables to include in the resulting data file.
         NOTE: This will remove ALL variables which are not included
@@ -1006,6 +1004,8 @@ def subset(file_to_subset, bbox, output_file, variables=(),
     cut : boolean
         True if the scanline should be cut, False if the scanline should
         not be cut. Defaults to True.
+    shapefile : str
+        Name of local shapefile used to subset given file.
     min_time : str
         ISO timestamp representing the lower bound of the temporal
         subset to be performed. If this value is not provided, the
