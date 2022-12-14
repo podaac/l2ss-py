@@ -60,7 +60,7 @@ def remove_scale_offset(value, scale, offset):
 
 def convert_bound(bound, coord_max, coord_var):
     """
-    This function will return a converted bound which which matches the
+    This function will return a converted bound, which matches the
     range of the given input file.
 
     Parameters
