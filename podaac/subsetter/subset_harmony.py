@@ -22,6 +22,9 @@ import os
 import subprocess
 import shutil
 from tempfile import mkdtemp
+from typing import List, Union
+
+import pystac
 from pystac import Asset
 
 import harmony
@@ -35,7 +38,7 @@ from podaac.subsetter.subset import SERVICE_NAME
 DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
 
 
-def podaac_to_harmony_bbox(bbox):
+def podaac_to_harmony_bbox(bbox: np.ndarray) -> Union[np.ndarray, float]:
     """
     Convert PO.DAAC bbox ((west, east), (south, north))
     to Harmony bbox (west, south, east, north)
@@ -49,14 +52,14 @@ def podaac_to_harmony_bbox(bbox):
     -------
     array, int or float
         Harmony bbox
-    TODO - fix this docstring type and the type hint to match code (currently returning a list)
+    TODO - fix this docstring type, type hint, and code to match (code currently returns a list)
     """
 
     return_box = [bbox.item(0), bbox.item(2), bbox.item(1), bbox.item(3)]
     return return_box
 
 
-def harmony_to_podaac_bbox(bbox):
+def harmony_to_podaac_bbox(bbox: list) -> np.ndarray:
     """
     Convert Harmony bbox (west, south, east, north)
     to PO.DAAC bbox ((west, east), (south, north))
@@ -86,7 +89,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
         self.data_dir = os.getenv(DATA_DIRECTORY_ENV, '/home/dockeruser/data')
 
-    def process_item(self, item, source):
+    def process_item(self, item: pystac.Item, source: harmony.message.Source) -> pystac.Item:
         """
         Performs variable and bounding box subsetting on the input STAC Item's data, returning
         an output STAC item
@@ -200,7 +203,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
             # Clean up any intermediate resources
             shutil.rmtree(temp_dir)
 
-    def prepare_output_dir(self, output_dir):
+    def prepare_output_dir(self, output_dir: str) -> None:
         """
         Deletes (if present) and recreates the given output_dir, ensuring it exists
         and is empty
@@ -213,7 +216,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
         self.cmd('rm', '-rf', output_dir)
         self.cmd('mkdir', '-p', output_dir)
 
-    def cmd(self, *args):
+    def cmd(self, *args) -> List[str]:
         """
         Logs and then runs command.
 
@@ -230,7 +233,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
         return result_str.split("\n")
 
 
-def main(config=None):
+def main(config: harmony.util.Config = None) -> None:
     """Parse command line arguments and invoke the service to respond to
     them.
 
@@ -241,7 +244,6 @@ def main(config=None):
     Returns
     -------
     None
-
     """
     parser = argparse.ArgumentParser(prog=SERVICE_NAME,
                                      description='Run the l2_subsetter service')
