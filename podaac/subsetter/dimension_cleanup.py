@@ -11,14 +11,14 @@ dimension_cleanup.py
 ======================
 Functions which improve upon existing netCDF4 library existing functions
 """
-
 import collections
+from typing import Tuple
 
 import netCDF4 as nc
 import xarray as xr
 
 
-def remove_duplicate_dims(nc_dataset: nc.Dataset) -> tuple[nc.Dataset, list[str]]:
+def remove_duplicate_dims(nc_dataset: nc.Dataset) -> Tuple[nc.Dataset, list[str]]:
     """
     xarray cannot read netCDF4 datasets with duplicate dimensions.
     Function goes through a dataset to catch any variables with duplicate dimensions.

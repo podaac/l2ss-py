@@ -5,6 +5,7 @@ Functions for converting multidimensional data structures
  between a group hierarchy and a flat structure
 """
 from shutil import copy
+from typing import Tuple
 
 import h5py
 import netCDF4 as nc
@@ -189,7 +190,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         var_group.variables[new_var_name][:] = variable.data
 
 
-def h5file_transform(finput: str) -> tuple[nc.Dataset, bool]:
+def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
     """
     Transform a h5py  Dataset that has groups to an xarray compatible
     dataset. xarray does not work with groups, so this transformation
