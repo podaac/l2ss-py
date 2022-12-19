@@ -5,7 +5,7 @@ Functions for converting multidimensional data structures
  between a group hierarchy and a flat structure
 """
 from shutil import copy
-from typing import Tuple
+from typing import List, Tuple
 
 import h5py
 import netCDF4 as nc
@@ -93,7 +93,7 @@ def transform_grouped_dataset(nc_dataset: nc.Dataset, file_to_subset: str) -> nc
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets: list[xr.Dataset], output_file: str, start_date) -> None:  # pylint: disable=too-many-branches
+def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, start_date) -> None:  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
