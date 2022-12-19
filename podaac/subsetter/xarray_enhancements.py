@@ -20,12 +20,13 @@ for this specific use-case.
 """
 
 import logging
+from typing import Union
 
 import numpy as np
 import xarray as xr
 
 
-def get_indexers_from_1d(cond):
+def get_indexers_from_1d(cond: xr.Dataset) -> dict:
     """
     Get indexers from a dataset with 1 dimension.
 
@@ -50,7 +51,7 @@ def get_indexers_from_1d(cond):
     return indexers
 
 
-def get_indexers_from_nd(cond, cut):
+def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     """
     Get indexers from a dataset with more than 1 dimensions.
 
@@ -95,9 +96,9 @@ def get_indexers_from_nd(cond, cut):
     return indexers
 
 
-def copy_empty_dataset(dataset):
+def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     """
-    Copy an dataset into a new, empty dataset. This dataset should:
+    Copy a dataset into a new, empty dataset. This dataset should:
         * Contain the same structure as the input dataset (only include
           requested variables, if variable subset)
         * Contain the same global metadata as the input dataset
@@ -124,26 +125,26 @@ def copy_empty_dataset(dataset):
     return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
 
 
-def cast_type(var, var_type):
+def cast_type(var: xr.DataArray, var_type: str) -> xr.DataArray:
     """
     Type cast a variable into a var type.
 
     Parameters
     ----------
-    var: xarray.core.dataarray.DataArray
+    var: xr.DataArray
         The dataarray to be type casted.
     var_type: string
         New type the variable will be type casted to.
     Returns
     -------
-    xarray.core.dataarray.DataArray
+    xr.DataArray
         The newly type casted variable.
     """
 
     return var.astype(var_type)
 
 
-def where(dataset, cond, cut):
+def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool) -> xr.Dataset:
     """
     Return a dataset which meets the given condition.
 
