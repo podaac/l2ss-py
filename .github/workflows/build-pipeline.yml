@@ -105,12 +105,12 @@ jobs:
         env:
             SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-        command: test
-        args: >
-            --org=${{ secrets.SNYK_ORG_ID }}
-            --project-name=${{ github.repository }}
-            --severity-threshold=high
-            --fail-on=all
+          command: test
+          args: >
+              --org=${{ secrets.SNYK_ORG_ID }}
+              --project-name=${{ github.repository }}
+              --severity-threshold=high
+              --fail-on=all
       - name: Run Snyk on Python
         uses: snyk/actions/python-3.8@master
         env:
