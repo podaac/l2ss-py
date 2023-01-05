@@ -100,7 +100,7 @@ jobs:
             -Dsonar.projectName=l2ss-py
             -Dsonar.projectVersion=${{ env.software_version }}
             -Dsonar.python.version=3.7,3.8,3.9
-      - name: Run Snyk on Python
+      - name: Run Snyk as a blocking step
           uses: snyk/actions/python-3.8@master
           env:
               SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
