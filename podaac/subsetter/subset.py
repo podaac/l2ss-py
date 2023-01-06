@@ -48,12 +48,12 @@ from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_datas
 SERVICE_NAME = 'l2ss-py'
 
 
-def apply_scale_offset(scale: float, offset: float, value: float):
+def apply_scale_offset(scale: float, offset: float, value: float) -> float:
     """Apply scale and offset to the given value"""
     return (value + offset) / scale
 
 
-def remove_scale_offset(value: float, scale: float, offset: float):
+def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     """Remove scale and offset from the given value"""
     return (value * scale) - offset
 
@@ -161,8 +161,8 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
                      convert_bound(bbox[1], 180, dataset[lat_var_name])])
 
 
-def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str, bbox: np.ndarray = None,
-                     shapefile: str = None, origin_source=None):
+def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
+                     bbox: np.ndarray = None, shapefile: str = None, origin_source=None) -> None:
     """
     Set the 'json_history' metadata header of the granule to reflect the
     current version of the subsetter, as well as the parameters used
@@ -990,7 +990,7 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, list, bool]:
     return nc_dataset, rename_vars, has_groups
 
 
-def override_decode_cf_datetime():
+def override_decode_cf_datetime() -> None:
     """
     WARNING !!! REMOVE AT EARLIEST XARRAY FIX, this is a override to xarray override_decode_cf_datetime function.
     xarray has problems decoding time units with format `seconds since 2000-1-1 0:0:0 0`, this solves by testing
@@ -1018,7 +1018,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
-           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = ()):
+           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = ()
+           ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
 
