@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 ### Security
 
+
+## [2.3.0]
+### Added
+- [issue/126](https://github.com/podaac/l2ss-py/issues/126): Added flexibility to variable subsetting
+for variables to not have leading slash in the front
+- [issue/136](https://github.com/podaac/l2ss-py/issues/136): Added type annotations throughout the package code
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+- PODAAC-5065: integration with SMAP_RSS_L2_SSS_V5, fix way xarray open granules that have `seconds since 2000-1-1 0:0:0 0` as a time unit.
+- [issue/127](https://github.com/podaac/l2ss-py/issues/127): Fixed bug when subsetting variables in grouped datasets. Variable names passed to `subset` will now have `/` replaced by `GROUP_DELIM` so they can be located in flattened datasets 
+### Security
+
 ## [2.2.0]
 ### Added
 ### Changed
@@ -40,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/105](https://github.com/podaac/l2ss-py/issues/105): Added function to convert np object to python native objects.
 ### Security
 
+
 ## [2.0.0]
 ### Added
 - [issue/98](https://github.com/podaac/l2ss-py/issues/98): Added logic to handle time decoding for he5 tai93 files. Changed the min and max inputs to tai93 format and compared to the time format in the file
@@ -51,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking Change** [issue/99](https://github.com/podaac/l2ss-py/issues/99): Removed support for python 3.7
 ### Fixed
 - [issue/95](https://github.com/podaac/l2ss-py/issues/95): Fix non variable subsets for OMI since variables are not in the same group as the lat lon variables 
+
 ### Security
 
 
