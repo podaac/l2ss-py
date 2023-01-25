@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - [issue/126](https://github.com/podaac/l2ss-py/issues/126): Added flexibility to variable subsetting
 for variables to not have leading slash in the front
+- [issue/136](https://github.com/podaac/l2ss-py/issues/136): Added type annotations throughout the package code
 ### Changed
 ### Deprecated 
 ### Removed
