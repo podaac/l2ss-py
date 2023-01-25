@@ -13,7 +13,7 @@ import numpy as np
 from podaac.subsetter import subset
 
 
-def parse_args(args):
+def parse_args(args: list) -> tuple:
     """
     Parse args for this script.
 
@@ -85,7 +85,7 @@ def parse_args(args):
         args.min_time, args.max_time, args.cut, args.shapefile
 
 
-def run_subsetter(args):
+def run_subsetter(args: list) -> None:
     """
     Parse arguments and run subsetter on the specified input file
     """
@@ -106,7 +106,7 @@ def run_subsetter(args):
     logging.info('Subset complete. Result in %s', output_file)
 
 
-def main():
+def main() -> None:
     """Entry point to the script"""
     logging.basicConfig(
         stream=sys.stdout,

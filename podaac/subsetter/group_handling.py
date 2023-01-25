@@ -5,6 +5,7 @@ Functions for converting multidimensional data structures
  between a group hierarchy and a flat structure
 """
 from shutil import copy
+from typing import List, Tuple
 
 import h5py
 import netCDF4 as nc
@@ -14,7 +15,7 @@ import xarray as xr
 GROUP_DELIM = '__'
 
 
-def transform_grouped_dataset(nc_dataset, file_to_subset):
+def transform_grouped_dataset(nc_dataset: nc.Dataset, file_to_subset: str) -> nc.Dataset:
     """
     Transform a netCDF4 Dataset that has groups to an xarray compatible
     dataset. xarray does not work with groups, so this transformation
@@ -92,7 +93,7 @@ def transform_grouped_dataset(nc_dataset, file_to_subset):
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets, output_file, start_date):  # pylint: disable=too-many-branches
+def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, start_date) -> None:  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
@@ -105,6 +106,7 @@ def recombine_grouped_datasets(datasets, output_file, start_date):  # pylint: di
         List of xarray datasets to be combined
     output_file : str
         Name of the output file to write the resulting NetCDF file to.
+    TODO: add docstring and type hint for `start_date` parameter.
     """
 
     base_dataset = nc.Dataset(output_file, mode='w')
@@ -142,14 +144,14 @@ def recombine_grouped_datasets(datasets, output_file, start_date):  # pylint: di
     base_dataset.close()
 
 
-def _get_nested_group(dataset, group_path):
+def _get_nested_group(dataset: nc.Dataset, group_path: str) -> nc.Group:
     nested_group = dataset
     for group in group_path.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1]:
         nested_group = nested_group.groups[group]
     return nested_group
 
 
-def _rename_variables(dataset, base_dataset, start_date):
+def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date) -> None:
     for var_name in list(dataset.variables.keys()):
         new_var_name = var_name.split(GROUP_DELIM)[-1]
         var_group = _get_nested_group(base_dataset, var_name)
@@ -188,7 +190,7 @@ def _rename_variables(dataset, base_dataset, start_date):
         var_group.variables[new_var_name][:] = variable.data
 
 
-def h5file_transform(finput):
+def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
     """
     Transform a h5py  Dataset that has groups to an xarray compatible
     dataset. xarray does not work with groups, so this transformation
@@ -201,6 +203,8 @@ def h5file_transform(finput):
     nc.Dataset
         netCDF4 Dataset that does not contain groups and that has been
         flattened.
+    bool
+        Whether this dataset contains groups
     """
     data_new = h5py.File(finput, 'r+')
     del_group_list = list(data_new.keys())

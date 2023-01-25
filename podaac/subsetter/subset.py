@@ -23,7 +23,7 @@ import functools
 import json
 import operator
 import os
-from typing import Tuple
+from typing import List, Tuple, Union
 import dateutil
 from dateutil import parser
 
@@ -48,19 +48,19 @@ from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_datas
 SERVICE_NAME = 'l2ss-py'
 
 
-def apply_scale_offset(scale, offset, value):
+def apply_scale_offset(scale: float, offset: float, value: float) -> float:
     """Apply scale and offset to the given value"""
     return (value + offset) / scale
 
 
-def remove_scale_offset(value, scale, offset):
+def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     """Remove scale and offset from the given value"""
     return (value * scale) - offset
 
 
-def convert_bound(bound, coord_max, coord_var):
+def convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -> np.ndarray:
     """
-    This function will return a converted bound which which matches the
+    This function will return a converted bound, which matches the
     range of the given input file.
 
     Parameters
@@ -128,7 +128,7 @@ def convert_bound(bound, coord_max, coord_var):
     return apply_scale_offset(scale, offset, bound)
 
 
-def convert_bbox(bbox, dataset, lat_var_name, lon_var_name):
+def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_var_name: str) -> np.ndarray:
     """
     This function will return a converted bbox which matches the range
     of the given input file. This will convert both the latitude and
@@ -161,8 +161,8 @@ def convert_bbox(bbox, dataset, lat_var_name, lon_var_name):
                      convert_bound(bbox[1], 180, dataset[lat_var_name])])
 
 
-def set_json_history(dataset, cut, file_to_subset, bbox=None, shapefile=None,
-                     origin_source=None):
+def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
+                     bbox: np.ndarray = None, shapefile: str = None, origin_source=None) -> None:
     """
     Set the 'json_history' metadata header of the granule to reflect the
     current version of the subsetter, as well as the parameters used
@@ -173,15 +173,15 @@ def set_json_history(dataset, cut, file_to_subset, bbox=None, shapefile=None,
     ----------
     dataset : xarray.Dataset
         The dataset to change the header of
-    bbox : np.ndarray
-        The requested bounding box
-    file_to_subset : string
-        The filepath of the file which was used to subset
     cut : boolean
         True to cut the scanline
+    file_to_subset : string
+        The filepath of the file which was used to subset
+    bbox : np.ndarray
+        The requested bounding box
     shapefile : str
         Name of the shapefile to include in the version history
-
+    TODO: add docstring and type hint for `origin_source` parameter.
     """
 
     params = f'cut={cut}'
@@ -213,7 +213,7 @@ def set_json_history(dataset, cut, file_to_subset, bbox=None, shapefile=None,
     dataset.attrs['history_json'] = json.dumps(history_json)
 
 
-def set_version_history(dataset, cut, bbox=None, shapefile=None):
+def set_version_history(dataset: xr.Dataset, cut: bool, bbox: np.ndarray = None, shapefile: str = None) -> None:
     """
     Set the 'history' metadata header of the granule to reflect the
     current version of the subsetter, as well as the parameters used
@@ -226,10 +226,10 @@ def set_version_history(dataset, cut, bbox=None, shapefile=None):
     ----------
     dataset : xarray.Dataset
         The dataset to change the header of
-    bbox : np.ndarray
-        The requested bounding box
     cut : boolean
         True to cut the scanline
+    bbox : np.ndarray
+        The requested bounding box
     shapefile : str
         Name of the shapefile to include in the version history
 
@@ -248,7 +248,7 @@ def set_version_history(dataset, cut, bbox=None, shapefile=None):
     dataset.attrs['history'] = history.strip()
 
 
-def calculate_chunks(dataset):
+def calculate_chunks(dataset: xr.Dataset) -> dict:
     """
     For the given dataset, calculate if the size on any dimension is
     worth chunking. Any dimension larger than 4000 will be chunked. This
@@ -276,7 +276,7 @@ def calculate_chunks(dataset):
     return chunk
 
 
-def find_matching_coords(dataset, match_list):
+def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str]:
     """
     As a backup for finding a coordinate var, look at the 'coordinates'
     metadata attribute of all data vars in the granule. Return any
@@ -316,7 +316,7 @@ def find_matching_coords(dataset, match_list):
     return match_coord_vars
 
 
-def compute_coordinate_variable_names(dataset):
+def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[str], str], Union[List[str], str]]:
     """
     Given a dataset, determine the coordinate variable from a list
     of options
@@ -329,7 +329,7 @@ def compute_coordinate_variable_names(dataset):
     Returns
     -------
     tuple, str
-        Tuple of strings, where the first element is the lat coordinate
+        Tuple of strings (or list of strings), where the first element is the lat coordinate
         name and the second element is the lon coordinate name
     """
 
@@ -373,7 +373,7 @@ def compute_coordinate_variable_names(dataset):
     return lat_coord_names, lon_coord_names
 
 
-def is_360(lon_var, scale, offset):
+def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
     """
     Determine if given dataset is a '360' dataset or not.
 
@@ -410,7 +410,7 @@ def is_360(lon_var, scale, offset):
     return False
 
 
-def get_spatial_bounds(dataset, lat_var_names, lon_var_names):
+def get_spatial_bounds(dataset: xr.Dataset, lat_var_names: str, lon_var_names: str) -> Union[np.ndarray, None]:
     """
     Get the spatial bounds for this dataset. These values are masked
     and scaled.
@@ -419,9 +419,9 @@ def get_spatial_bounds(dataset, lat_var_names, lon_var_names):
     ----------
     dataset : xr.Dataset
         Dataset to retrieve spatial bounds for
-    lat_var_name : str
+    lat_var_names : str
         Name of the lat variable
-    lon_var_name : str
+    lon_var_names : str
         Name of the lon variable
 
     Returns
@@ -484,7 +484,7 @@ def get_spatial_bounds(dataset, lat_var_names, lon_var_names):
     return np.array([[min_lon, max_lon], [min_lat, max_lat]])
 
 
-def compute_time_variable_name(dataset, lat_var):
+def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str:
     """
     Try to determine the name of the 'time' variable. This is done as
     follows:
@@ -534,7 +534,7 @@ def compute_time_variable_name(dataset, lat_var):
     raise ValueError('Unable to determine time variable')
 
 
-def compute_utc_name(dataset):
+def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
     """
     Get the name of the utc variable if it is there to determine origine time
     """
@@ -545,7 +545,7 @@ def compute_utc_name(dataset):
     return None
 
 
-def get_time_epoch_var(dataset, time_var_name):
+def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
     """
     Get the name of the epoch time var. This is only needed in the case
     where there is a single time var (of size 1) that contains the time
@@ -583,7 +583,7 @@ def get_time_epoch_var(dataset, time_var_name):
     return epoch_var_name
 
 
-def is_time_mjd(dataset, time_var_name):
+def is_time_mjd(dataset: xr.Dataset, time_var_name: str) -> bool:
     """
     Check to see if the time format is a time delta from a modified julian date.
 
@@ -607,7 +607,7 @@ def is_time_mjd(dataset, time_var_name):
     return False
 
 
-def translate_timestamp(str_timestamp):
+def translate_timestamp(str_timestamp: str) -> datetime.datetime:
     """
     Translate timestamp to datetime object
 
@@ -637,7 +637,7 @@ def translate_timestamp(str_timestamp):
     return datetime.datetime.fromisoformat(str_timestamp)
 
 
-def datetime_from_mjd(dataset, time_var_name):
+def datetime_from_mjd(dataset: xr.Dataset, time_var_name: str) -> Union[datetime.datetime, None]:
     """
     Translate the modified julian date from the long name in the time attribute.
 
@@ -669,7 +669,8 @@ def datetime_from_mjd(dataset, time_var_name):
     return None
 
 
-def build_temporal_cond(min_time, max_time, dataset, time_var_name):
+def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str
+                        ) -> Union[np.ndarray, bool]:
     """
     Build the temporal condition used in the xarray 'where' call which
     drops data not in the given bounds. If the data in the time var is
@@ -729,8 +730,15 @@ def build_temporal_cond(min_time, max_time, dataset, time_var_name):
     return temporal_cond
 
 
-def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, variables=None, bbox=None, cut=True,
-                     min_time=None, max_time=None):
+def subset_with_bbox(dataset: xr.Dataset,
+                     lat_var_names: list,
+                     lon_var_names: list,
+                     time_var_names: list,
+                     variables=None,
+                     bbox: np.ndarray = None,
+                     cut: bool = True,
+                     min_time: str = None,
+                     max_time: str = None) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -752,11 +760,13 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
         ISO timestamp of min temporal bound
     max_time : str
         ISO timestamp of max temporal bound
+    TODO: add docstring and type hint for `variables` parameter.
 
     Returns
     -------
     np.array
         Spatial bounds of Dataset after subset operation
+    TODO - fix this docstring type and the type hint to match code (currently returning a list[xr.Dataset])
     """
     lon_bounds, lat_bounds = convert_bbox(bbox, dataset, lat_var_names[0], lon_var_names[0])
     # condition should be 'or' instead of 'and' when bbox lon_min > lon_max
@@ -813,7 +823,12 @@ def subset_with_bbox(dataset, lat_var_names, lon_var_names, time_var_names, vari
     return datasets
 
 
-def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, chunks):
+def subset_with_shapefile(dataset: xr.Dataset,
+                          lat_var_name: str,
+                          lon_var_name: str,
+                          shapefile: str,
+                          cut: bool,
+                          chunks) -> np.ndarray:
     """
     Subset an xarray Dataset using a shapefile
 
@@ -829,10 +844,13 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, c
         Absolute path to the shapefile used to subset the given dataset
     cut : bool
         True if scanline should be cut.
+    TODO: add docstring and type hint for `chunks` parameter.
+
     Returns
     -------
     np.array
         Spatial bounds of Dataset after shapefile subset operation
+    TODO - fix this docstring type and the type hint to match code (currently returning a xr.Dataset)
     """
     shapefile_df = gpd.read_file(shapefile)
 
@@ -875,7 +893,10 @@ def subset_with_shapefile(dataset, lat_var_name, lon_var_name, shapefile, cut, c
     return xre.where(dataset, boolean_mask, cut)
 
 
-def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=None, time_var_names=None):
+def get_coordinate_variable_names(dataset: xr.Dataset,
+                                  lat_var_names: list = None,
+                                  lon_var_names: list = None,
+                                  time_var_names: list = None):
     """
     Retrieve coordinate variables for this dataset. If coordinate
     variables are provided, use those, Otherwise, attempt to determine
@@ -892,6 +913,10 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
         List of longitude coordinate variables.
     time_var_names : list
         List of time coordinate variables.
+
+    Returns
+    -------
+    TODO: add return type docstring and type hint.
     """
 
     if not lat_var_names or not lon_var_names:
@@ -908,9 +933,19 @@ def get_coordinate_variable_names(dataset, lat_var_names=None, lon_var_names=Non
     return lat_var_names, lon_var_names, time_var_names
 
 
-def convert_to_datetime(dataset, time_vars):
+def convert_to_datetime(dataset: xr.Dataset, time_vars: list) -> Tuple[xr.Dataset, datetime.datetime]:
     """
-    converts the time variable to datetime if xarray doesn't decode times
+    Converts the time variable to datetime if xarray doesn't decode times
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+    time_vars : list
+
+    Returns
+    -------
+    xr.Dataset
+    datetime.datetime
     """
     for var in time_vars:
         start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f") if any('TAI93' in str(dataset[var].attrs[attribute_name])
@@ -955,7 +990,7 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, list, bool]:
     return nc_dataset, rename_vars, has_groups
 
 
-def override_decode_cf_datetime():
+def override_decode_cf_datetime() -> None:
     """
     WARNING !!! REMOVE AT EARLIEST XARRAY FIX, this is a override to xarray override_decode_cf_datetime function.
     xarray has problems decoding time units with format `seconds since 2000-1-1 0:0:0 0`, this solves by testing
@@ -978,10 +1013,13 @@ def override_decode_cf_datetime():
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
-def subset(file_to_subset, bbox, output_file, variables=(),
+def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
+           variables: Union[List[str], str, None] = (),
            # pylint: disable=too-many-branches, disable=too-many-statements
-           cut=True, shapefile=None, min_time=None, max_time=None, origin_source=None,
-           lat_var_names=(), lon_var_names=(), time_var_names=()):
+           cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
+           origin_source: str = None,
+           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = ()
+           ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
 
@@ -989,16 +1027,14 @@ def subset(file_to_subset, bbox, output_file, variables=(),
     ----------
     file_to_subset : string
         The location of the file which will be subset
-    output_file : string
-        The file path for the output of the subsetting operation.
     bbox : np.ndarray
         The chosen bounding box. This is a tuple of tuples formatted
         as such: ((west, east), (south, north)). The assumption is that
         the valid range is ((-180, 180), (-90, 90)). This will be
         transformed as appropriate if the actual longitude range is
         0-360.
-    shapefile : str
-        Name of local shapefile used to subset given file.
+    output_file : string
+        The file path for the output of the subsetting operation.
     variables : list, str, optional
         List of variables to include in the resulting data file.
         NOTE: This will remove ALL variables which are not included
@@ -1006,6 +1042,8 @@ def subset(file_to_subset, bbox, output_file, variables=(),
     cut : boolean
         True if the scanline should be cut, False if the scanline should
         not be cut. Defaults to True.
+    shapefile : str
+        Name of local shapefile used to subset given file.
     min_time : str
         ISO timestamp representing the lower bound of the temporal
         subset to be performed. If this value is not provided, the
