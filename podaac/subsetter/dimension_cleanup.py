@@ -18,7 +18,7 @@ import netCDF4 as nc
 import xarray as xr
 
 
-def remove_duplicate_dims(nc_dataset: nc.Dataset) -> Tuple[nc.Dataset, List[str]]:
+def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
     """
     xarray cannot read netCDF4 datasets with duplicate dimensions.
     Function goes through a dataset to catch any variables with duplicate dimensions.
@@ -95,7 +95,7 @@ def remove_duplicate_dims(nc_dataset: nc.Dataset) -> Tuple[nc.Dataset, List[str]
         new_dup_var[dup_var_name][:] = dup_var[:]
 
     # return the variables that will need to be renamed: Rename method is still an issue per https://github.com/Unidata/netcdf-c/issues/1672
-    return nc_dataset, []
+    return nc_dataset
 
 
 def rename_dup_vars(dataset: xr.Dataset, rename_vars: List[str]) -> xr.Dataset:
