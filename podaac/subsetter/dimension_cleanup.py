@@ -58,9 +58,6 @@ def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
         for attrname in dup_var.ncattrs():
             if attrname != '_FillValue':
                 attrs_contents[attrname] = nc_dataset.variables[dup_var_name].getncattr(attrname)
-                # new_dup_var[var_name_new].setncattr(attrname, nc_dataset.variables[dup_var_name].getncattr(attrname))
-                # new_dup_var[var_name_new][:] = nc_dataset.variables[dup_var_name][:]
-        # data_contents = nc_dataset.variables[dup_var_name][:]
 
         fill_value = dup_var._FillValue  # pylint: disable=W0212
 
@@ -82,9 +79,7 @@ def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
                         new_dup_var[dim_dup_new].setncattr(ncattr, nc_dataset.variables[dim_dup].getncattr(ncattr))
                 new_dup_var[dim_dup_new][:] = nc_dataset.variables[dim_dup][:]
 
-        # if var_name_new not in nc_dataset.variables.keys():
-        # Grab new_dup_var and attributes from variable, before deleting it.
-
+        # Delete existing Variable
         del nc_dataset.variables[dup_var_name]
 
         # Replace original *Variable* with new variable with no duplicated dimensions.
