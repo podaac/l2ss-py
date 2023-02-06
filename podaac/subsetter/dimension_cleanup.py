@@ -12,7 +12,7 @@ dimension_cleanup.py
 Functions which improve upon existing netCDF4 library existing functions
 """
 import collections
-from typing import List, Tuple
+from typing import List
 
 import netCDF4 as nc
 import xarray as xr
