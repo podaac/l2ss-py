@@ -90,12 +90,12 @@ def remove_duplicate_dims(nc_dataset: nc.Dataset) -> Tuple[nc.Dataset, List[str]
         # Replace original *Variable* with new variable with no duplicated dimensions.
         new_dup_var[dup_var_name] = nc_dataset.createVariable(dup_var_name, str(dup_var[:].dtype),
                                                               tuple(new_dim_list), fill_value=fill_value)
-        for a, contents in attrs_contents.items():
-            new_dup_var[dup_var_name].setncattr(a, contents)
+        for attr_name, contents in attrs_contents.items():
+            new_dup_var[dup_var_name].setncattr(attr_name, contents)
         new_dup_var[dup_var_name][:] = dup_var[:]
 
     # return the variables that will need to be renamed: Rename method is still an issue per https://github.com/Unidata/netcdf-c/issues/1672
-    return nc_dataset, list()
+    return nc_dataset, []
 
 
 def rename_dup_vars(dataset: xr.Dataset, rename_vars: List[str]) -> xr.Dataset:
