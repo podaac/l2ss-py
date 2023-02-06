@@ -183,7 +183,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         output_file=subset_output_file
     )
 
-    out_ds, _ = subset.open_as_nc_dataset(subset_output_file)
+    out_ds, rename_vars, _ = subset.open_as_nc_dataset(subset_output_file)
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False,
@@ -549,7 +549,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
 
-    in_ds, _ = subset.open_as_nc_dataset(join(data_dir, test_file))
+    in_ds, rename_vars, _ = subset.open_as_nc_dataset(join(data_dir, test_file))
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
@@ -575,7 +575,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
         variables=[var.replace(GROUP_DELIM, '/') for var in included_variables]
     )
 
-    out_ds, _ = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
+    out_ds, rename_vars, _ = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False)
@@ -1226,7 +1226,7 @@ def test_get_time_variable_name(test_file, data_dir, subset_output_dir):
         'mask_and_scale': False,
         'decode_times': True
     }
-    ds, _ = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
+    ds, rename_vars, _ = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
