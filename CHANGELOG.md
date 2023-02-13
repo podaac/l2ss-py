@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/143](https://github.com/podaac/l2ss-py/issues/143): Fixed bug when not specifying any variable subsetting for grouped datasets.
 ### Security
 
 
