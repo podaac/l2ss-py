@@ -1077,12 +1077,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if has_groups:
         # Make sure all variables start with '/'
-        variables = ['/' + var if not var.startswith('/') else var for var in variables]
+        if variables:
+            variables = ['/' + var if not var.startswith('/') else var for var in variables]
         lat_var_names = ['/' + var if not var.startswith('/') else var for var in lat_var_names]
         lon_var_names = ['/' + var if not var.startswith('/') else var for var in lon_var_names]
         time_var_names = ['/' + var if not var.startswith('/') else var for var in time_var_names]
         # Replace all '/' with GROUP_DELIM
-        variables = [var.replace('/', GROUP_DELIM) for var in variables]
+        if variables:
+            variables = [var.replace('/', GROUP_DELIM) for var in variables]
         lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
         lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
