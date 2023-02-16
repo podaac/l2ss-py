@@ -110,6 +110,7 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
     """
 
     base_dataset = nc.Dataset(output_file, mode='w')
+
     for dataset in datasets:
         group_lst = []
         for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
@@ -118,6 +119,7 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
         groups = set(group_lst)
         for group in groups:
             base_dataset.createGroup(group)
+
         for dim_name in list(dataset.dims.keys()):
             new_dim_name = dim_name.split(GROUP_DELIM)[-1]
             dim_group = _get_nested_group(base_dataset, dim_name)
@@ -154,14 +156,12 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         new_var_name = var_name.split(GROUP_DELIM)[-1]
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
-
         var_dims = [x.split(GROUP_DELIM)[-1] for x in dataset.variables[var_name].dims]
         if np.issubdtype(
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
         ):
-
             if start_date:
                 dataset.variables[var_name].values = (dataset.variables[var_name].values - np.datetime64(start_date))/np.timedelta64(1, 's')
                 variable = dataset.variables[var_name]
@@ -173,14 +173,33 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         var_attrs = variable.attrs
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
-        comp_args = {"zlib": False, "complevel": 1}
+        comp_args = {"zlib": True, "complevel": 1}
 
         var_data = variable.data
         if variable.dtype == object:
-            var_group.createVariable(new_var_name, 'S4', var_dims, fill_value=fill_value, **comp_args)
+            #print (var_name)
+            # https://stackoverflow.com/questions/48889639/how-do-i-read-dates-into-a-netcdf4-variable  
+            dim_time = var_group.dimensions[var_dims[0]].size
+            dim_time_length = var_group.dimensions[var_dims[1]].size
+            datetime_string_length = len(np.array(var_data[:]).squeeze()[0])
+
+            """copy_time = np.full((dim_time_length, datetime_string_length), fill_value='')
+            
+            for i in range(dim_time_length):
+                copy_time[i] = list(np.array(var_data[:]).squeeze()[i])
+
+            print (copy_time)"""
+            var_group.createDimension('tlendim', datetime_string_length)
+            print (var_group.dimensions['tlendim'])
+            var_data = np
+            raise Exception
+
+            #print (var_group.dimensions[var_dims[1]])
+            var_group.createVariable(new_var_name,'S1', var_dims, fill_value=fill_value, **comp_args)
             # data values converted back to an object for netcdf4 copying purposes
-            # see https://github.com/Unidata/netcdf4-python/issues/324
-            var_data = np.array(variable.data, dtype=object)
+            #var_data = nc.chartostring(variable.data)
+            raise Exception
+            var_data = np.array(variable.data, np.unicode_)
         elif variable.dtype == 'timedelta64[ns]':
             var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
         else:
@@ -189,9 +208,18 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         # Copy attributes
         var_group.variables[new_var_name].setncatts(var_attrs)
 
-        # Copy data
         var_group.variables[new_var_name].set_auto_maskandscale(False)
-        var_group.variables[new_var_name][:] = var_data
+
+        # Copy data
+        if var_name == '__PRODUCT__time_utc':
+            var_group.variables[new_var_name][0,:] = var_data[:]
+            print (np.array(var_data))
+            print (np.array(var_group.variables[new_var_name][:]))
+        else:
+
+            var_group.variables[new_var_name][:] = var_data
+
+
 
 
 def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
