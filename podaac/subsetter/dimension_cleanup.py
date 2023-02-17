@@ -12,10 +12,8 @@ dimension_cleanup.py
 Functions which improve upon existing netCDF4 library existing functions
 """
 import collections
-from typing import List
 
 import netCDF4 as nc
-import xarray as xr
 
 
 def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
@@ -89,17 +87,4 @@ def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
             new_dup_var[dup_var_name].setncattr(attr_name, contents)
         new_dup_var[dup_var_name][:] = dup_var[:]
 
-    # return the variables that will need to be renamed: Rename method is still an issue per https://github.com/Unidata/netcdf-c/issues/1672
     return nc_dataset
-
-
-def rename_dup_vars(dataset: xr.Dataset, rename_vars: List[str]) -> xr.Dataset:
-    """
-    NetCDF4 rename function raises and HDF error for variable in S5P files with duplicate dimensions
-    This method will use xarray to rename the variables
-    """
-    for i in rename_vars:
-        original_name = i[:-2]
-        dataset = dataset.rename({i: original_name})
-
-    return dataset
