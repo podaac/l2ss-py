@@ -179,9 +179,9 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         if variable.dtype == object:
             #print (var_name)
             # https://stackoverflow.com/questions/48889639/how-do-i-read-dates-into-a-netcdf4-variable  
-            dim_time = var_group.dimensions[var_dims[0]].size
+            """dim_time = var_group.dimensions[var_dims[0]].size
             dim_time_length = var_group.dimensions[var_dims[1]].size
-            datetime_string_length = len(np.array(var_data[:]).squeeze()[0])
+            datetime_string_length = len(np.array(var_data[:]).squeeze()[0])"""
 
             """copy_time = np.full((dim_time_length, datetime_string_length), fill_value='')
             
@@ -189,17 +189,22 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
                 copy_time[i] = list(np.array(var_data[:]).squeeze()[i])
 
             print (copy_time)"""
+            """var_dims.append('tlendim')
             var_group.createDimension('tlendim', datetime_string_length)
             print (var_group.dimensions['tlendim'])
-            var_data = np
-            raise Exception
+            np_time_var = []
+            print (np_time_var)
+            time_var = []
+            for i in np.array(var_data[0,:]):
+                time_var.append(list(i))
+            np_time_var.append(time_var)
 
-            #print (var_group.dimensions[var_dims[1]])
-            var_group.createVariable(new_var_name,'S1', var_dims, fill_value=fill_value, **comp_args)
-            # data values converted back to an object for netcdf4 copying purposes
-            #var_data = nc.chartostring(variable.data)
-            raise Exception
-            var_data = np.array(variable.data, np.unicode_)
+            var_data = np.array(np_time_var)
+
+            print (var_data)"""
+            comp_args = {"zlib": False, "complevel": 1}
+            var_group.createVariable(new_var_name,'|S4', var_dims, fill_value=fill_value, **comp_args)
+            var_data = np.array(variable.data, dtype=object)
         elif variable.dtype == 'timedelta64[ns]':
             var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
         else:
@@ -211,15 +216,8 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         var_group.variables[new_var_name].set_auto_maskandscale(False)
 
         # Copy data
-        if var_name == '__PRODUCT__time_utc':
-            var_group.variables[new_var_name][0,:] = var_data[:]
-            print (np.array(var_data))
-            print (np.array(var_group.variables[new_var_name][:]))
-        else:
-
-            var_group.variables[new_var_name][:] = var_data
-
-
+        var_group.variables[new_var_name][:] = var_data
+        var_group.variables[new_var_name][:] = var_data
 
 
 def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
