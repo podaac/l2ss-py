@@ -178,7 +178,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         var_data = variable.data
         if variable.dtype == object:
             comp_args = {"zlib": False, "complevel": 1}
-            var_group.createVariable(new_var_name,'|S4', var_dims, fill_value=fill_value, **comp_args)
+            var_group.createVariable(new_var_name, '|S4', var_dims, fill_value=fill_value, **comp_args)
             var_data = np.array(variable.data, dtype=object)
         elif variable.dtype == 'timedelta64[ns]':
             var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
