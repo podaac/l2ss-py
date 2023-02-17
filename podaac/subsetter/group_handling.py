@@ -187,9 +187,9 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
 
         # Copy attributes
         var_group.variables[new_var_name].setncatts(var_attrs)
-        var_group.variables[new_var_name].set_auto_maskandscale(False)
 
         # Copy data
+        var_group.variables[new_var_name].set_auto_maskandscale(False)
         var_group.variables[new_var_name][:] = var_data
 
 
