@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- [issue/142](https://github.com/podaac/l2ss-py/issues/142): Changed handling of duplicate dimensions as part of integration with new TEMPO ozone profile data.
 ### Deprecated 
 ### Removed
 ### Fixed

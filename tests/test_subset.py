@@ -183,7 +183,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         output_file=subset_output_file
     )
 
-    out_ds, rename_vars, _ = subset.open_as_nc_dataset(subset_output_file)
+    out_ds, _ = subset.open_as_nc_dataset(subset_output_file)
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False,
@@ -549,7 +549,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
 
-    in_ds, rename_vars, _ = subset.open_as_nc_dataset(join(data_dir, test_file))
+    in_ds, _ = subset.open_as_nc_dataset(join(data_dir, test_file))
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
@@ -575,7 +575,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
         variables=[var.replace(GROUP_DELIM, '/') for var in included_variables]
     )
 
-    out_ds, rename_vars, _ = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
+    out_ds, _ = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False)
@@ -1226,7 +1226,7 @@ def test_get_time_variable_name(test_file, data_dir, subset_output_dir):
         'mask_and_scale': False,
         'decode_times': True
     }
-    ds, rename_vars, _ = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
+    ds, _ = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
@@ -1329,6 +1329,34 @@ def test_duplicate_dims_tropomi(data_dir, subset_output_dir, request):
         'DETAILED_RESULTS'].variables.items():
         assert variable.shape == \
                out_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['DETAILED_RESULTS'].variables[var_name].shape
+
+def test_duplicate_dims_tempo_ozone(data_dir, subset_output_dir, request):
+    """
+    Check if TEMPO Ozone files run successfully even though
+    these files have variables with duplicate dimensions
+    """
+    TEMPO_dir = join(data_dir, 'TEMPO')
+    tempo_ozone_file = 'TEMPO_O3PROF-PROXY_L2_V01_20130831T222959Z_S014G06.nc'
+
+    bbox = np.array(((-180, 180), (-90, 90)))
+    output_file = "{}_{}".format(request.node.name, tempo_ozone_file)
+    shutil.copyfile(
+        os.path.join(TEMPO_dir, tempo_ozone_file),
+        os.path.join(subset_output_dir, tempo_ozone_file)
+    )
+    box_test = subset.subset(
+        file_to_subset=join(subset_output_dir, tempo_ozone_file),
+        bbox=bbox,
+        output_file=join(subset_output_dir, output_file)
+    )
+    # check if the box_test is
+
+    in_nc = nc.Dataset(join(TEMPO_dir, tempo_ozone_file))
+    out_nc = nc.Dataset(join(subset_output_dir, output_file))
+
+    for var_name, variable in in_nc.groups['support_data'].variables.items():
+        assert variable.shape == \
+               out_nc.groups['support_data'].variables[var_name].shape
 
 
 def test_omi_novars_subset(data_dir, subset_output_dir, request):
