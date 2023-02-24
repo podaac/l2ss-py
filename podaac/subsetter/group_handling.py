@@ -191,6 +191,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         var_group.variables[new_var_name].set_auto_maskandscale(False)
         var_group.variables[new_var_name][:] = var_data
 
+
 def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
     """
     Transform a h5py  Dataset that has groups to an xarray compatible
