@@ -2040,6 +2040,29 @@ def test_var_subsetting_tropomi(data_dir, subset_output_dir, request):
 
     assert list(slash_dataset.groups['PRODUCT'].variables) == list(noslash_dataset.groups['PRODUCT'].variables)
 
+def test_tropomi_utc_time(data_dir, subset_output_dir, request):
+    """Verify that the time UTC values are conserved in S5P files"""
+    trop_dir = join(data_dir, 'tropomi')
+    trop_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
+    variable = ['/PRODUCT/time_utc']
+    bbox = np.array(((-180, 180), (-90, 90)))
+    output_file = "{}_{}".format(request.node.name, trop_file)
+    shutil.copyfile(
+        os.path.join(trop_dir, trop_file),
+        os.path.join(subset_output_dir, trop_file)
+    )
+    subset.subset(
+        file_to_subset=join(subset_output_dir, trop_file),
+        bbox=bbox,
+        output_file=join(subset_output_dir, output_file),
+        variables=variable
+    )
+
+    in_nc_dataset = nc.Dataset(join(trop_dir, trop_file))
+    out_nc_dataset = nc.Dataset(join(subset_output_dir, output_file))
+
+    assert in_nc_dataset.groups['PRODUCT'].variables['time_utc'][:].squeeze()[0] ==\
+                    out_nc_dataset.groups['PRODUCT'].variables['time_utc'][:].squeeze()[0]
 
 def test_bad_time_unit(subset_output_dir):
     fill_val = -99999.0
