@@ -970,7 +970,7 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list) -> Tuple[xr.Datase
     return dataset, start_date
 
 
-def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, list, bool]:
+def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
     """Open netcdf file, and flatten groups if they exist."""
     file_extension = filepath.split('.')[-1]
 
@@ -985,9 +985,9 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, list, bool]:
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
 
-    nc_dataset, rename_vars = dc.remove_duplicate_dims(nc_dataset)
+    nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
-    return nc_dataset, rename_vars, has_groups
+    return nc_dataset, has_groups
 
 
 def override_decode_cf_datetime() -> None:
@@ -1071,18 +1071,20 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
     """
-    nc_dataset, rename_vars, has_groups = open_as_nc_dataset(file_to_subset)
+    nc_dataset, has_groups = open_as_nc_dataset(file_to_subset)
 
     override_decode_cf_datetime()
 
     if has_groups:
         # Make sure all variables start with '/'
-        variables = ['/' + var if not var.startswith('/') else var for var in variables]
+        if variables:
+            variables = ['/' + var if not var.startswith('/') else var for var in variables]
         lat_var_names = ['/' + var if not var.startswith('/') else var for var in lat_var_names]
         lon_var_names = ['/' + var if not var.startswith('/') else var for var in lon_var_names]
         time_var_names = ['/' + var if not var.startswith('/') else var for var in time_var_names]
         # Replace all '/' with GROUP_DELIM
-        variables = [var.replace('/', GROUP_DELIM) for var in variables]
+        if variables:
+            variables = [var.replace('/', GROUP_DELIM) for var in variables]
         lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
         lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
@@ -1099,7 +1101,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        dataset = dc.rename_dup_vars(dataset, rename_vars)
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,

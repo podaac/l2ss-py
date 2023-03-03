@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [2.4.0]
+### Added
+### Changed
+- [issue/142](https://github.com/podaac/l2ss-py/issues/142): Changed handling of duplicate dimensions as part of integration with new TEMPO ozone profile data.
+### Deprecated 
+### Removed
+### Fixed
+- [issue/149](https://github.com/podaac/l2ss-py/issues/149): Fixed compression level for netCDF4 object variable creation into a string. Will need to address after netcdf4 rebuilds library. https://github.com/Unidata/netcdf4-python/issues/1236
+- [issue/143](https://github.com/podaac/l2ss-py/issues/143): Fixed bug when not specifying any variable subsetting for grouped datasets.
+### Security
+
 ## [2.3.0]
 ### Added
 - [issue/126](https://github.com/podaac/l2ss-py/issues/126): Added flexibility to variable subsetting
