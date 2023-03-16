@@ -1270,6 +1270,41 @@ def test_subset_size(test_file, data_dir, subset_output_dir, request):
 
     assert subset_file_size < original_file_size
 
+def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
+    """
+    Check that SNDR ascending and descending granule types are able
+    to go through xarray cf_decode_times
+    """
+    SNDR_dir = join(data_dir, 'SNDR')
+    sndr_files = ['SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc',
+                  'SNDR.AQUA.AIRS.20140110T0305.m06.g031.L2_CLIMCAPS_RET.std.v02_39.G.210131015806.nc',
+                  'SNDR.J1.CRIMSS.20190101T0006.m06.g002.L2_CLIMCAPS_RET.std.v02_28.G.200211192708.nc']
+    
+    for sndr_file in sndr_files:
+
+        shutil.copyfile(
+            os.path.join(SNDR_dir, sndr_file),
+            os.path.join(subset_output_dir, sndr_file)
+        )
+
+        nc_dataset, has_groups = subset.open_as_nc_dataset(join(subset_output_dir, sndr_file))
+
+        args = {
+            'decode_coords': False,
+            'mask_and_scale': False,
+            'decode_times': True
+        }
+
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+
+            lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(dataset)
+            assert dataset
+            assert np.issubdtype(dataset[time_var_names[0]].dtype, np.datetime64)
+            dataset.close()
+    
 
 def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     """

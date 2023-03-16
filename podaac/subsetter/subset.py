@@ -1094,6 +1094,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         'mask_and_scale': False,
         'decode_times': False
     }
+
+    # clean up time variable in SNDR before decode_times
+    if any('__asc_flag' in i for i in list(nc_dataset.variables)):
+        if any(0 == flag for flag in list(np.array(nc_dataset.variables['__asc_flag']))):
+            del nc_dataset.variables['__asc_node_tai93']
+
     if min_time or max_time:
         args['decode_times'] = True
 
