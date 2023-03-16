@@ -1295,6 +1295,11 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
             'decode_times': True
         }
 
+        # clean up time variable in SNDR before decode_times
+        if any('__asc_flag' in i for i in list(nc_dataset.variables)):
+            if any(0 == flag for flag in list(np.array(nc_dataset.variables['__asc_flag']))):
+                del nc_dataset.variables['__asc_node_tai93']
+
         with xr.open_dataset(
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
