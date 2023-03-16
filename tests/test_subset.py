@@ -1278,7 +1278,7 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     SNDR_dir = join(data_dir, 'SNDR')
     sndr_files = ['SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc',
                   'SNDR.AQUA.AIRS.20140110T0305.m06.g031.L2_CLIMCAPS_RET.std.v02_39.G.210131015806.nc',
-                  'SNDR.J1.CRIMSS.20190101T0006.m06.g002.L2_CLIMCAPS_RET.std.v02_28.G.200211192708.nc']
+                  'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc']
     
     for sndr_file in sndr_files:
 
