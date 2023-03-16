@@ -1279,15 +1279,13 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     sndr_files = ['SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc',
                   'SNDR.AQUA.AIRS.20140110T0305.m06.g031.L2_CLIMCAPS_RET.std.v02_39.G.210131015806.nc',
                   'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc']
-    
+    bbox = np.array(((-180, 180), (-90, 90)))
     for sndr_file in sndr_files:
-
+        output_file = "{}_{}".format(request.node.name, sndr_file)
         shutil.copyfile(
             os.path.join(SNDR_dir, sndr_file),
             os.path.join(subset_output_dir, sndr_file)
         )
-
-        nc_dataset, has_groups = subset.open_as_nc_dataset(join(subset_output_dir, sndr_file))
 
         args = {
             'decode_coords': False,
@@ -1295,20 +1293,15 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
             'decode_times': True
         }
 
-        # clean up time variable in SNDR before decode_times
-        if any('__asc_flag' in i for i in list(nc_dataset.variables)):
-            if any(0 == flag for flag in list(np.array(nc_dataset.variables['__asc_flag']))):
-                del nc_dataset.variables['__asc_node_tai93']
-
-        with xr.open_dataset(
-                xr.backends.NetCDF4DataStore(nc_dataset),
-                **args
-        ) as dataset:
-
-            lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(dataset)
-            assert dataset
-            assert np.issubdtype(dataset[time_var_names[0]].dtype, np.datetime64)
-            dataset.close()
+        box_test = subset.subset(
+            file_to_subset=join(subset_output_dir, sndr_file),
+            bbox=bbox,
+            output_file=join(subset_output_dir, output_file),
+            min_time='2014-02-24T00:50:20Z',
+            max_time='2021-02-24T01:09:55Z'
+        )
+        
+        assert box_test
     
 
 def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
