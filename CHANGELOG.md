@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/153](https://github.com/podaac/l2ss-py/issues/153): Remove the asc_node_tai93 variable when blank in the SNDR collections for xarray.decode_times to decode
 ### Security
 
 
