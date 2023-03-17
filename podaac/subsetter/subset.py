@@ -1098,7 +1098,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     # SNDR.AQUA files have ascending node time blank
     if any('__asc_node_tai93' in i for i in list(nc_dataset.variables)):
         asc_time_var = nc_dataset.variables['__asc_node_tai93']
-        if not (asc_time_var[:] > 0):
+        if not asc_time_var[:] > 0:
             del nc_dataset.variables['__asc_node_tai93']
 
     if min_time or max_time:
