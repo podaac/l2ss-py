@@ -1094,10 +1094,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         'mask_and_scale': False,
         'decode_times': False
     }
-
     # clean up time variable in SNDR before decode_times
-    if any('__asc_flag' in i for i in list(nc_dataset.variables)):
-        if any(0 == flag for flag in list(np.array(nc_dataset.variables['__asc_flag']))):
+    # SNDR.AQUA files have ascending node time blank
+    if any('__asc_node_tai93' in i for i in list(nc_dataset.variables)):
+        asc_time_var = nc_dataset.variables['__asc_node_tai93']
+        if not (asc_time_var[:] > 0):
             del nc_dataset.variables['__asc_node_tai93']
 
     if min_time or max_time:
