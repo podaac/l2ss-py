@@ -1291,10 +1291,11 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
             file_to_subset=join(subset_output_dir, sndr_file),
             bbox=bbox,
             output_file=join(subset_output_dir, output_file),
-            min_time='2014-02-24T00:50:20Z',
+            min_time='2014-01-10T00:50:20Z',
             max_time='2021-02-24T01:09:55Z'
         )
-        if isinstance(box_test, np.ndarray):
+
+        if not isinstance(box_test, np.ndarray):
             raise ValueError('Subset for SNDR not returned properly')
     
 
