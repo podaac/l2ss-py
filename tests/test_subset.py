@@ -1300,8 +1300,8 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
             min_time='2014-02-24T00:50:20Z',
             max_time='2021-02-24T01:09:55Z'
         )
-        
-        assert box_test
+        if not box_test:
+            raise ValueError
     
 
 def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
