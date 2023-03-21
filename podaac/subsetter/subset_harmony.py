@@ -175,10 +175,10 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             # Stage the output file with a conventional filename
             mime = 'application/x-netcdf4'
-            operations = dict(
-                variable_subset=subset_params.get('variables'),
-                is_subsetted=bool(result_bbox is not None)
-            )
+            operations = {
+                "variable_subset": subset_params.get('variables'),
+                "is_subsetted": bool(result_bbox is not None)
+            }
             staged_filename = generate_output_filename(asset.href, '.nc4', **operations)
 
             url = stage(subset_params['output_file'],

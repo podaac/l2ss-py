@@ -1166,7 +1166,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 ))
             else:
                 encoding = {}
-                compression = dict(zlib=True, complevel=5, _FillValue=None)
+                compression = {"zlib": True, "complevel": 5, "_FillValue": None}
 
                 if (min_time or max_time) and not all(
                         dim_size == 1 for dim_size in dataset.dims.values()):
