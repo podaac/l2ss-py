@@ -1270,6 +1270,34 @@ def test_subset_size(test_file, data_dir, subset_output_dir, request):
 
     assert subset_file_size < original_file_size
 
+def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
+    """
+    Check that SNDR ascending and descending granule types are able
+    to go through xarray cf_decode_times
+    """
+    SNDR_dir = join(data_dir, 'SNDR')
+    sndr_files = ['SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc',
+                  'SNDR.AQUA.AIRS.20140110T0305.m06.g031.L2_CLIMCAPS_RET.std.v02_39.G.210131015806.nc',
+                  'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc']
+    bbox = np.array(((-180, 180), (-90, 90)))
+    for sndr_file in sndr_files:
+        output_file = "{}_{}".format(request.node.name, sndr_file)
+        shutil.copyfile(
+            os.path.join(SNDR_dir, sndr_file),
+            os.path.join(subset_output_dir, sndr_file)
+        )
+
+        box_test = subset.subset(
+            file_to_subset=join(subset_output_dir, sndr_file),
+            bbox=bbox,
+            output_file=join(subset_output_dir, output_file),
+            min_time='2014-01-10T00:50:20Z',
+            max_time='2021-02-24T01:09:55Z'
+        )
+
+        if not isinstance(box_test, np.ndarray):
+            raise ValueError('Subset for SNDR not returned properly')
+    
 
 def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     """
