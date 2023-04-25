@@ -1018,7 +1018,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
-           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (), test=False
+           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = ()
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -1189,8 +1189,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     data_var.load().to_netcdf(output_file, 'a', encoding={var: encoding.get(var)})
                     del data_var
 
-                with nc.Dataset(output_file, 'a') as ds:
-                    ds.setncatts(dataset.attrs)
+                with nc.Dataset(output_file, 'a') as dataset_attr:
+                    dataset_attr.setncatts(dataset.attrs)
 
         if has_groups:
             recombine_grouped_datasets(datasets, output_file, start_date)
