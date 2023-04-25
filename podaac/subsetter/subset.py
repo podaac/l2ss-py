@@ -46,6 +46,7 @@ from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_datas
     h5file_transform
 
 SERVICE_NAME = 'l2ss-py'
+MAX_MEM_USE = 1024 * 1024 * 1024 * 2 * .8
 
 
 def apply_scale_offset(scale: float, offset: float, value: float) -> float:
@@ -1018,7 +1019,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
-           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = ()
+           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (), test=False
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -1185,7 +1186,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
                         dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
-                dataset.load().to_netcdf(output_file, 'w', encoding=encoding)
+                    data_var = dataset[var].copy()
+                    data_var.load().to_netcdf(output_file, 'a', encoding={var: encoding.get(var)})
+                    del data_var
+
+                with nc.Dataset(output_file, 'a') as ds:
+                    ds.setncatts(dataset.attrs)
 
         if has_groups:
             recombine_grouped_datasets(datasets, output_file, start_date)

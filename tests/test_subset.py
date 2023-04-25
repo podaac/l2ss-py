@@ -140,7 +140,8 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
-        output_file=join(subset_output_dir, output_file)
+        output_file=join(subset_output_dir, output_file),
+        test=True
     )
 
     in_ds = xr.open_dataset(join(data_dir, test_file),
