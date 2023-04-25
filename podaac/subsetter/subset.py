@@ -46,7 +46,6 @@ from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_datas
     h5file_transform
 
 SERVICE_NAME = 'l2ss-py'
-MAX_MEM_USE = 1024 * 1024 * 1024 * 2 * .8
 
 
 def apply_scale_offset(scale: float, offset: float, value: float) -> float:
