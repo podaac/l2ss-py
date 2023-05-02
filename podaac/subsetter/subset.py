@@ -1185,7 +1185,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
                         dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
-                dataset.load().to_netcdf(output_file, 'w', encoding=encoding)
+                    data_var = dataset[var].copy()
+                    data_var.load().to_netcdf(output_file, 'a', encoding={var: encoding.get(var)})
+                    del data_var
+
+                with nc.Dataset(output_file, 'a') as dataset_attr:
+                    dataset_attr.setncatts(dataset.attrs)
 
         if has_groups:
             recombine_grouped_datasets(datasets, output_file, start_date)
