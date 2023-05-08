@@ -978,12 +978,15 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
         nc_dataset, has_groups = h5file_transform(filepath)
     else:
         # Open dataset with netCDF4 first, so we can get group info
-        nc_dataset = nc.Dataset(filepath, mode='r')
-        has_groups = bool(nc_dataset.groups)
+        try:
+            nc_dataset = nc.Dataset(filepath, mode='r')
+            has_groups = bool(nc_dataset.groups)
 
-        # If dataset has groups, transform to work with xarray
-        if has_groups:
-            nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
+            # If dataset has groups, transform to work with xarray
+            if has_groups:
+                nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
+        except Exception:
+            nc_dataset, has_groups = h5file_transform(filepath)
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
