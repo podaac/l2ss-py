@@ -985,7 +985,7 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
             # If dataset has groups, transform to work with xarray
             if has_groups:
                 nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
-        except Exception:
+        except OSError:
             nc_dataset, has_groups = h5file_transform(filepath)
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)

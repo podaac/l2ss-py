@@ -176,8 +176,6 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
             new_value = value.replace("/", "_") if isinstance(value, str) else value
             var_attrs[new_key] = new_value
 
-        #var_attrs = variable.attrs
-
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
         comp_args = {"zlib": True, "complevel": 1}
