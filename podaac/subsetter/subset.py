@@ -731,13 +731,14 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
 
 
 def get_base_group_names(lats):
+    """Function string to pass linting"""
     group_list = []
     group_names = []
     for lat in lats:
         group_list.append(lat.strip(GROUP_DELIM).split(GROUP_DELIM))
 
-    for j in range(len(group_list)):
-        for i in range(len(group_list[0])):
+    for j, group in enumerate(group_list):
+        for i, index in enumerate(group_list[0]):
             if group_list[0][i] == group_list[j][i]:
                 pass
             else:
@@ -794,7 +795,7 @@ def subset_with_bbox(dataset: xr.Dataset,
     diff_count = -1
     if len(lat_var_names) > 1:
         unique_groups, diff_count = get_base_group_names(lat_var_names)
-    else: 
+    else:
         unique_groups = [GROUP_DELIM.join(lat_var_names[0].strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])]
 
     datasets = []
@@ -824,11 +825,11 @@ def subset_with_bbox(dataset: xr.Dataset,
                     ])
 
             for var in group_vars:
-                dim_list.extend([dim for dim in list(dataset[var].dims)])
+                dim_list.extend(list(list(dataset[var].dims)))
 
             group_dims = [
                 dim for dim in list(dataset.coords.keys())
-                if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == lat_var_prefix             
+                if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == lat_var_prefix
             ]
 
             var_included = list(set(group_dims) - set(dim_list))
@@ -853,7 +854,7 @@ def subset_with_bbox(dataset: xr.Dataset,
             temporal_cond,
             cut
         )
-    
+
         datasets.append(group_dataset)
 
     return datasets
