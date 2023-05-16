@@ -799,7 +799,6 @@ def subset_with_bbox(dataset: xr.Dataset,
     else:
         unique_groups = [GROUP_DELIM.join(lat_var_names[0].strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])]
 
-    #print (lat_var_names)
     datasets = []
 
     for lat_var_name, lon_var_name, time_var_name in zip(
@@ -808,8 +807,7 @@ def subset_with_bbox(dataset: xr.Dataset,
         if GROUP_DELIM in lat_var_name:
 
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])
-            print ('lat_var_prefix', lat_var_prefix)
-            print (lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM))
+
             dim_list = []
             group_vars = [
                 var for var in dataset.data_vars.keys()
