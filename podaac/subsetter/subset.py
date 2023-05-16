@@ -743,8 +743,8 @@ def get_base_group_names(lats):
                 pass
             else:
                 diff_count = index[0]+1
-                group_names.append(GROUP_DELIM.join(group[1][:diff_count]))
-    group_names.insert(0, GROUP_DELIM.join(group_list[0][:diff_count]))
+                group_names.append(GROUP_DELIM+GROUP_DELIM.join(group[1][:diff_count]))
+    group_names.insert(0, GROUP_DELIM+GROUP_DELIM.join(group_list[0][:diff_count]))
 
     return group_names, diff_count
 
@@ -799,6 +799,7 @@ def subset_with_bbox(dataset: xr.Dataset,
     else:
         unique_groups = [GROUP_DELIM.join(lat_var_names[0].strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])]
 
+    #print (lat_var_names)
     datasets = []
 
     for lat_var_name, lon_var_name, time_var_name in zip(
@@ -807,7 +808,8 @@ def subset_with_bbox(dataset: xr.Dataset,
         if GROUP_DELIM in lat_var_name:
 
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])
-
+            print ('lat_var_prefix', lat_var_prefix)
+            print (lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM))
             dim_list = []
             group_vars = [
                 var for var in dataset.data_vars.keys()
@@ -815,10 +817,10 @@ def subset_with_bbox(dataset: xr.Dataset,
             ]
 
             if variables:
-                group_vars = [
+                group_vars.extend([
                     var for var in dataset.data_vars.keys()
-                    if var in variables and var not in group_vars
-                ]
+                    if var in variables and var not in group_vars and not var.startswith(tuple(unique_groups))
+                ])
             else:
                 group_vars.extend([
                     var for var in dataset.data_vars.keys()
