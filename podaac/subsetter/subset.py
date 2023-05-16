@@ -730,6 +730,23 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     return temporal_cond
 
 
+def get_base_group_names(lats):
+    group_list = []
+    group_names = []
+    for lat in lats:
+        group_list.append(lat.strip(GROUP_DELIM).split(GROUP_DELIM))
+
+
+    for j in range(len(group_list)):
+        for i in range(len(group_list[0])):
+            if group_list[0][i] == group_list[j][i]:
+                pass
+            else:
+                diff_count = i+1
+                group_names.append(GROUP_DELIM.join(group_list[j][:diff_count]))
+    group_names.insert(0, GROUP_DELIM.join(group_list[0][:diff_count]))                    
+    return group_names, diff_count
+
 def subset_with_bbox(dataset: xr.Dataset,
                      lat_var_names: list,
                      lon_var_names: list,
@@ -774,35 +791,77 @@ def subset_with_bbox(dataset: xr.Dataset,
 
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
+    diff_count = -1
+    if len(lat_var_names) > 1:
+        unique_groups, diff_count = get_base_group_names(lat_var_names)
 
-    lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in
-                      lat_var_names]
+    """lat_var_prefix = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])}' for x in
+                      lat_var_names]"""
     datasets = []
+    """for var in list(dataset.data_vars.keys()):
+        print (var)
+        print (list(dataset[var].dims))
+    for dim in list(dataset.coords.keys()):
+        print (dim)
+        print (list(dataset[dim].dims))
+    print (time_var_names)
+    print (list(dataset.coords.keys()))"""
+    """print (lat_var_names)
+    print (lon_var_names)
+    print (time_var_names)"""
     for lat_var_name, lon_var_name, time_var_name in zip(
             lat_var_names, lon_var_names, time_var_names
     ):
         if GROUP_DELIM in lat_var_name:
-            var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])
+
+            lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])
+            #var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:-2])
+            #print ('VAR PREFIX')
+            #print (var_prefix)
+            dim_list = []
             group_vars = [
                 var for var in dataset.data_vars.keys()
-                if var.startswith(f'{GROUP_DELIM}{var_prefix}')
+                if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == lat_var_prefix #or \
+                   #GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1]) == lat_var_prefix
+                #if var.startswith(f'{GROUP_DELIM}{var_prefix}')
             ]
+            for var in group_vars:
+                dim_list.extend([dim for dim in list(dataset[var].dims)])
+            #var_dims = [*set([dim for dim in [dataset[var].dims for var in group_vars]])]
+            group_dims = [
+                dim for dim in list(dataset.coords.keys())
+                if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == lat_var_prefix
+                #if var.startswith(f'{GROUP_DELIM}{var_prefix}')              
+            ]
+            #print (group_dims)
+            #print (list(set(dim_list)))
+            var_included = list(set(group_dims) - set(dim_list))
+            group_vars.extend(var_included)
+            #print (var_included)
+            #print (group_vars)
+            #raise Exception
             if variables:
-                group_vars.extend([
+                group_vars = [
                     var for var in dataset.data_vars.keys()
-                    if var in variables and var not in group_vars and not var.startswith(tuple(lat_var_prefix))
-                ])
-            else:
+                    if var in variables and var not in group_vars #and not var.startswith(tuple(lat_var_prefix))
+                ]
+            """else:
                 group_vars.extend([
                     var for var in dataset.data_vars.keys()
                     if var not in group_vars and not var.startswith(tuple(lat_var_prefix))
-                    ])
+                    ])"""
 
         else:
             group_vars = list(dataset.keys())
-
+        #group_vars = list(dataset.keys())
+        #group_vars.extend(list(dataset.coords.keys()))
+        #print (group_vars)
+        #print ('\n\n')
         group_dataset = dataset[group_vars]
-
+        """for var in list(group_dataset.data_vars.keys()):
+            print (var)
+            print (list(group_dataset[var].dims))
+            print (group_dataset[var].shape)"""
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
 
@@ -817,7 +876,11 @@ def subset_with_bbox(dataset: xr.Dataset,
             temporal_cond,
             cut
         )
-
+        for var in list(group_dataset.data_vars.keys()):
+            print (var)
+            print (list(group_dataset[var].dims))
+            print (group_dataset[var].shape)
+    
         datasets.append(group_dataset)
 
     return datasets
