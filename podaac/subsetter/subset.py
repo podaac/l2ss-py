@@ -743,7 +743,7 @@ def get_base_group_names(lats):
                 pass
             else:
                 diff_count = index[0]+1
-                group_names.append(GROUP_DELIM.join(group_list[j][:diff_count]))
+                group_names.append(GROUP_DELIM.join(group[:diff_count]))
     group_names.insert(0, GROUP_DELIM.join(group_list[0][:diff_count]))
 
     return group_names, diff_count
