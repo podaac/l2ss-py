@@ -737,13 +737,13 @@ def get_base_group_names(lats):
     for lat in lats:
         group_list.append(lat.strip(GROUP_DELIM).split(GROUP_DELIM))
 
-    for j, group in enumerate(group_list):
+    for group in enumerate(group_list):
         for index in enumerate(group_list[0]):
-            if group_list[0][index[0]] == group[index[0]]:
+            if group_list[0][index[0]] == group[1][index[0]]:
                 pass
             else:
                 diff_count = index[0]+1
-                group_names.append(GROUP_DELIM.join(group[:diff_count]))
+                group_names.append(GROUP_DELIM.join(group[1][:diff_count]))
     group_names.insert(0, GROUP_DELIM.join(group_list[0][:diff_count]))
 
     return group_names, diff_count
