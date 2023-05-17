@@ -749,7 +749,7 @@ def get_base_group_names(lats):
     return group_names, diff_count
 
 
-def subset_with_bbox(dataset: xr.Dataset, # pylint: disable=too-many-branches
+def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
                      time_var_names: list,
@@ -801,7 +801,7 @@ def subset_with_bbox(dataset: xr.Dataset, # pylint: disable=too-many-branches
 
     datasets = []
 
-    for lat_var_name, lon_var_name, time_var_name in zip( # pylint: disable=too-many-nested-blocks
+    for lat_var_name, lon_var_name, time_var_name in zip(  # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names
     ):
         if GROUP_DELIM in lat_var_name:
