@@ -1111,6 +1111,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
+
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
@@ -1152,6 +1153,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 min_time=min_time,
                 max_time=max_time
             )
+            #datasets = [dataset]
 
         else:
             raise ValueError('Either bbox or shapefile must be provided')
