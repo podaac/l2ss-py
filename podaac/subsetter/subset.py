@@ -749,7 +749,7 @@ def get_base_group_names(lats):
     return group_names, diff_count
 
 
-def subset_with_bbox(dataset: xr.Dataset,
+def subset_with_bbox(dataset: xr.Dataset, # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
                      time_var_names: list,
@@ -801,7 +801,7 @@ def subset_with_bbox(dataset: xr.Dataset,
 
     datasets = []
 
-    for lat_var_name, lon_var_name, time_var_name in zip(
+    for lat_var_name, lon_var_name, time_var_name in zip( # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names
     ):
         if GROUP_DELIM in lat_var_name:
@@ -813,12 +813,19 @@ def subset_with_bbox(dataset: xr.Dataset,
                 var for var in dataset.data_vars.keys()
                 if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == lat_var_prefix
             ]
-
+            extend_list = None
             if variables:
-                group_vars.extend([
-                    var for var in dataset.data_vars.keys()
-                    if var in variables and var not in group_vars and not var.startswith(tuple(unique_groups))
-                ])
+                for var in variables:
+                    for group in unique_groups:
+                        if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == group:
+                            extend_list = True
+                        else:
+                            pass
+                if extend_list:
+                    group_vars.extend([
+                        var for var in dataset.data_vars.keys()
+                        if var in variables and var not in group_vars
+                    ])
             else:
                 group_vars.extend([
                     var for var in dataset.data_vars.keys()
