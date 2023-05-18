@@ -817,7 +817,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         unique_groups, diff_count = get_base_group_names(lat_var_names)
     else:
         unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in
-                      lat_var_names]
+                        lat_var_names]
 
     datasets = []
 
