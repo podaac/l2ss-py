@@ -812,11 +812,12 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
-    diff_count = -1
+    diff_count = [-1]
     if len(lat_var_names) > 1:
         unique_groups, diff_count = get_base_group_names(lat_var_names)
     else:
-        unique_groups = [GROUP_DELIM+GROUP_DELIM.join(lat_var_names[0].strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])]
+        unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in
+                      lat_var_names]
 
     datasets = []
 
