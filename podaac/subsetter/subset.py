@@ -753,9 +753,9 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
         for i in range(len(my_list)):  # pylint: disable=consider-using-enumerate
             count = 0
             for j in range(len(my_list)):  # pylint: disable=consider-using-enumerate
-                if my_list[i]==my_list[j] and not isinstance(diff_count[j], int):
-                    count+=1
-            if count<2:
+                if my_list[i] == my_list[j] and not isinstance(diff_count[j], int):
+                    count += 1
+            if count < 2:
                 if isinstance(diff_count[i], int):
                     continue
 
@@ -819,10 +819,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         unique_groups = [GROUP_DELIM+GROUP_DELIM.join(lat_var_names[0].strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])]
 
     datasets = []
-    #print (unique_groups)
-    #print (lat_var_names)
-    #print (time_var_names)
-    print (list(dataset.coords.keys()))
+
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names, diff_count
     ):
