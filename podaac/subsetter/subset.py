@@ -730,23 +730,42 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     return temporal_cond
 
 
-def get_base_group_names(lats):
+def get_base_group_names(lats):  # pylint: disable=too-many-branches
     """Function string to pass linting"""
     group_list = []
-    group_names = []
+    unique_groups = []
     for lat in lats:
         group_list.append(lat.strip(GROUP_DELIM).split(GROUP_DELIM))
+    max_length = max([len(group) for group in group_list])  # pylint: disable=consider-using-generator
+    for i in range(max_length):  # pylint: disable=consider-using-enumerate
+        for j in range(len(group_list)):  # pylint: disable=consider-using-enumerate
+            try:
+                if group_list[j][i]:
+                    pass
+            except IndexError:
+                group_list[j].append('')
 
-    for group in enumerate(group_list):
-        for index in enumerate(group_list[0]):
-            if group_list[0][index[0]] == group[1][index[0]]:
-                pass
-            else:
-                diff_count = index[0]+1
-                group_names.append(GROUP_DELIM+GROUP_DELIM.join(group[1][:diff_count]))
-    group_names.insert(0, GROUP_DELIM+GROUP_DELIM.join(group_list[0][:diff_count]))
+    group_list_transpose = np.array(group_list).T.tolist()
 
-    return group_names, diff_count
+    diff_count = ['' for i in range(len(group_list))]
+    group_count = 0
+    for my_list in group_list_transpose:
+        for i in range(len(my_list)):  # pylint: disable=consider-using-enumerate
+            count = 0
+            for j in range(len(my_list)):  # pylint: disable=consider-using-enumerate
+                if my_list[i]==my_list[j] and not isinstance(diff_count[j], int):
+                    count+=1
+            if count<2:
+                if isinstance(diff_count[i], int):
+                    continue
+
+                diff_count[i] = group_count
+
+        group_count += 1
+    for lat in enumerate(lats):
+        unique_groups.append(GROUP_DELIM+GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)]))
+
+    return unique_groups, diff_count
 
 
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
@@ -797,27 +816,30 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     if len(lat_var_names) > 1:
         unique_groups, diff_count = get_base_group_names(lat_var_names)
     else:
-        unique_groups = [GROUP_DELIM.join(lat_var_names[0].strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])]
+        unique_groups = [GROUP_DELIM+GROUP_DELIM.join(lat_var_names[0].strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])]
 
     datasets = []
-
-    for lat_var_name, lon_var_name, time_var_name in zip(  # pylint: disable=too-many-nested-blocks
-            lat_var_names, lon_var_names, time_var_names
+    #print (unique_groups)
+    #print (lat_var_names)
+    #print (time_var_names)
+    print (list(dataset.coords.keys()))
+    for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
+            lat_var_names, lon_var_names, time_var_names, diff_count
     ):
         if GROUP_DELIM in lat_var_name:
 
-            lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count])
+            lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
 
             dim_list = []
             group_vars = [
                 var for var in dataset.data_vars.keys()
-                if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == lat_var_prefix
+                if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
             ]
             extend_list = None
             if variables:
                 for var in variables:
                     for group in unique_groups:
-                        if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == group:
+                        if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == group:
                             extend_list = True
                         else:
                             pass
@@ -837,7 +859,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
             group_dims = [
                 dim for dim in list(dataset.coords.keys())
-                if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:diff_count]) == lat_var_prefix
+                if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
             ]
 
             var_included = list(set(group_dims) - set(dim_list))
