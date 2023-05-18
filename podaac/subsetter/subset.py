@@ -825,7 +825,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             lat_var_names, lon_var_names, time_var_names, diff_count
     ):
         if GROUP_DELIM in lat_var_name:
-
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
 
             dim_list = []
