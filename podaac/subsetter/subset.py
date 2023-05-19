@@ -731,12 +731,15 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
 
 
 def get_base_group_names(lats):  # pylint: disable=too-many-branches
-    """Function string to pass linting"""
+    """Latitude groups may be at different depths. This function gets the level
+    number that makes each latitude group unique from the other latitude names"""
     group_list = []
     unique_groups = []
     for lat in lats:
         group_list.append(lat.strip(GROUP_DELIM).split(GROUP_DELIM))
     max_length = max([len(group) for group in group_list])  # pylint: disable=consider-using-generator
+
+    # make all lists of group levels the same length
     for i in range(max_length):  # pylint: disable=consider-using-enumerate
         for j in range(len(group_list)):  # pylint: disable=consider-using-enumerate
             try:
@@ -745,16 +748,21 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
             except IndexError:
                 group_list[j].append('')
 
+    # put the groups in the same levels in the same list
     group_list_transpose = np.array(group_list).T.tolist()
 
     diff_count = ['' for i in range(len(group_list))]
     group_count = 0
+
+    # loop through each group level
     for my_list in group_list_transpose:
         for i in range(len(my_list)):  # pylint: disable=consider-using-enumerate
             count = 0
             for j in range(len(my_list)):  # pylint: disable=consider-using-enumerate
+                # go through each lat name and compare the level names
                 if my_list[i] == my_list[j] and not isinstance(diff_count[j], int):
                     count += 1
+            # if the lat names is equivalent to only itself then insert the level number
             if count < 2:
                 if isinstance(diff_count[i], int):
                     continue
@@ -762,6 +770,8 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
                 diff_count[i] = group_count
 
         group_count += 1
+
+    # go back and re-put together the unique groups
     for lat in enumerate(lats):
         unique_groups.append(GROUP_DELIM+GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)]))
 
@@ -812,6 +822,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
+
+    # get unique group names for latitude coordinates    
     diff_count = [-1]
     if len(lat_var_names) > 1:
         unique_groups, diff_count = get_base_group_names(lat_var_names)
@@ -825,39 +837,36 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     ):
         if GROUP_DELIM in lat_var_name:
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
-
-            dim_list = []
             group_vars = [
                 var for var in dataset.data_vars.keys()
                 if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
             ]
-            extend_list = None
+
+            # include variables that aren't in a latitude group
             if variables:
-                for var in variables:
-                    for group in unique_groups:
-                        if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == group:
-                            extend_list = True
-                        else:
-                            pass
-                if extend_list:
-                    group_vars.extend([
-                        var for var in dataset.data_vars.keys()
-                        if var in variables and var not in group_vars
-                    ])
+                group_vars.extend([
+                    var for var in dataset.data_vars.keys()
+                    if var in variables and var not in group_vars and not var.startswith(tuple(unique_groups))
+                ])
             else:
                 group_vars.extend([
                     var for var in dataset.data_vars.keys()
                     if var not in group_vars and not var.startswith(tuple(unique_groups))
                     ])
-
+                
+            # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
+            # get all dimensions from data variables
+            dim_list = []
             for var in group_vars:
                 dim_list.extend(list(list(dataset[var].dims)))
 
+            # get all group dimensions 
             group_dims = [
                 dim for dim in list(dataset.coords.keys())
                 if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
             ]
 
+            # include any group dimensions that aren't accounted for in variable dimensions
             var_included = list(set(group_dims) - set(dim_list))
             group_vars.extend(var_included)
 

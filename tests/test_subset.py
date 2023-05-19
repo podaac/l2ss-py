@@ -293,10 +293,10 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
 
 @pytest.mark.parametrize("test_file", TEST_DATA_FILES)
 def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
-    """
-    Test that an empty file is returned when the bounding box
-    contains no data.
-    """
+    
+    """Test that an empty file is returned when the bounding box
+    contains no data."""
+    
 
     bbox = np.array(((120, 125), (-90, -85)))
     output_file = "{}_{}".format(request.node.name, test_file)
@@ -322,6 +322,8 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
     for variable_name, variable in empty_dataset.data_vars.items():
         assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
 
+    print (list(test_input_dataset.dims.keys()))
+    print (list(empty_dataset.dims.keys()))
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
 
 
@@ -2124,3 +2126,40 @@ def test_bad_time_unit(subset_output_dir):
 
     ds_test = xr.open_dataset(nc_out_location)
     ds_test.close()
+
+def test_get_unique_groups():
+        """Test lat_var_names return the expected unique groups"""
+
+        input_lats_s6 = ['__data_01__latitude', '__data_20__c__latitude', '__data_20__ku__latitude']
+
+        unique_groups_s6, diff_counts_s6 = subset.get_base_group_names(input_lats_s6)
+
+        expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
+        expected_diff_counts_s6 = [0,1,1]
+
+        assert expected_groups_s6 == unique_groups_s6
+        assert expected_diff_counts_s6 == diff_counts_s6
+
+        input_lats_mls = ['__HDF__swaths__o3__geo__latitude',
+                          '__HDF__swaths__o3 columns__geo__latitude',
+                          '__HDF__swaths__o3-apiori__geo__latitude']
+
+        unique_groups_mls, diff_counts_mls = subset.get_base_group_names(input_lats_mls)
+
+        expected_groups_mls = ['__HDF__swaths__o3',
+                               '__HDF__swaths__o3 columns',
+                               '__HDF__swaths__o3-apiori']
+        expected_diff_counts_mls = [2,2,2]
+
+        assert expected_groups_mls == unique_groups_mls
+        assert expected_diff_counts_mls == diff_counts_mls
+
+        input_lats_single = ['__latitude']
+
+        unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
+
+        expected_groups_single = ['__latitude']
+        expected_diff_counts_single = [0]
+
+        assert expected_groups_single == unique_groups_single
+        assert expected_diff_counts_single == diff_counts_single
