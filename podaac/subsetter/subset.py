@@ -823,7 +823,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
 
-    # get unique group names for latitude coordinates    
+    # get unique group names for latitude coordinates
     diff_count = [-1]
     if len(lat_var_names) > 1:
         unique_groups, diff_count = get_base_group_names(lat_var_names)
@@ -853,14 +853,14 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                     var for var in dataset.data_vars.keys()
                     if var not in group_vars and not var.startswith(tuple(unique_groups))
                     ])
-                
+
             # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
             # get all dimensions from data variables
             dim_list = []
             for var in group_vars:
                 dim_list.extend(list(list(dataset[var].dims)))
 
-            # get all group dimensions 
+            # get all group dimensions
             group_dims = [
                 dim for dim in list(dataset.coords.keys())
                 if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
