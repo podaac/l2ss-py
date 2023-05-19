@@ -119,6 +119,7 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
         groups = set(group_lst)
         for group in groups:
             base_dataset.createGroup(group)
+            
         for dim_name in list(dataset.dims.keys()):
             new_dim_name = dim_name.split(GROUP_DELIM)[-1]
             dim_group = _get_nested_group(base_dataset, dim_name)
