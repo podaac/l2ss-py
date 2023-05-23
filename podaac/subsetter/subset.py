@@ -831,7 +831,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
 
     datasets = []
-    total_list = [] # don't include repeated variables
+    total_list = []  # don't include repeated variables
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names, diff_count
     ):
