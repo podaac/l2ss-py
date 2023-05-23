@@ -831,7 +831,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
 
     datasets = []
-
+    total_list = [] # don't include repeated variables
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names, diff_count
     ):
@@ -841,6 +841,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                 var for var in dataset.data_vars.keys()
                 if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
             ]
+            total_list.extend(group_vars)
 
             # include variables that aren't in a latitude group
             if variables:
@@ -851,8 +852,9 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             else:
                 group_vars.extend([
                     var for var in dataset.data_vars.keys()
-                    if var not in group_vars and not var.startswith(tuple(unique_groups))
+                    if var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
                     ])
+                total_list.extend(group_vars)
 
             # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
             # get all dimensions from data variables
