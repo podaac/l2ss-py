@@ -781,8 +781,6 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
     return unique_groups, diff_count
 
 
-
-
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
