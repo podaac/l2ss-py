@@ -753,7 +753,6 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
 
     diff_count = ['' for i in range(len(group_list))]
     group_count = 0
-
     # loop through each group level
     for my_list in group_list_transpose:
         for i in range(len(my_list)):  # pylint: disable=consider-using-enumerate
@@ -766,7 +765,7 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
             if count < 2:
                 if isinstance(diff_count[i], int):
                     continue
-                if 'lats' in my_list[i]:
+                if 'lat' in my_list[i]:  # if we get to the end of the list, go to the previous level
                     diff_count[i] = group_count - 1
                     continue
 
@@ -776,8 +775,8 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
 
     # go back and re-put together the unique groups
     for lat in enumerate(lats):
-        unique_groups.append(f'{GROUP_DELIM}{GROUP_DELIM.join(lat.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)])}')
-
+        unique_groups.append(f'{GROUP_DELIM}{GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)])}')
+        
     return unique_groups, diff_count
 
 
@@ -850,7 +849,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             if variables:
                 group_vars.extend([
                     var for var in dataset.data_vars.keys()
-                    if var in variables and var not in group_vars and not var.startswith(tuple(unique_groups))
+                    if var in variables and var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
                 ])
             else:
                 group_vars.extend([
