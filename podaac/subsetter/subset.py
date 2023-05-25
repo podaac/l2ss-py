@@ -766,6 +766,9 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
             if count < 2:
                 if isinstance(diff_count[i], int):
                     continue
+                if 'lats' in my_list[i]:
+                    diff_count[i] = group_count - 1
+                    continue
 
                 diff_count[i] = group_count
 
@@ -773,9 +776,11 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
 
     # go back and re-put together the unique groups
     for lat in enumerate(lats):
-        unique_groups.append(GROUP_DELIM+GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)]))
+        unique_groups.append(f'{GROUP_DELIM}{GROUP_DELIM.join(lat.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)])}')
 
     return unique_groups, diff_count
+
+
 
 
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches

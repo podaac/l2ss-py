@@ -2158,8 +2158,8 @@ def test_get_unique_groups():
 
         unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
 
-        expected_groups_single = ['__latitude']
-        expected_diff_counts_single = [0]
+        expected_groups_single = ['__']
+        expected_diff_counts_single = [-1]
 
         assert expected_groups_single == unique_groups_single
         assert expected_diff_counts_single == diff_counts_single
