@@ -187,6 +187,8 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
             var_data = np.array(variable.data)
         elif variable.dtype == 'timedelta64[ns]':
             var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
+        elif variable.dtype in ['|S1', '|S2']:
+            var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
         else:
             var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value, **comp_args)
 
@@ -195,7 +197,10 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
 
         # Copy data
         var_group.variables[new_var_name].set_auto_maskandscale(False)
-        var_group.variables[new_var_name][:] = var_data
+        if variable.dtype in ['|S1', '|S2']:
+            var_group.variables[new_var_name][:] = variable.values
+        else:
+            var_group.variables[new_var_name][:] = var_data
 
 
 def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
