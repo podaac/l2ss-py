@@ -733,20 +733,12 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
 def get_base_group_names(lats):  # pylint: disable=too-many-branches
     """Latitude groups may be at different depths. This function gets the level
     number that makes each latitude group unique from the other latitude names"""
-    group_list = []
     unique_groups = []
-    for lat in lats:
-        group_list.append(lat.strip(GROUP_DELIM).split(GROUP_DELIM))
-    max_length = max([len(group) for group in group_list])  # pylint: disable=consider-using-generator
+    group_list = [lat.strip(GROUP_DELIM).split(GROUP_DELIM) for lat in lats]
 
     # make all lists of group levels the same length
-    for i in range(max_length):  # pylint: disable=consider-using-enumerate
-        for j in range(len(group_list)):  # pylint: disable=consider-using-enumerate
-            try:
-                if group_list[j][i]:
-                    pass
-            except IndexError:
-                group_list[j].append('')
+    group_list = list(zip(*zip_longest(*group_list, fillvalue='')))
+    print(f"group_list == {group_list}")
 
     # put the groups in the same levels in the same list
     group_list_transpose = np.array(group_list).T.tolist()
