@@ -852,9 +852,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
             if diffs == -1:  # if the lat name is in the root group: take only the root group vars
                 if len(lat_var_names) == 1:
-                    group_vars = [
-                        list(dataset.data_vars.keys())
-                    ]
+                    group_vars = list(dataset.data_vars.keys())
                 else:
                     group_vars = [
                         var for var in dataset.data_vars.keys()
