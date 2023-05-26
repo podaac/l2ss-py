@@ -850,10 +850,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         if GROUP_DELIM in lat_var_name:
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
             # lat_var_prefix_len = len(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
-            print (lat_var_name)
-            print (lon_var_name)
-            print (lat_var_names)
-            print (diffs)
+
             if diffs == -1:  # if the lat name is in the root group: take only the root group vars
                 group_vars = [
                     var for var in dataset.data_vars.keys()
@@ -864,7 +861,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                     var for var in dataset.data_vars.keys()
                     if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
                 ]
-            print (group_vars)
+
             if time_var_name not in group_vars:  # need the time var name to do any subsetting
                 group_vars.append(time_var_name)
                 time_count += 1
