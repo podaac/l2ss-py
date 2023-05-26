@@ -170,7 +170,12 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
                 encoded_var = cf_dt_coder.encode(dataset.variables[var_name])
                 variable = encoded_var
 
-        var_attrs = variable.attrs
+        var_attrs = {}
+        for key, value in variable.attrs.items():
+            new_key = key.replace("/", "_") if isinstance(key, str) else key
+            new_value = value.replace("/", "_") if isinstance(value, str) else value
+            var_attrs[new_key] = new_value
+
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
         comp_args = {"zlib": True, "complevel": 1}
