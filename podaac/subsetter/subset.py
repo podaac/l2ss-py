@@ -755,7 +755,7 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
                 if my_list[i] == my_list[j] and not isinstance(diff_count[j], int):
                     count += 1
             # if the lat names is equivalent to only itself then insert the level number
-            if count < 2:
+            if count == 1:
                 if isinstance(diff_count[i], int):
                     continue
                 if 'lat' in my_list[i]:  # if we get to the end of the list, go to the previous level
@@ -769,7 +769,6 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
     # go back and re-put together the unique groups
     for lat in enumerate(lats):
         unique_groups.append(f'{GROUP_DELIM}{GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)])}')
-
     return unique_groups, diff_count
 
 
