@@ -196,7 +196,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     for variable_name, variable in new_dataset.data_vars.items():
         original_type = indexed_ds[variable_name].dtype
         new_type = variable.dtype
-        
         indexed_var = indexed_ds[variable_name]
 
         if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(

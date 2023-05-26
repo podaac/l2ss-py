@@ -11,7 +11,6 @@ import h5py
 import netCDF4 as nc
 import numpy as np
 import xarray as xr
-from netCDF4 import stringtochar
 
 GROUP_DELIM = '__'
 
@@ -154,7 +153,6 @@ def _get_nested_group(dataset: nc.Dataset, group_path: str) -> nc.Group:
 
 def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date) -> None:
     for var_name in list(dataset.variables.keys()):
-
         new_var_name = var_name.split(GROUP_DELIM)[-1]
         var_group = _get_nested_group(base_dataset, var_name)
         variable = dataset.variables[var_name]
@@ -189,7 +187,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
             var_data = np.array(variable.data)
         elif variable.dtype == 'timedelta64[ns]':
             var_group.createVariable(new_var_name, 'i4', var_dims, fill_value=fill_value, **comp_args)
-        elif variable.dtype == '|S1' or variable.dtype == '|S2':
+        elif variable.dtype in ['|S1', '|S2']:
             var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
         else:
             var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value, **comp_args)
@@ -199,7 +197,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
 
         # Copy data
         var_group.variables[new_var_name].set_auto_maskandscale(False)
-        if variable.dtype == '|S1' or variable.dtype == '|S2':
+        if variable.dtype in ['|S1', '|S2']:
             var_group.variables[new_var_name][:] = variable.values
         else:
             var_group.variables[new_var_name][:] = var_data
