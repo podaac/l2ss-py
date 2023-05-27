@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+### Security
+
+
+## [2.5.0]
+### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
 - [issue/153](https://github.com/podaac/l2ss-py/issues/153): Remove the asc_node_tai93 variable when blank in the SNDR collections for xarray.decode_times to decode
 - PODAAC-5538: Reduce memory footprint of l2ss by loading each variable individually to write to memory
 - [issue/155](https://github.com/podaac/l2ss-py/issues/155): lat var name prefix now generalized to unique group names. Group variables determined in 
