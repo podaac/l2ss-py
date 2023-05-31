@@ -61,7 +61,7 @@ jobs:
           if [ "$BUMP_RC" = true ]; then
             poetry version prerelease
           else
-            poetry version ${GITHUB_REF#refs/heads/release/}-rc.1
+            poetry version ${GITHUB_REF#refs/heads/release/}rc1
           fi
           echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
           echo "venue=uat" >> $GITHUB_ENV
@@ -208,7 +208,7 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=semver,pattern={{version}},value=${{ env.software_version }}
+            type=pep440,pattern={{version}},value=${{ env.software_version }}
             type=raw,value=${{ env.venue }}
       - name: Wait for package
         if: |
