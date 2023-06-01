@@ -173,8 +173,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         var_attrs = {}
         for key, value in variable.attrs.items():
             new_key = key.replace("/", "_") if isinstance(key, str) else key
-            new_value = value.replace("/", "_") if isinstance(value, str) else value
-            var_attrs[new_key] = new_value
+            var_attrs[new_key] = value
 
         fill_value = var_attrs.get('_FillValue')
         var_attrs.pop('_FillValue', None)
