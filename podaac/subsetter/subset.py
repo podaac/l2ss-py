@@ -24,6 +24,7 @@ import json
 import operator
 from itertools import zip_longest
 import os
+from itertools import zip_longest
 from typing import List, Tuple, Union
 import dateutil
 from dateutil import parser
@@ -832,6 +833,13 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     else:
         unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
 
+    # get unique group names for latitude coordinates
+    diff_count = [-1]
+    if len(lat_var_names) > 1:
+        unique_groups, diff_count = get_base_group_names(lat_var_names)
+    else:
+        unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
+
     datasets = []
     total_list = []  # don't include repeated variables
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
@@ -1056,12 +1064,15 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
         nc_dataset, has_groups = h5file_transform(filepath)
     else:
         # Open dataset with netCDF4 first, so we can get group info
-        nc_dataset = nc.Dataset(filepath, mode='r')
-        has_groups = bool(nc_dataset.groups)
+        try:
+            nc_dataset = nc.Dataset(filepath, mode='r')
+            has_groups = bool(nc_dataset.groups)
 
-        # If dataset has groups, transform to work with xarray
-        if has_groups:
-            nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
+            # If dataset has groups, transform to work with xarray
+            if has_groups:
+                nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
+        except OSError:
+            nc_dataset, has_groups = h5file_transform(filepath)
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 

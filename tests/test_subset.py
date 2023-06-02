@@ -322,8 +322,6 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
     for variable_name, variable in empty_dataset.data_vars.items():
         assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
 
-    print (list(test_input_dataset.dims.keys()))
-    print (list(empty_dataset.dims.keys()))
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
 
 
