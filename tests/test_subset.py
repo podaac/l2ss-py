@@ -1216,7 +1216,7 @@ def test_temporal_subset_s6(data_dir, subset_output_dir, request):
     start_dt = subset.translate_timestamp(min_time)
     end_dt = subset.translate_timestamp(max_time)
 
-    # All dates should be within the given temporal bounds.
+    # All dates should be within the given temporal bounds
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()
     assert (out_ds.time <= pd.to_datetime(end_dt)).all()
 
@@ -2154,12 +2154,12 @@ def test_get_unique_groups():
         assert expected_groups_mls == unique_groups_mls
         assert expected_diff_counts_mls == diff_counts_mls
 
-        input_lats_single = ['__latitude']
+        input_lats_single = ['__latitude', '__geolocation__latitude']
 
         unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
 
-        expected_groups_single = ['__']
-        expected_diff_counts_single = [-1]
+        expected_groups_single = ['__', '__geolocation']
+        expected_diff_counts_single = [-1, 0]
 
         assert expected_groups_single == unique_groups_single
         assert expected_diff_counts_single == diff_counts_single
