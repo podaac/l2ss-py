@@ -22,6 +22,7 @@ import datetime
 import functools
 import json
 import operator
+from itertools import zip_longest
 import os
 from typing import List, Tuple, Union
 import dateutil
@@ -742,27 +743,17 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
 def get_base_group_names(lats):  # pylint: disable=too-many-branches
     """Latitude groups may be at different depths. This function gets the level
     number that makes each latitude group unique from the other latitude names"""
-    group_list = []
     unique_groups = []
-    for lat in lats:
-        group_list.append(lat.strip(GROUP_DELIM).split(GROUP_DELIM))
-    max_length = max([len(group) for group in group_list])  # pylint: disable=consider-using-generator
+    group_list = [lat.strip(GROUP_DELIM).split(GROUP_DELIM) for lat in lats]
 
     # make all lists of group levels the same length
-    for i in range(max_length):  # pylint: disable=consider-using-enumerate
-        for j in range(len(group_list)):  # pylint: disable=consider-using-enumerate
-            try:
-                if group_list[j][i]:
-                    pass
-            except IndexError:
-                group_list[j].append('')
+    group_list = list(zip(*zip_longest(*group_list, fillvalue='')))
 
     # put the groups in the same levels in the same list
     group_list_transpose = np.array(group_list).T.tolist()
 
     diff_count = ['' for i in range(len(group_list))]
     group_count = 0
-
     # loop through each group level
     for my_list in group_list_transpose:
         for i in range(len(my_list)):  # pylint: disable=consider-using-enumerate
@@ -772,20 +763,20 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
                 if my_list[i] == my_list[j] and not isinstance(diff_count[j], int):
                     count += 1
             # if the lat names is equivalent to only itself then insert the level number
-            if count < 2:
+            if count == 1:
                 if isinstance(diff_count[i], int):
                     continue
-                if 'lat' in my_list[i].lower():
+                if 'lat' in my_list[i].lower():  # if we get to the end of the list, go to the previous level
                     diff_count[i] = group_count - 1
                     continue
+
                 diff_count[i] = group_count
 
         group_count += 1
 
     # go back and re-put together the unique groups
     for lat in enumerate(lats):
-        unique_groups.append(GROUP_DELIM+GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)]))
-
+        unique_groups.append(f'{GROUP_DELIM}{GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)])}')
     return unique_groups, diff_count
 
 
@@ -846,59 +837,42 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names, diff_count
     ):
-        time_count = 0
         if GROUP_DELIM in lat_var_name:
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
 
             if diffs == -1:  # if the lat name is in the root group: take only the root group vars
-                if len(lat_var_names) == 1:
-                    group_vars = list(dataset.data_vars.keys())
-                else:
-                    group_vars = [
-                        var for var in dataset.data_vars.keys()
-                        if len(var.strip(GROUP_DELIM).split(GROUP_DELIM)) == 1
-                    ]
+                group_vars = list(dataset.data_vars.keys())
             else:
                 group_vars = [
                     var for var in dataset.data_vars.keys()
                     if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
                 ]
-
-            if time_var_name not in group_vars:  # need the time var name to do any subsetting
-                group_vars.append(time_var_name)
-                time_count += 1
-            total_list.extend(group_vars)
-
-            # include variables that aren't in a latitude group, but need subsetting
-            if variables:
-                group_vars.extend([
-                    var for var in dataset.data_vars.keys()
-                    if var in variables and var not in group_vars and
-                    var not in total_list and not var.startswith(tuple(unique_groups))
-                ])
-            else:
-                group_vars.extend([
-                    var for var in dataset.data_vars.keys()
-                    if var not in group_vars and var not in total_list and
-                    not var.startswith(tuple(unique_groups))
+                # include variables that aren't in a latitude group
+                if variables:
+                    group_vars.extend([
+                        var for var in dataset.data_vars.keys()
+                        if var in variables and var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
                     ])
-            total_list.extend(group_vars)
+                else:
+                    group_vars.extend([
+                        var for var in dataset.data_vars.keys()
+                        if var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
+                        ])
 
-            # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
-            # get all dimensions from data variables
-            dim_list = []
-            for var in group_vars:
-                dim_list.extend(list(list(dataset[var].dims)))
+                # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
+                # get all dimensions from data variables
+                dim_list = []
+                for var in group_vars:
+                    dim_list.extend(list(list(dataset[var].dims)))
+                # get all group dimensions
+                group_dims = [
+                    dim for dim in list(dataset.coords.keys())
+                    if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
+                ]
+                # include any group dimensions that aren't accounted for in variable dimensions
+                var_included = list(set(group_dims) - set(dim_list))
+                group_vars.extend(var_included)
 
-            # get all group dimensions
-            group_dims = [
-                dim for dim in list(dataset.coords.keys())
-                if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
-            ]
-
-            # include any group dimensions that aren't accounted for in variable dimensions
-            var_included = list(set(group_dims) - set(dim_list))
-            group_vars.extend(var_included)
         else:
             group_vars = list(dataset.keys())
 
@@ -918,9 +892,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             temporal_cond,
             cut
         )
-        if time_count >= 1:
-            group_dataset = group_dataset.drop_vars(time_var_name)
+
         datasets.append(group_dataset)
+        total_list.extend(group_vars)
+        if diffs == -1:
+            return datasets
 
     return datasets
 
@@ -1205,7 +1181,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
-
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
@@ -1217,7 +1192,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
         start_date = None
-        if min_time or max_time and file_extension:
+        if file_extension == 'he5' and (min_time or max_time):
             dataset, start_date = convert_to_datetime(dataset, time_var_names)
         chunks = calculate_chunks(dataset)
         if chunks:
@@ -1251,7 +1226,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 min_time=min_time,
                 max_time=max_time
             )
-
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
