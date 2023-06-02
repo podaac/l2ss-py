@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/153](https://github.com/podaac/l2ss-py/issues/153): Remove the asc_node_tai93 variable when blank in the SNDR collections for xarray.decode_times to decode
 - PODAAC-5538: Reduce memory footprint of l2ss by loading each variable individually to write to memory
 - [issue/155](https://github.com/podaac/l2ss-py/issues/155): lat var name prefix now generalized to unique group names. Group variables determined in subset_bbox using the unique group name.
+- [issue/162](https://github.com/podaac/l2ss-py/issues/162): allow time variable subsetting differences handled for MLS and OCO3 collections. At the moment: assuming 'he5' files to be tai93 files is a fine assumption. Xarray does not decode these times in he5 files
 ### Security
 
 
