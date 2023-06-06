@@ -27,13 +27,12 @@ import operator
 import os
 import shutil
 import tempfile
-import unittest
 from os import listdir
 from os.path import dirname, join, realpath, isfile, basename
+from pathlib import Path
 
 import geopandas as gpd
 import importlib_metadata
-import netCDF4
 import netCDF4 as nc
 import h5py
 import numpy as np
@@ -296,7 +295,9 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
     
     """Test that an empty file is returned when the bounding box
     contains no data."""
-    
+    nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
+    shutil.copyfile(os.path.join(data_dir, test_file),
+                    nc_copy_for_expected_results)
 
     bbox = np.array(((120, 125), (-90, -85)))
     output_file = "{}_{}".format(request.node.name, test_file)
@@ -305,8 +306,9 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
         bbox=bbox,
         output_file=join(subset_output_dir, output_file)
     )
+
     test_input_dataset = xr.open_dataset(
-        join(data_dir, test_file),
+        nc_copy_for_expected_results,
         decode_times=False,
         decode_coords=False,
         mask_and_scale=False
@@ -548,10 +550,14 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     operation are present in the resulting subsetted data file,
     and that the variables which are specified are not present.
     """
+    nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
+    shutil.copyfile(os.path.join(data_dir, test_file),
+                    nc_copy_for_expected_results)
+
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
 
-    in_ds, _ = subset.open_as_nc_dataset(join(data_dir, test_file))
+    in_ds, _ = subset.open_as_nc_dataset(nc_copy_for_expected_results)
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
@@ -562,7 +568,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(in_ds)
     coordinate_variables = lat_var_names + lon_var_names + time_var_names
 
-    # Pick some variable to include in the result
+    # Pick some variables to include in the result (every other variable: first, third, fifth, etc.)
     included_variables = set([variable[0] for variable in in_ds.data_vars.items()][::2])
     included_variables = list(included_variables)
 
