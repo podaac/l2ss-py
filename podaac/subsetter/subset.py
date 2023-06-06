@@ -533,11 +533,6 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
             continue
         if 'time' == var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
-
-    for var_name in list(dataset.data_vars.keys()):
-        var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-        if len(dataset[var_name].squeeze().dims) == 0:
-            continue
         if 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
