@@ -189,7 +189,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         output_file=subset_output_file
     )
 
-    out_ds, _ = subset.open_as_nc_dataset(subset_output_file)
+    out_ds, _, file_ext = subset.open_as_nc_dataset(subset_output_file)
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False,
@@ -330,8 +330,6 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
     for _, variable in empty_dataset.data_vars.items():
         assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
 
-    print (list(test_input_dataset.dims.keys()))
-    print (list(empty_dataset.dims.keys()))
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
 
 
@@ -563,7 +561,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
 
-    in_ds, _ = subset.open_as_nc_dataset(nc_copy_for_expected_results)
+    in_ds, _, file_ext = subset.open_as_nc_dataset(nc_copy_for_expected_results)
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
@@ -589,7 +587,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
         variables=[var.replace(GROUP_DELIM, '/') for var in included_variables]
     )
 
-    out_ds, _ = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
+    out_ds, _, file_ext = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False)
@@ -1241,7 +1239,7 @@ def test_get_time_variable_name(test_file, data_dir):
         'mask_and_scale': False,
         'decode_times': True
     }
-    ds, _ = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
+    ds, _, file_ext = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
@@ -2148,7 +2146,7 @@ def test_get_unique_groups():
     unique_groups_s6, diff_counts_s6 = subset.get_base_group_names(input_lats_s6)
 
     expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
-    expected_diff_counts_s6 = [0,1,1]
+    expected_diff_counts_s6 = [0, 1, 1]
 
     assert expected_groups_s6 == unique_groups_s6
     assert expected_diff_counts_s6 == diff_counts_s6
@@ -2162,17 +2160,17 @@ def test_get_unique_groups():
     expected_groups_mls = ['__HDF__swaths__o3',
                             '__HDF__swaths__o3 columns',
                             '__HDF__swaths__o3-apiori']
-    expected_diff_counts_mls = [2,2,2]
+    expected_diff_counts_mls = [2, 2, 2]
 
     assert expected_groups_mls == unique_groups_mls
     assert expected_diff_counts_mls == diff_counts_mls
 
-    input_lats_single = ['__latitude']
+    input_lats_single = ['__latitude', '__geolocation__latitude']
 
     unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
 
-    expected_groups_single = ['__']
-    expected_diff_counts_single = [-1]
-
+    expected_groups_single = ['__', '__geolocation']
+    expected_diff_counts_single = [-1, 0]
+    
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
