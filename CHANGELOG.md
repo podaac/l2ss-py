@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/155](https://github.com/podaac/l2ss-py/issues/155): lat var name prefix now generalized to unique group names. Group variables determined in 
   subset_bbox using the unique group name.
 - PODAAC-5537: Fixed AQUARIUS_L2_SSS_V5 dataset
+-  [issue/168](https://github.com/podaac/l2ss-py/issues/168): A separate copy of test data is used to get expected results before subsetting at the beginning of two test functions --- test_subset_empty_bbox() and test_specified_variables() --- that rely on opening the dataset more than once.
 ### Security
 
 
