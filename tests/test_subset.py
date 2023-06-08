@@ -9,6 +9,9 @@
 # licenses, or other export authority as may be required before exporting
 # such information to foreign countries or providing access to foreign
 # persons.
+# pylint: disable=redefined-outer-name
+# pylint: disable=invalid-name
+# pylint: disable=consider-using-f-string
 
 """
 ==============
@@ -27,39 +30,40 @@ import operator
 import os
 import shutil
 import tempfile
-import unittest
+import urllib.parse
 from os import listdir
 from os.path import dirname, join, realpath, isfile, basename
+from pathlib import Path
+from unittest import TestCase
 
 import geopandas as gpd
 import importlib_metadata
-import netCDF4
 import netCDF4 as nc
 import h5py
 import numpy as np
 import pandas as pd
 import pytest
 import xarray as xr
-import urllib.parse
 from jsonschema import validate
 from shapely.geometry import Point
-from unittest import TestCase
 
 from podaac.subsetter import subset
 from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
-from podaac.subsetter import dimension_cleanup as dc
+# from podaac.subsetter import dimension_cleanup as dc
 
 
 @pytest.fixture(scope='class')
 def data_dir():
+    """Gets the directory containing data files used for tests."""
     test_dir = dirname(realpath(__file__))
     return join(test_dir, 'data')
 
 
 @pytest.fixture(scope='class')
 def subset_output_dir(data_dir):
+    """Makes a new temporary directory to hold the subset results while tests are running."""
     subset_output_dir = tempfile.mkdtemp(dir=data_dir)
     yield subset_output_dir
     shutil.rmtree(subset_output_dir)
@@ -67,6 +71,7 @@ def subset_output_dir(data_dir):
 
 @pytest.fixture(scope='class')
 def history_json_schema():
+    """Creates a metadata header schema."""
     return {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "$id": "https://harmony.earthdata.nasa.gov/history.schema.json",
@@ -119,6 +124,7 @@ def history_json_schema():
 
 
 def data_files():
+    """Get all the netCDF files from the test data directory."""
     test_dir = dirname(realpath(__file__))
     test_data_dir = join(test_dir, 'data')
     return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")]
@@ -234,7 +240,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
 
     # Step 2: Get mask of values which are NaN or "_FillValue in
     # each variable.
-    for var_name, var in out_ds.data_vars.items():
+    for _, var in out_ds.data_vars.items():
         # remove dimension of '1' if necessary
         vals = np.squeeze(var.values)
 
@@ -293,10 +299,11 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
 
 @pytest.mark.parametrize("test_file", TEST_DATA_FILES)
 def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
-    
     """Test that an empty file is returned when the bounding box
     contains no data."""
-    
+    nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
+    shutil.copyfile(os.path.join(data_dir, test_file),
+                    nc_copy_for_expected_results)
 
     bbox = np.array(((120, 125), (-90, -85)))
     output_file = "{}_{}".format(request.node.name, test_file)
@@ -305,8 +312,9 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
         bbox=bbox,
         output_file=join(subset_output_dir, output_file)
     )
+
     test_input_dataset = xr.open_dataset(
-        join(data_dir, test_file),
+        nc_copy_for_expected_results,
         decode_times=False,
         decode_coords=False,
         mask_and_scale=False
@@ -319,7 +327,7 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
     )
 
     # Ensure all variables are present but empty.
-    for variable_name, variable in empty_dataset.data_vars.items():
+    for _, variable in empty_dataset.data_vars.items():
         assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
 
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
@@ -546,10 +554,14 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     operation are present in the resulting subsetted data file,
     and that the variables which are specified are not present.
     """
+    nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
+    shutil.copyfile(os.path.join(data_dir, test_file),
+                    nc_copy_for_expected_results)
+
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
 
-    in_ds, _, file_ext = subset.open_as_nc_dataset(join(data_dir, test_file))
+    in_ds, _, file_ext = subset.open_as_nc_dataset(nc_copy_for_expected_results)
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
@@ -560,7 +572,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(in_ds)
     coordinate_variables = lat_var_names + lon_var_names + time_var_names
 
-    # Pick some variable to include in the result
+    # Pick some variables to include in the result (every other variable: first, third, fifth, etc.)
     included_variables = set([variable[0] for variable in in_ds.data_vars.items()][::2])
     included_variables = list(included_variables)
 
@@ -580,7 +592,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
                              decode_times=False,
                              decode_coords=False)
 
-    out_vars = [out_var for out_var in out_ds.variables.keys()]
+    out_vars = list(out_ds.variables.keys())
 
     assert set(out_vars) == set(included_variables + coordinate_variables).union(non_data_vars)
     assert set(out_vars).isdisjoint(expected_excluded_variables)
@@ -696,11 +708,11 @@ def test_cannot_get_coord_variable_names(data_dir):
 
     ds = ds.rename({old_lat_var_name: new_lat_var_name})
     # Remove 'coordinates' attribute
-    for var_name, var in ds.items():
+    for _, var in ds.items():
         if 'coordinates' in var.attrs:
             del var.attrs['coordinates']
 
-    with pytest.raises(ValueError) as e_info:
+    with pytest.raises(ValueError):
         subset.compute_coordinate_variable_names(ds)
 
 
@@ -851,7 +863,7 @@ def test_variable_subset_oco2(data_dir, subset_output_dir):
 
     out_nc = nc.Dataset(join(subset_output_dir, output_file_name))
     var_listout = list(out_nc.groups['Retrieval'].variables.keys())
-    assert ('water_height' in var_listout)
+    assert 'water_height' in var_listout
 
 
 def test_variable_subset_s6(data_dir, subset_output_dir):
@@ -875,8 +887,8 @@ def test_variable_subset_s6(data_dir, subset_output_dir):
     out_nc = nc.Dataset(join(subset_output_dir, output_file_name))
     var_listout = list(out_nc.groups['data_01'].groups['ku'].variables.keys())
     var_listout.extend(list(out_nc.groups['data_20'].groups['ku'].variables.keys()))
-    assert ('range_ocean_mle3_rms' in var_listout)
-    assert ('range_ocean' in var_listout)
+    assert 'range_ocean_mle3_rms' in var_listout
+    assert 'range_ocean' in var_listout
 
 
 def test_transform_grouped_dataset(data_dir, subset_output_dir):
@@ -907,7 +919,7 @@ def test_transform_grouped_dataset(data_dir, subset_output_dir):
     assert nc_ds_transformed.variables
 
     # Each var in the new ds should map to a variable in the old ds
-    for var_name, var in nc_ds_transformed.variables.items():
+    for var_name, _ in nc_ds_transformed.variables.items():
         path = var_name.strip('__').split('__')
 
         group = nc_ds[path[0]]
@@ -1214,13 +1226,14 @@ def test_temporal_subset_s6(data_dir, subset_output_dir, request):
     start_dt = subset.translate_timestamp(min_time)
     end_dt = subset.translate_timestamp(max_time)
 
-    # All dates should be within the given temporal bounds
+    # All dates should be within the given temporal bounds.
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()
     assert (out_ds.time <= pd.to_datetime(end_dt)).all()
 
 
 @pytest.mark.parametrize('test_file', TEST_DATA_FILES)
-def test_get_time_variable_name(test_file, data_dir, subset_output_dir):
+def test_get_time_variable_name(test_file, data_dir):
+    """Ensures that the name of the time variable can be retrieved."""
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
@@ -1237,6 +1250,7 @@ def test_get_time_variable_name(test_file, data_dir, subset_output_dir):
 
 
 def test_subset_jason(data_dir, subset_output_dir, request):
+    """TODO: Give description to this test function."""
     bbox = np.array(((-180, 0), (-90, 90)))
     file = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
     output_file = "{}_{}".format(request.node.name, file)
@@ -1254,6 +1268,7 @@ def test_subset_jason(data_dir, subset_output_dir, request):
 
 @pytest.mark.parametrize('test_file', TEST_DATA_FILES)
 def test_subset_size(test_file, data_dir, subset_output_dir, request):
+    """Verifies that the subsetted file is smaller in size than the original file."""
     bbox = np.array(((-180, 0), (-30, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
     input_file_path = os.path.join(data_dir, test_file)
@@ -1297,7 +1312,6 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
 
         if not isinstance(box_test, np.ndarray):
             raise ValueError('Subset for SNDR not returned properly')
-    
 
 def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     """
@@ -1313,7 +1327,7 @@ def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
         os.path.join(SNDR_dir, sndr_file),
         os.path.join(subset_output_dir, sndr_file)
     )
-    box_test = subset.subset(
+    _ = subset.subset(
         file_to_subset=join(subset_output_dir, sndr_file),
         bbox=bbox,
         output_file=join(subset_output_dir, output_file),
@@ -1325,7 +1339,7 @@ def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     in_nc = nc.Dataset(join(SNDR_dir, sndr_file))
     out_nc = nc.Dataset(join(subset_output_dir, output_file))
 
-    for var_name, variable in in_nc.variables.items():
+    for var_name, _ in in_nc.variables.items():
         assert in_nc[var_name].shape == out_nc[var_name].shape
 
 
@@ -1343,7 +1357,7 @@ def test_duplicate_dims_tropomi(data_dir, subset_output_dir, request):
         os.path.join(TROP_dir, trop_file),
         os.path.join(subset_output_dir, trop_file)
     )
-    box_test = subset.subset(
+    _ = subset.subset(
         file_to_subset=join(subset_output_dir, trop_file),
         bbox=bbox,
         output_file=join(subset_output_dir, output_file)
@@ -1372,7 +1386,7 @@ def test_duplicate_dims_tempo_ozone(data_dir, subset_output_dir, request):
         os.path.join(TEMPO_dir, tempo_ozone_file),
         os.path.join(subset_output_dir, tempo_ozone_file)
     )
-    box_test = subset.subset(
+    _ = subset.subset(
         file_to_subset=join(subset_output_dir, tempo_ozone_file),
         bbox=bbox,
         output_file=join(subset_output_dir, output_file)
@@ -1401,7 +1415,7 @@ def test_omi_novars_subset(data_dir, subset_output_dir, request):
         os.path.join(omi_dir, omi_file),
         os.path.join(subset_output_dir, omi_file)
     )
-    box_test = subset.subset(
+    _ = subset.subset(
         file_to_subset=join(subset_output_dir, omi_file),
         bbox=bbox,
         output_file=join(subset_output_dir, output_file),
@@ -1411,7 +1425,7 @@ def test_omi_novars_subset(data_dir, subset_output_dir, request):
     in_nc = nc.Dataset(join(omi_dir, omi_file))
     out_nc = nc.Dataset(join(subset_output_dir, output_file))
 
-    for var_name, variable in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
+    for var_name, _ in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
         'Geolocation Fields'].variables.items():
         assert in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
                    'Geolocation Fields'].variables[var_name].shape == \
@@ -1439,14 +1453,14 @@ def test_root_group(data_dir, subset_output_dir):
             **args
     ) as dataset:
         var_list = list(dataset.variables)
-        assert (var_list[0][0:2] == subset.GROUP_DELIM)
+        assert var_list[0][0:2] == subset.GROUP_DELIM
         group_lst = []
         for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
             group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
         group_lst = ['/' if group == '' else group for group in group_lst]
         groups = set(group_lst)
         expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
-        assert (groups == expected_group)
+        assert groups == expected_group
 
 
 def test_get_time_squeeze(data_dir, subset_output_dir):
@@ -1475,7 +1489,7 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
         time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
         lat_dims = dataset[lat_var_name].squeeze().dims
         time_dims = dataset[time_var_name].squeeze().dims
-        assert (lat_dims == time_dims)
+        assert lat_dims == time_dims
 
 
 def test_get_indexers_nd(data_dir, subset_output_dir):
@@ -1498,7 +1512,6 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        time_var_names = []
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
         lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
         time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
@@ -1514,8 +1527,8 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
         indexed_ds = dataset.isel(**indexers)
         new_dataset = indexed_ds.where(indexed_cond)
 
-        assert ((time_var_name not in indexers.keys()) == True)  # time can't be in the index
-        assert (new_dataset.dims == dataset.dims)
+        assert (time_var_name not in indexers) is True  # time can't be in the index
+        assert new_dataset.dims == dataset.dims
 
 
 def test_variable_type_string_oco2(data_dir, subset_output_dir):
@@ -1535,7 +1548,7 @@ def test_variable_type_string_oco2(data_dir, subset_output_dir):
 
     in_nc = xr.open_dataset(join(data_dir, 'OCO2', oco2_file_name))
     out_nc = xr.open_dataset(join(subset_output_dir, output_file_name))
-    assert (in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype)
+    assert in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype
 
 
 def test_transform_h5py_dataset(data_dir, subset_output_dir):
@@ -1556,19 +1569,19 @@ def test_transform_h5py_dataset(data_dir, subset_output_dir):
     # Go through every level of the file to fill out the remaining objects
     for entry_str in key_lst:
         # If object is a group, add it to the loop list
-        if (isinstance(h5_ds[entry_str], h5py.Group)):
+        if isinstance(h5_ds[entry_str], h5py.Group):
             for group_keys in list(h5_ds[entry_str].keys()):
-                if (isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset)):
+                if isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset):
                     entry_lst.append(entry_str + "/" + group_keys)
                 key_lst.append(entry_str + "/" + group_keys)
 
-    nc_dataset, has_groups = subset.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
+    nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
 
     nc_vars_flattened = list(nc_dataset.variables.keys())
-    for i in range(len(entry_lst)):  # go through all the datasets in h5py file
-        input_variable = '__' + entry_lst[i].replace('/', '__')
+    for i, entry in enumerate(entry_lst):  # go through all the datasets in h5py file
+        input_variable = '__' + entry.replace('/', '__')
         output_variable = nc_vars_flattened[i]
-        assert (input_variable == output_variable)
+        assert input_variable == output_variable
 
     nc_dataset.close()
     h5_ds.close()
@@ -1579,9 +1592,8 @@ def test_variable_dims_matched_tropomi(data_dir, subset_output_dir):
     Code must match the dimensions for each variable rather than
     assume all dimensions in a group are the same
     """
-
     tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
-    output_file_name = 'tropomi_test_out.nc'
+
     shutil.copyfile(os.path.join(data_dir, 'tropomi', tropomi_file_name),
                     os.path.join(subset_output_dir, tropomi_file_name))
 
@@ -1673,7 +1685,6 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
     """
     Test that get_time_epoch_var method returns the 'time' variable for the tropomi CH4 granule"
     """
-    bbox = np.array(((-180, 180), (-90, 90)))
     tropomi_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
 
     shutil.copyfile(os.path.join(data_dir, 'tropomi', tropomi_file),
@@ -1693,7 +1704,7 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
+        lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
         time_var_names = [
             subset.compute_time_variable_name(
                 dataset, dataset[lat_var_name]
@@ -1774,8 +1785,8 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
                         os.path.join(subset_output_dir, OMI_copy_file))
         min_time = '2020-01-16T12:30:00Z'
         max_time = '2020-01-16T12:40:00Z'
-        bbox = np.array(((-180, 180), (-90, 90)))
-        nc_dataset, has_groups = subset.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
+
+        nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
 
         args = {
             'decode_coords': False,
@@ -1790,7 +1801,7 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
         ) as dataset:
-            lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+            _, _, time_var_names = subset.get_coordinate_variable_names(
                 dataset=dataset,
                 lat_var_names=None,
                 lon_var_names=None,
@@ -1799,7 +1810,7 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             if 'BRO' in i:
                 assert any('utc' in x.lower() for x in time_var_names)
 
-            dataset, start_date = subset.convert_to_datetime(dataset, time_var_names)
+            dataset, _ = subset.convert_to_datetime(dataset, time_var_names)
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 
@@ -1854,6 +1865,7 @@ def test_he5_timeattrs_output(data_dir, subset_output_dir, request):
 
 
 def test_temporal_subset_lines(data_dir, subset_output_dir, request):
+    """TODO: Give description to this test function."""
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
     output_file = "{}_{}".format(request.node.name, file)
@@ -1907,7 +1919,7 @@ def test_get_time_OMI(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'OMI', omi_file),
                     os.path.join(subset_output_dir, omi_file))
 
-    nc_dataset, has_groups = subset.h5file_transform(os.path.join(subset_output_dir, omi_file))
+    nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, omi_file))
 
     args = {
         'decode_coords': False,
@@ -1919,8 +1931,7 @@ def test_get_time_OMI(data_dir, subset_output_dir):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        time_var_names = []
-        lat_var_names, lon_var_names = subset.compute_coordinate_variable_names(dataset)
+        lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
         time_var_names = [
             subset.compute_time_variable_name(
                 dataset, dataset[lat_var_name]
@@ -1962,7 +1973,7 @@ def test_empty_temporal_subset(data_dir, subset_output_dir, request):
     assert all(dim_size == 1 for dim_size in ds.dims.values())
 
 
-def test_passed_coords(data_dir, subset_output_dir):
+def test_passed_coords(data_dir):
     """
     Ensure the coordinates passed in to the subsetter are
     utilized and not manually calculated.
@@ -2093,6 +2104,8 @@ def test_tropomi_utc_time(data_dir, subset_output_dir, request):
                     out_nc_dataset.groups['PRODUCT'].variables['time_utc'][:].squeeze()[0]
 
 def test_bad_time_unit(subset_output_dir):
+    """TODO: give this function a description
+    """
     fill_val = -99999.0
     time_vals = np.random.rand(10)
     time_vals[0] = fill_val
@@ -2126,38 +2139,38 @@ def test_bad_time_unit(subset_output_dir):
     ds_test.close()
 
 def test_get_unique_groups():
-        """Test lat_var_names return the expected unique groups"""
+    """Test lat_var_names return the expected unique groups"""
 
-        input_lats_s6 = ['__data_01__latitude', '__data_20__c__latitude', '__data_20__ku__latitude']
+    input_lats_s6 = ['__data_01__latitude', '__data_20__c__latitude', '__data_20__ku__latitude']
 
-        unique_groups_s6, diff_counts_s6 = subset.get_base_group_names(input_lats_s6)
+    unique_groups_s6, diff_counts_s6 = subset.get_base_group_names(input_lats_s6)
 
-        expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
-        expected_diff_counts_s6 = [0,1,1]
+    expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
+    expected_diff_counts_s6 = [0, 1, 1]
 
-        assert expected_groups_s6 == unique_groups_s6
-        assert expected_diff_counts_s6 == diff_counts_s6
+    assert expected_groups_s6 == unique_groups_s6
+    assert expected_diff_counts_s6 == diff_counts_s6
 
-        input_lats_mls = ['__HDF__swaths__o3__geo__latitude',
-                          '__HDF__swaths__o3 columns__geo__latitude',
-                          '__HDF__swaths__o3-apiori__geo__latitude']
+    input_lats_mls = ['__HDF__swaths__o3__geo__latitude',
+                        '__HDF__swaths__o3 columns__geo__latitude',
+                        '__HDF__swaths__o3-apiori__geo__latitude']
 
-        unique_groups_mls, diff_counts_mls = subset.get_base_group_names(input_lats_mls)
+    unique_groups_mls, diff_counts_mls = subset.get_base_group_names(input_lats_mls)
 
-        expected_groups_mls = ['__HDF__swaths__o3',
-                               '__HDF__swaths__o3 columns',
-                               '__HDF__swaths__o3-apiori']
-        expected_diff_counts_mls = [2,2,2]
+    expected_groups_mls = ['__HDF__swaths__o3',
+                            '__HDF__swaths__o3 columns',
+                            '__HDF__swaths__o3-apiori']
+    expected_diff_counts_mls = [2, 2, 2]
 
-        assert expected_groups_mls == unique_groups_mls
-        assert expected_diff_counts_mls == diff_counts_mls
+    assert expected_groups_mls == unique_groups_mls
+    assert expected_diff_counts_mls == diff_counts_mls
 
-        input_lats_single = ['__latitude', '__geolocation__latitude']
+    input_lats_single = ['__latitude', '__geolocation__latitude']
 
-        unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
+    unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
 
-        expected_groups_single = ['__', '__geolocation']
-        expected_diff_counts_single = [-1, 0]
-
-        assert expected_groups_single == unique_groups_single
-        assert expected_diff_counts_single == diff_counts_single
+    expected_groups_single = ['__', '__geolocation']
+    expected_diff_counts_single = [-1, 0]
+    
+    assert expected_groups_single == unique_groups_single
+    assert expected_diff_counts_single == diff_counts_single
