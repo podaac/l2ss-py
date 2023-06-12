@@ -511,7 +511,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         If the time variable could not be determined
     """
 
-    time_vars = find_matching_coords(dataset, ['time'])
+    time_vars = find_matching_coords(dataset, ['time', 'Time'])
     if time_vars:
         # There should only be one time var match (this is called once
         # per lat var)
@@ -533,6 +533,11 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
             continue
         if 'time' == var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
+
+    for var_name in list(dataset.data_vars.keys()):
+        var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
+        if len(dataset[var_name].squeeze().dims) == 0:
+            continue
         if 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
