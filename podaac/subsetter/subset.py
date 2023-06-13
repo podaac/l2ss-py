@@ -527,6 +527,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
 
+    # first check if any variables are named 'time'
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
@@ -534,6 +535,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         if 'time' == var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
+    # then check if any variables have 'time' in the string if the above loop doesn't return anything
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
