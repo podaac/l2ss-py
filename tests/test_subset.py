@@ -1777,11 +1777,12 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
     Test that the time type changes to datetime for subsetting
     """
 
-    OMI_file_names = ['OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5',
-                      'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5']
+    OMI_file_names = [('OMI','OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'),
+                      ('OMI','OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'),
+                      ('MLS','MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5')]
     OMI_copy_file = 'OMI_copy_testing_2.he5'
     for i in OMI_file_names:
-        shutil.copyfile(os.path.join(data_dir, 'OMI', i),
+        shutil.copyfile(os.path.join(data_dir, i[0], i[1]),
                         os.path.join(subset_output_dir, OMI_copy_file))
         min_time = '2020-01-16T12:30:00Z'
         max_time = '2020-01-16T12:40:00Z'
