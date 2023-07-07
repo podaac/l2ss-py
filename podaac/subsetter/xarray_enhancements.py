@@ -238,7 +238,7 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
             new_dataset[variable_name] = indexed_var.where(var_cond)
             variable = new_dataset[variable_name]
         elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
-                indexers.keys()).intersection(new_datasets[variable_name].dims):
+                indexers.keys()).intersection(new_dataset[variable_name].dims):
             new_dataset[variable_name] = indexed_var
 
             new_dataset[variable_name].attrs = indexed_var.attrs
@@ -270,9 +270,9 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
                 fill_value = np.datetime64('nat')
             if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
                 fill_value = np.timedelta64('nat')
-            new_dataset[variable_name] = new_datasets[variable_name].fillna(fill_value)
+            new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
             if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_datasets[variable_name],
+                new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
                                                              str(original_type), dask='allowed',
                                                              keep_attrs=True)
 
