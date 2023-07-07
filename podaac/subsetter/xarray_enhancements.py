@@ -217,10 +217,10 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     new_dataset_non_sub = indexed_ds[non_subset_vars]
 
     # merge the datasets
-    new_datasets = xr.merge([new_dataset_non_sub, new_dataset_sub])
+    new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
 
     # Cast all variables to their original type
-    for variable_name, variable in new_datasets.data_vars.items():
+    for variable_name, variable in new_dataset.data_vars.items():
         original_type = indexed_ds[variable_name].dtype
         new_type = variable.dtype
         indexed_var = indexed_ds[variable_name]
@@ -235,19 +235,19 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
             }
             var_cond = cond.sel({missing_dim: 1}).isel(**var_indexers)
             indexed_var = dataset[variable_name].isel(**var_indexers)
-            new_datasets[variable_name] = indexed_var.where(var_cond)
-            variable = new_datasets[variable_name]
+            new_dataset[variable_name] = indexed_var.where(var_cond)
+            variable = new_dataset[variable_name]
         elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
                 indexers.keys()).intersection(new_datasets[variable_name].dims):
-            new_datasets[variable_name] = indexed_var
+            new_dataset[variable_name] = indexed_var
 
-            new_datasets[variable_name].attrs = indexed_var.attrs
+            new_dataset[variable_name].attrs = indexed_var.attrs
             variable.attrs = indexed_var.attrs
         # Check if variable has no _FillValue. If so, use original data
         if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
 
             if original_type != new_type:
-                new_datasets[variable_name] = xr.apply_ufunc(cast_type, variable,
+                new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
                                                              str(original_type), dask='allowed',
                                                              keep_attrs=True)
 
@@ -255,25 +255,25 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
             # variable has more than one dimension, copy the entire
             # variable over, otherwise use a NaN mask to copy over the
             # relevant values.
-            new_datasets[variable_name] = indexed_var
+            new_dataset[variable_name] = indexed_var
 
-            new_datasets[variable_name].attrs = indexed_var.attrs
+            new_dataset[variable_name].attrs = indexed_var.attrs
             variable.attrs = indexed_var.attrs
-            new_datasets[variable_name].encoding['_FillValue'] = None
+            new_dataset[variable_name].encoding['_FillValue'] = None
             variable.encoding['_FillValue'] = None
 
         else:
             # Manually replace nans with FillValue
             # If variable represents time, cast _FillValue to datetime
-            fill_value = new_datasets[variable_name].attrs.get('_FillValue')
-            if np.issubdtype(new_datasets[variable_name].dtype, np.dtype(np.datetime64)):
+            fill_value = new_dataset[variable_name].attrs.get('_FillValue')
+            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
                 fill_value = np.datetime64('nat')
-            if np.issubdtype(new_datasets[variable_name].dtype, np.dtype(np.timedelta64)):
+            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
                 fill_value = np.timedelta64('nat')
-            new_datasets[variable_name] = new_datasets[variable_name].fillna(fill_value)
+            new_dataset[variable_name] = new_datasets[variable_name].fillna(fill_value)
             if original_type != new_type:
-                new_datasets[variable_name] = xr.apply_ufunc(cast_type, new_datasets[variable_name],
+                new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_datasets[variable_name],
                                                              str(original_type), dask='allowed',
                                                              keep_attrs=True)
 
-    return new_datasets
+    return new_dataset
