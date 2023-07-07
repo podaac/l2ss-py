@@ -143,8 +143,12 @@ def cast_type(var: xr.DataArray, var_type: str) -> xr.DataArray:
 
     return var.astype(var_type)
 
+
 def get_variables_with_indexers(dataset, indexers):
-    """"""
+    """
+    returns a list of variables with bounding box dimensions and variables that
+    don't have bounding box dimensions
+    """
     index_list = list(indexers.keys())
     subset_vars = []
     no_subset_vars = []
@@ -154,8 +158,9 @@ def get_variables_with_indexers(dataset, indexers):
             subset_vars.append(i)
         else:
             no_subset_vars.append(i)
-    print (subset_vars, no_subset_vars)
+
     return subset_vars, no_subset_vars
+
 
 def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool) -> xr.Dataset:
     """
@@ -203,14 +208,16 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
+
     subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
+    # dataset with variables that need to be subsetted
     new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
-    #if len(non_subset_vars) > 0:
+    # data with variables that shouldn't be subsetted
     new_dataset_non_sub = indexed_ds[non_subset_vars]
-    new_datasets = xr.merge([new_dataset_sub, new_dataset_non_sub])
-    #else:
-    #    new_datasets = new_dataset_sub
+
+    # merge the datasets
+    new_datasets = xr.merge([new_dataset_non_sub, new_dataset_sub])
 
     # Cast all variables to their original type
     for variable_name, variable in new_datasets.data_vars.items():
@@ -241,8 +248,8 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
             if original_type != new_type:
                 new_datasets[variable_name] = xr.apply_ufunc(cast_type, variable,
-                                                            str(original_type), dask='allowed',
-                                                            keep_attrs=True)
+                                                             str(original_type), dask='allowed',
+                                                             keep_attrs=True)
 
             # Replace nans with values from original dataset. If the
             # variable has more than one dimension, copy the entire
@@ -266,7 +273,7 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
             new_datasets[variable_name] = new_datasets[variable_name].fillna(fill_value)
             if original_type != new_type:
                 new_datasets[variable_name] = xr.apply_ufunc(cast_type, new_datasets[variable_name],
-                                                            str(original_type), dask='allowed',
-                                                            keep_attrs=True)
-                
+                                                             str(original_type), dask='allowed',
+                                                             keep_attrs=True)
+
     return new_datasets
