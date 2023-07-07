@@ -248,8 +248,8 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
             if original_type != new_type:
                 new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
-                                                             str(original_type), dask='allowed',
-                                                             keep_attrs=True)
+                                                            str(original_type), dask='allowed',
+                                                            keep_attrs=True)
 
             # Replace nans with values from original dataset. If the
             # variable has more than one dimension, copy the entire
@@ -273,7 +273,7 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
             new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
             if original_type != new_type:
                 new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
-                                                             str(original_type), dask='allowed',
-                                                             keep_attrs=True)
+                                                            str(original_type), dask='allowed',
+                                                            keep_attrs=True)
 
     return new_dataset
