@@ -1814,6 +1814,39 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             dataset, _ = subset.convert_to_datetime(dataset, time_var_names)
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
+def test_MLS_levels(data_dir, subset_output_dir, request):
+    """"""
+    mls_dir = join(data_dir, 'MLS')
+    mls_file = 'MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5'
+    mls_file_input = 'input' + mls_file
+    bbox = np.array(((-180, 180), (-90, 90)))
+    output_file = "{}_{}".format(request.node.name, mls_file)
+
+    shutil.copyfile(
+        os.path.join(mls_dir, mls_file),
+        os.path.join(subset_output_dir, mls_file)
+    )
+
+    subset.subset(
+        file_to_subset=os.path.join(subset_output_dir, mls_file),
+        bbox=bbox,
+        output_file=os.path.join(subset_output_dir, output_file)
+    )
+
+    in_ds = h5py.File(os.path.join(mls_dir, mls_file), "r")
+    out_ds = h5py.File(os.path.join(subset_output_dir, output_file), "r")
+
+    # check that the variable shapes are conserved in MLS
+    for i in list(in_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields']):
+        var_in_shape = in_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields'][i].shape
+        var_out_shape = out_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields'][i].shape
+        assert var_in_shape == var_out_shape
+
+    for i in list(in_ds['HDFEOS']['SWATHS']['CO']['Data Fields']):
+        var_in_shape = in_ds['HDFEOS']['SWATHS']['CO']['Data Fields'][i].shape
+        var_out_shape = out_ds['HDFEOS']['SWATHS']['CO']['Data Fields'][i].shape
+        assert var_in_shape == var_out_shape
+
 
 def test_he5_timeattrs_output(data_dir, subset_output_dir, request):
     """Test that the time attributes in the output match the attributes of the input for OMI test files"""

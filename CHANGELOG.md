@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - PODAAC-5537: Fixed AQUARIUS_L2_SSS_V5 dataset
 - Update github action docker versioning to use pep440
 - [issue/170](https://github.com/podaac/l2ss-py/issues/170): Prioritize getting time variables if 'time' == var_time_name over 'time' being in the var name such as 'SunLocalTime'.
+- [issue/173](https://github.com/podaac/l2ss-py/issues/173): Variables without any spatial dimensions in "indexers" array should get copied over to the subsetting new_dataset after the xarray.where() function is applied.
 ### Security
 
 ## [2.4.0]
