@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [2.5.0]
+### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+- [issue/153](https://github.com/podaac/l2ss-py/issues/153): Remove the asc_node_tai93 variable when blank in the SNDR collections for xarray.decode_times to decode.
+- PODAAC-5538: Reduce memory footprint of l2ss by loading each variable individually to write to memory
+- [issue/155](https://github.com/podaac/l2ss-py/issues/155): lat var name prefix now generalized to unique group names. Group variables determined in subset_bbox using the unique group name.
+- [issue/162](https://github.com/podaac/l2ss-py/issues/162): allow time variable subsetting differences handled for MLS and OCO3 collections. At the moment: assuming 'he5' files to be tai93 files is a fine assumption. Xarray does not decode these times in he5 files
+- [issue/168](https://github.com/podaac/l2ss-py/issues/168): A separate copy of test data is used to get expected results before subsetting at the beginning of two test functions --- test_subset_empty_bbox() and test_specified_variables() --- that rely on opening the dataset more than once.
+- PODAAC-5537: Fixed AQUARIUS_L2_SSS_V5 dataset
+- Update github action docker versioning to use pep440
+- [issue/170](https://github.com/podaac/l2ss-py/issues/170): Prioritize getting time variables if 'time' == var_time_name over 'time' being in the var name such as 'SunLocalTime'.
+- [issue/173](https://github.com/podaac/l2ss-py/issues/173): Variables without any spatial dimensions in "indexers" array should get copied over to the subsetting new_dataset after the xarray.where() function is applied.
+### Security
+
 ## [2.4.0]
 ### Added
 ### Changed
