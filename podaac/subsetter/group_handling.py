@@ -93,7 +93,7 @@ def transform_grouped_dataset(nc_dataset: nc.Dataset, file_to_subset: str) -> nc
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, start_date) -> None:  # pylint: disable=too-many-branches
+def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, start_date, time_var_names) -> None:  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
@@ -119,14 +119,13 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
         groups = set(group_lst)
         for group in groups:
             base_dataset.createGroup(group)
-
         for dim_name in list(dataset.dims.keys()):
             new_dim_name = dim_name.split(GROUP_DELIM)[-1]
             dim_group = _get_nested_group(base_dataset, dim_name)
             dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
 
         # Rename variables
-        _rename_variables(dataset, base_dataset, start_date)
+        _rename_variables(dataset, base_dataset, start_date, time_var_names)
 
     # Remove group vars from base dataset
     for var_name in list(base_dataset.variables.keys()):
@@ -151,7 +150,7 @@ def _get_nested_group(dataset: nc.Dataset, group_path: str) -> nc.Group:
     return nested_group
 
 
-def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date) -> None:
+def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date, time_var_names) -> None:
     for var_name in list(dataset.variables.keys()):
         new_var_name = var_name.split(GROUP_DELIM)[-1]
         var_group = _get_nested_group(base_dataset, var_name)
@@ -162,7 +161,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
         ):
-            if start_date:
+            if start_date and var_name in time_var_names:
                 dataset.variables[var_name].values = (dataset.variables[var_name].values - np.datetime64(start_date))/np.timedelta64(1, 's')
                 variable = dataset.variables[var_name]
             else:

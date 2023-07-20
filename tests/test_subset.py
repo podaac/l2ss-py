@@ -1799,7 +1799,7 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             if 'BRO' in i:
                 assert any('utc' in x.lower() for x in time_var_names)
 
-            dataset, start_date = subset.convert_to_datetime(dataset, time_var_names)
+            dataset, start_date = subset.convert_to_datetime(dataset, time_var_names, 'he5')
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 

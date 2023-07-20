@@ -43,6 +43,7 @@ from shapely.ops import transform
 
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import GPM_cleanup as gc
 from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
     h5file_transform
 
@@ -531,8 +532,9 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if 'time' == var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
-            return var_name
+        if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) \
+            and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+                return var_name
 
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
@@ -1018,7 +1020,7 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     return lat_var_names, lon_var_names, time_var_names
 
 
-def convert_to_datetime(dataset: xr.Dataset, time_vars: list) -> Tuple[xr.Dataset, datetime.datetime]:
+def convert_to_datetime(dataset: xr.Dataset, time_vars: list, file_extension) -> Tuple[xr.Dataset, datetime.datetime]:
     """
     Converts the time variable to datetime if xarray doesn't decode times
 
@@ -1034,7 +1036,10 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list) -> Tuple[xr.Datase
     """
 
     for var in time_vars:
-        start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
+        if file_extension == 'HDF5':
+            start_date = datetime.datetime.strptime("1980-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
+        else:
+            start_date = datetime.datetime.strptime("1993-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
 
         if np.issubdtype(dataset[var].dtype, np.dtype(float)) or np.issubdtype(dataset[var].dtype, np.float32):
             # adjust the time values from the start date
@@ -1161,6 +1166,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     """
     nc_dataset, has_groups, file_extension = open_as_nc_dataset(file_to_subset)
 
+
+
+    if file_extension == 'HDF5':
+        gc.change_var_dims(nc_dataset)
+
     override_decode_cf_datetime()
 
     if has_groups:
@@ -1176,6 +1186,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
         lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
+
+    
 
     args = {
         'decode_coords': False,
@@ -1201,9 +1213,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
+        """for i in list(dataset.variables.keys()):
+            print (i)"""
+        print (time_var_names)
+
         start_date = None
-        if file_extension == 'he5' and (min_time or max_time):
-            dataset, start_date = convert_to_datetime(dataset, time_var_names)
+        if (file_extension == 'he5' or file_extension == 'HDF5') and (min_time or max_time):
+            dataset, start_date = convert_to_datetime(dataset, time_var_names, file_extension)
+
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
@@ -1279,7 +1296,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     dataset_attr.setncatts(dataset.attrs)
 
         if has_groups:
-            recombine_grouped_datasets(datasets, output_file, start_date)
+            recombine_grouped_datasets(datasets, output_file, start_date, time_var_names)
             # Check if the spatial bounds are all 'None'. This means the
             # subset result is empty.
             if any(bound is None for bound in spatial_bounds):
