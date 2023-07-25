@@ -1,14 +1,20 @@
 import collections
 
 import netCDF4 as nc
+import xarray as xr
 
 dim_dict = {}
 
-# if i do for var_name, var in nc_dataset.variables.items() i get string in use error
-
-def change_var_dims(nc_dataset):
+def change_var_dims(nc_dataset, variables):
     var_list = list(nc_dataset.variables.keys())
     for var_name in var_list:
+        # GPM will always need to be cleaned up via netCDF
+        # generalizing coordinate variables in netCDF file to speed variable subsetting up
+        if var_name not in variables and 'lat' not in var_name.lower() and \
+            'lon' not in var_name.lower() and 'time' not in var_name.lower():
+            del nc_dataset.variables[var_name]
+            continue
+        
         var = nc_dataset.variables[var_name]
         if 'DimensionNames' in var.ncattrs():
             dim_list = var.getncattr('DimensionNames').split(',')
