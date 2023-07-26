@@ -5,15 +5,16 @@ import xarray as xr
 
 dim_dict = {}
 
-def change_var_dims(nc_dataset, variables):
+def change_var_dims(nc_dataset, variables=None):
     var_list = list(nc_dataset.variables.keys())
     for var_name in var_list:
         # GPM will always need to be cleaned up via netCDF
         # generalizing coordinate variables in netCDF file to speed variable subsetting up
-        if var_name not in variables and 'lat' not in var_name.lower() and \
-            'lon' not in var_name.lower() and 'time' not in var_name.lower():
-            del nc_dataset.variables[var_name]
-            continue
+        if variables:
+            if var_name not in variables and 'lat' not in var_name.lower() and \
+                'lon' not in var_name.lower() and 'time' not in var_name.lower():
+                del nc_dataset.variables[var_name]
+                continue
         
         var = nc_dataset.variables[var_name]
         if 'DimensionNames' in var.ncattrs():
