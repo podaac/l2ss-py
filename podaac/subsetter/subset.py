@@ -43,7 +43,7 @@ from shapely.ops import transform
 
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter import xarray_enhancements as xre
-from podaac.subsetter import GPM_cleanup as gc
+from podaac.subsetter.gpm_cleanup import change_var_dims
 from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
     h5file_transform
 
@@ -533,8 +533,8 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
         if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) \
-            and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
-                return var_name
+                    and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+            return var_name
 
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
@@ -1166,11 +1166,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     """
     nc_dataset, has_groups, file_extension = open_as_nc_dataset(file_to_subset)
 
-
-
-    if file_extension == 'HDF5':
-        gc.change_var_dims(nc_dataset)
-
     override_decode_cf_datetime()
 
     if has_groups:
@@ -1187,7 +1182,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
 
-    
+        if file_extension == 'HDF5':
+            nc_dataset = change_var_dims(nc_dataset, variables)
 
     args = {
         'decode_coords': False,
@@ -1213,12 +1209,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
-        """for i in list(dataset.variables.keys()):
-            print (i)"""
-        print (time_var_names)
 
         start_date = None
-        if (file_extension == 'he5' or file_extension == 'HDF5') and (min_time or max_time):
+        if file_extension in ['he5','HDF5'] and (min_time or max_time):
             dataset, start_date = convert_to_datetime(dataset, time_var_names, file_extension)
 
         chunks = calculate_chunks(dataset)
