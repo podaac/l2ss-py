@@ -51,12 +51,8 @@ from podaac.subsetter import subset
 from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
-<<<<<<< HEAD
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter import gpm_cleanup as gc
-=======
-# from podaac.subsetter import dimension_cleanup as dc
->>>>>>> develop
 
 
 @pytest.fixture(scope='class')
@@ -566,11 +562,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
 
-<<<<<<< HEAD
-    in_ds, _, file_ext = subset.open_as_nc_dataset(join(data_dir, test_file))
-=======
     in_ds, _, file_ext = subset.open_as_nc_dataset(nc_copy_for_expected_results)
->>>>>>> develop
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
@@ -1820,11 +1812,7 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             if 'BRO' in i:
                 assert any('utc' in x.lower() for x in time_var_names)
 
-<<<<<<< HEAD
-            dataset, start_date = subset.convert_to_datetime(dataset, time_var_names, 'he5')
-=======
             dataset, _ = subset.convert_to_datetime(dataset, time_var_names)
->>>>>>> develop
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 def test_MLS_levels(data_dir, subset_output_dir, request):
@@ -2192,13 +2180,8 @@ def test_get_unique_groups():
 
         unique_groups_s6, diff_counts_s6 = subset.get_base_group_names(input_lats_s6)
 
-<<<<<<< HEAD
         expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
-        expected_diff_counts_s6 = [0,1,1]
-=======
-    expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
-    expected_diff_counts_s6 = [0, 1, 1]
->>>>>>> develop
+        expected_diff_counts_s6 = [0, 1, 1]
 
         assert expected_groups_s6 == unique_groups_s6
         assert expected_diff_counts_s6 == diff_counts_s6
@@ -2209,30 +2192,18 @@ def test_get_unique_groups():
 
         unique_groups_mls, diff_counts_mls = subset.get_base_group_names(input_lats_mls)
 
-<<<<<<< HEAD
         expected_groups_mls = ['__HDF__swaths__o3',
                                '__HDF__swaths__o3 columns',
                                '__HDF__swaths__o3-apiori']
         expected_diff_counts_mls = [2,2,2]
-=======
-    expected_groups_mls = ['__HDF__swaths__o3',
-                            '__HDF__swaths__o3 columns',
-                            '__HDF__swaths__o3-apiori']
-    expected_diff_counts_mls = [2, 2, 2]
->>>>>>> develop
 
         assert expected_groups_mls == unique_groups_mls
         assert expected_diff_counts_mls == diff_counts_mls
 
-<<<<<<< HEAD
         input_lats_single = ['__latitude', '__geolocation__latitude']
-=======
-    input_lats_single = ['__latitude', '__geolocation__latitude']
->>>>>>> develop
 
         unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
 
-<<<<<<< HEAD
         expected_groups_single = ['__', '__geolocation']
         expected_diff_counts_single = [-1, 0]
 
@@ -2242,10 +2213,6 @@ def test_get_unique_groups():
 def test_gpm_dimension_map(data_dir, subset_output_dir, request):
     """Test GPM files for dimension mapping and returns the expected netCDF
        dataset without the phony dimensions"""
-=======
-    expected_groups_single = ['__', '__geolocation']
-    expected_diff_counts_single = [-1, 0]
->>>>>>> develop
     
     gpm_dir = join(data_dir, 'GPM')
     gpm_file = 'GPM_test_file.HDF5'
