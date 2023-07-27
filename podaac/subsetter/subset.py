@@ -533,7 +533,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
         if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) \
-                    and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
     for var_name in list(dataset.data_vars.keys()):
@@ -1211,7 +1211,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         )
 
         start_date = None
-        if file_extension in ['he5','HDF5'] and (min_time or max_time):
+        if file_extension in ['he5', 'HDF5'] and (min_time or max_time):
             dataset, start_date = convert_to_datetime(dataset, time_var_names, file_extension)
 
         chunks = calculate_chunks(dataset)

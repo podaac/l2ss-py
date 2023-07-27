@@ -5,6 +5,7 @@ to nscan, nbin, nfreq by using the DimensionNames variable attribute
 
 dim_dict = {}
 
+
 def change_var_dims(nc_dataset, variables=None):
     """
     Go through each variable and get the dimension names from attribute "DimensionNames
@@ -17,7 +18,7 @@ def change_var_dims(nc_dataset, variables=None):
         # generalizing coordinate variables in netCDF file to speed variable subsetting up
         if variables:
             if var_name not in variables and 'lat' not in var_name.lower() and \
-                'lon' not in var_name.lower() and 'time' not in var_name.lower():
+            'lon' not in var_name.lower() and 'time' not in var_name.lower():
                 del nc_dataset.variables[var_name]
                 continue
 

@@ -143,6 +143,7 @@ def cast_type(var: xr.DataArray, var_type: str) -> xr.DataArray:
 
     return var.astype(var_type)
 
+
 def get_variables_with_indexers(dataset, indexers):
     """
     returns a list of variables with bounding box dimensions and variables that
@@ -159,6 +160,7 @@ def get_variables_with_indexers(dataset, indexers):
             no_subset_vars.append(i)
 
     return subset_vars, no_subset_vars
+
 
 def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool) -> xr.Dataset:
     """
@@ -207,8 +209,7 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
     subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
-    #print (dataset['__FS__SLV__precipRate'])
-    #raise Exception
+
     # dataset with variables that need to be subsetted
     new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
     # data with variables that shouldn't be subsetted
