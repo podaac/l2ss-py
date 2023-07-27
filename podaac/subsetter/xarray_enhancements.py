@@ -208,10 +208,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
-<<<<<<< HEAD
-=======
-
->>>>>>> develop
     subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
     # dataset with variables that need to be subsetted

@@ -1090,7 +1090,6 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
     return nc_dataset, has_groups, file_extension
-    return nc_dataset, has_groups, file_extension
 
 
 def override_decode_cf_datetime() -> None:
