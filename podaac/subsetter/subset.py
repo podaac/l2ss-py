@@ -1043,7 +1043,6 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list, file_extension) ->
     datetime.datetime
     """
 
-
     for var in time_vars:
         if file_extension == 'HDF5':
             start_date = datetime.datetime.strptime("1980-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
