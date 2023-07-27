@@ -6,6 +6,11 @@ to nscan, nbin, nfreq by using the DimensionNames variable attribute
 dim_dict = {}
 
 def change_var_dims(nc_dataset, variables=None):
+    """
+    Go through each variable and get the dimension names from attribute "DimensionNames
+    If the name is unique, add it as a dimension to the netCDF4 dataset. Then change the
+    dimensions to have the name in the DimensionName attribute rather than phony_dim
+    """
     var_list = list(nc_dataset.variables.keys())
     for var_name in var_list:
         # GPM will always need to be cleaned up via netCDF
@@ -20,11 +25,11 @@ def change_var_dims(nc_dataset, variables=None):
         if 'DimensionNames' in var.ncattrs():
             dim_list = var.getncattr('DimensionNames').split(',')
             # create dimension map
-            for i in range(len(dim_list)):
+            for count, dim in enumerate(dim_list):
                 dim_prefix = var_name.split('__')[1]
-                key = '__'+dim_prefix+'__'+dim_list[i]
-                length = var.shape[i]
-                if key not in list(dim_dict.keys()):
+                key = '__'+dim_prefix+'__'+dim
+                length = var.shape[count]
+                if key not in dim_dict:
                     nc_dataset.createDimension(key, length)
                     dim_dict[key] = length
 
@@ -37,7 +42,7 @@ def change_var_dims(nc_dataset, variables=None):
                         attrs_contents[attrname] = nc_dataset.variables[var_name].getncattr(attrname)
 
                 fill_value = var._FillValue  # pylint: disable=W0212
-                dim_tup = tuple(['__'+dim_prefix+'__'+i for i in var.getncattr('DimensionNames').split(',')])
+                dim_tup = ('__'+dim_prefix+'__'+i for i in var.getncattr('DimensionNames').split(','))
                 del nc_dataset.variables[var_name]
 
                 new_mapped_var[var_name] = nc_dataset.createVariable(var_name, str(var[:].dtype),

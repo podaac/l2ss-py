@@ -50,7 +50,7 @@ from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter import dimension_cleanup as dc
-from podaac.subsetter import GPM_cleanup as gc
+from podaac.subsetter import gpm_cleanup as gc
 
 
 @pytest.fixture(scope='class')
