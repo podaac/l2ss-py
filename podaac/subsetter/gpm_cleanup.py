@@ -17,8 +17,7 @@ def change_var_dims(nc_dataset, variables=None):
         # GPM will always need to be cleaned up via netCDF
         # generalizing coordinate variables in netCDF file to speed variable subsetting up
         if variables:
-            if var_name not in variables and 'lat' not in var_name.lower() and \
-            'lon' not in var_name.lower() and 'time' not in var_name.lower():
+            if var_name not in variables and 'lat' not in var_name.lower() and 'lon' not in var_name.lower() and 'time' not in var_name.lower():
                 del nc_dataset.variables[var_name]
                 continue
 
@@ -47,7 +46,7 @@ def change_var_dims(nc_dataset, variables=None):
                 del nc_dataset.variables[var_name]
 
                 new_mapped_var[var_name] = nc_dataset.createVariable(var_name, str(var[:].dtype),
-                                                                    dim_tup, fill_value=fill_value)
+                                                                     dim_tup, fill_value=fill_value)
                 for attr_name, contents in attrs_contents.items():
                     new_mapped_var[var_name].setncattr(attr_name, contents)
 
