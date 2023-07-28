@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/119](https://github.com/podaac/l2ss-py/issues/119): GPM variable dimensions are renamed from "phony_dim" to the dimension names in the variable attribute "DimensionNames"
 ### Security
 
 
