@@ -532,10 +532,10 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if 'time' == var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) \
+                    and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
-    # then check if any variables have 'time' in the string if the above loop doesn't return anything
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
@@ -1035,8 +1035,26 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list) -> Tuple[xr.Datase
     datetime.datetime
     """
 
+def convert_to_datetime(dataset: xr.Dataset, time_vars: list, file_extension) -> Tuple[xr.Dataset, datetime.datetime]:
+    """
+    Converts the time variable to datetime if xarray doesn't decode times
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+    time_vars : list
+
+    Returns
+    -------
+    xr.Dataset
+    datetime.datetime
+    """
+
     for var in time_vars:
-        start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
+        if file_extension == 'HDF5':
+            start_date = datetime.datetime.strptime("1980-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
+        else:
+            start_date = datetime.datetime.strptime("1993-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
 
         if np.issubdtype(dataset[var].dtype, np.dtype(float)) or np.issubdtype(dataset[var].dtype, np.float32):
             # adjust the time values from the start date
@@ -1204,8 +1222,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
         start_date = None
-        if file_extension == 'he5' and (min_time or max_time):
-            dataset, start_date = convert_to_datetime(dataset, time_var_names)
+        if file_extension in ['he5','HDF5'] and (min_time or max_time):
+            dataset, start_date = convert_to_datetime(dataset, time_var_names, file_extension)
+
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
