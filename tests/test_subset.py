@@ -51,6 +51,7 @@ from podaac.subsetter import subset
 from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import gpm_cleanup as gc
 # from podaac.subsetter import dimension_cleanup as dc
 
 
@@ -1811,7 +1812,7 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             if 'BRO' in i:
                 assert any('utc' in x.lower() for x in time_var_names)
 
-            dataset, _ = subset.convert_to_datetime(dataset, time_var_names)
+            dataset, _ = subset.convert_to_datetime(dataset, time_var_names, i[1].split('.')[-1])
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 def test_MLS_levels(data_dir, subset_output_dir, request):
@@ -2208,3 +2209,25 @@ def test_get_unique_groups():
     
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
+
+def test_gpm_dimension_map(data_dir, subset_output_dir, request):
+    """Test GPM files for dimension mapping and returns the expected netCDF
+       dataset without the phony dimensions"""
+    
+    gpm_dir = join(data_dir, 'GPM')
+    gpm_file = 'GPM_test_file.HDF5'
+    bbox = np.array(((-180, 180), (-90, 90)))
+    shutil.copyfile(
+        os.path.join(gpm_dir, gpm_file),
+        os.path.join(subset_output_dir, gpm_file)
+    )
+
+    nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
+
+    nc_dataset = gc.change_var_dims(nc_dataset)
+
+    for var_name, var in nc_dataset.variables.items():
+        dims = list(var.dimensions)
+        
+        for dim in dims:
+            assert 'phony' not in dim

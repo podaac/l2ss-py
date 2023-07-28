@@ -41,6 +41,7 @@ import xarray.coding.times
 from shapely.geometry import Point
 from shapely.ops import transform
 
+from podaac.subsetter import gpm_cleanup as gc
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
@@ -1196,6 +1197,10 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
         lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
+
+        if file_extension == 'HDF5':
+            nc_dataset = gc.change_var_dims(nc_dataset, variables)
+
 
     args = {
         'decode_coords': False,
