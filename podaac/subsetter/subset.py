@@ -533,8 +533,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) \
-                    and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
     for var_name in list(dataset.data_vars.keys()):
@@ -1021,21 +1020,6 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     return lat_var_names, lon_var_names, time_var_names
 
 
-def convert_to_datetime(dataset: xr.Dataset, time_vars: list) -> Tuple[xr.Dataset, datetime.datetime]:
-    """
-    Converts the time variable to datetime if xarray doesn't decode times
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-    time_vars : list
-
-    Returns
-    -------
-    xr.Dataset
-    datetime.datetime
-    """
-
 def convert_to_datetime(dataset: xr.Dataset, time_vars: list, file_extension) -> Tuple[xr.Dataset, datetime.datetime]:
     """
     Converts the time variable to datetime if xarray doesn't decode times
@@ -1201,7 +1185,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if file_extension == 'HDF5':
             nc_dataset = gc.change_var_dims(nc_dataset, variables)
 
-
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
@@ -1227,7 +1210,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
         start_date = None
-        if file_extension in ['he5','HDF5'] and (min_time or max_time):
+        if file_extension in ['he5', 'HDF5'] and (min_time or max_time):
             dataset, start_date = convert_to_datetime(dataset, time_var_names, file_extension)
 
         chunks = calculate_chunks(dataset)
