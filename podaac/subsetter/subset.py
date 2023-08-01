@@ -1039,7 +1039,7 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list, file_extension) ->
         if file_extension == 'HDF5':
             start_date = datetime.datetime.strptime("1980-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
         else:
-            start_date = datetime.datetime.strptime("1993-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
+            start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
 
         if np.issubdtype(dataset[var].dtype, np.dtype(float)) or np.issubdtype(dataset[var].dtype, np.float32):
             # adjust the time values from the start date
