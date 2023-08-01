@@ -161,7 +161,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date,
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
-        ) and var_name in time_vars: # check that time changes are done to a time variable
+        ) and var_name in time_vars:  # check that time changes are done to a time variable
             if start_date:
                 dataset.variables[var_name].values = (dataset.variables[var_name].values - np.datetime64(start_date))/np.timedelta64(1, 's')
                 variable = dataset.variables[var_name]
