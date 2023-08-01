@@ -1288,7 +1288,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     dataset_attr.setncatts(dataset.attrs)
 
         if has_groups:
-            recombine_grouped_datasets(datasets, output_file, start_date)
+            recombine_grouped_datasets(datasets, output_file, start_date, time_var_names)
             # Check if the spatial bounds are all 'None'. This means the
             # subset result is empty.
             if any(bound is None for bound in spatial_bounds):
