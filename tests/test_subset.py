@@ -52,6 +52,7 @@ from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter import gpm_cleanup as gc
+from podaac.subsetter import time_converting as tc
 # from podaac.subsetter import dimension_cleanup as dc
 
 
@@ -1813,12 +1814,14 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             if 'BRO' in i:
                 assert any('utc' in x.lower() for x in time_var_names)
             
-            file_ext = os.path.splitext(i[1])[1]
-            dataset, _ = subset.convert_to_datetime(dataset, time_var_names, file_ext)
+            dataset, _ = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 def test_MLS_levels(data_dir, subset_output_dir, request):
-    """"""
+    """
+    Test that the unique groups are determined before bounding box
+    subsetting
+    """
     mls_dir = join(data_dir, 'MLS')
     mls_file = 'MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5'
     mls_file_input = 'input' + mls_file
