@@ -37,7 +37,7 @@ def get_start_date(instrument_type):
 def convert_to_datetime(dataset: xr.Dataset, time_vars: list, instrument_type: str) -> Tuple[xr.Dataset, datetime.datetime]:
     """
     Get the start date based on what the Instrument type is
-    Then convert the time variable from seconds since the start date to a datetime format 
+    Then convert the time variable from seconds since the start date to a datetime format
     """
     start_date = get_start_date(instrument_type)
 
