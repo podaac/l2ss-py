@@ -42,7 +42,7 @@ from shapely.geometry import Point
 from shapely.ops import transform
 
 from podaac.subsetter import gpm_cleanup as gc
-from podaac.subsetter import time_converting_handling as tc
+from podaac.subsetter import time_converting as tc
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
@@ -536,7 +536,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
             continue
         if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
-        
+
     # then check if any variables have 'time' in the string if the above loop doesn't return anything
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
@@ -1020,46 +1020,6 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
         time_var_names = [x for x in time_var_names if x is not None]  # remove Nones and any duplicates
 
     return lat_var_names, lon_var_names, time_var_names
-
-
-def convert_to_datetime(dataset: xr.Dataset, time_vars: list, file_extension) -> Tuple[xr.Dataset, datetime.datetime]:
-    """
-    Converts the time variable to datetime if xarray doesn't decode times
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-    time_vars : list
-
-    Returns
-    -------
-    xr.Dataset
-    datetime.datetime
-    """
-
-    for var in time_vars:
-        if file_extension == 'HDF5':
-            start_date = datetime.datetime.strptime("1980-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
-        else:
-            start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
-
-        if np.issubdtype(dataset[var].dtype, np.dtype(float)) or np.issubdtype(dataset[var].dtype, np.float32):
-            # adjust the time values from the start date
-            if start_date:
-                dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
-                continue
-
-            utc_var_name = compute_utc_name(dataset)
-            if utc_var_name:
-                start_seconds = dataset[var].values[0]
-                dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
-                start_date = dataset[var].values[0] - np.timedelta64(int(start_seconds), 's')
-                return dataset, start_date
-
-        else:
-            pass
-
-    return dataset, start_date
 
 
 def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
