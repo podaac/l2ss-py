@@ -14,6 +14,7 @@ import xarray as xr
 
 GROUP_DELIM = '__'
 
+
 def transform_grouped_dataset(nc_dataset: nc.Dataset, file_to_subset: str) -> nc.Dataset:
     """
     Transform a netCDF4 Dataset that has groups to an xarray compatible

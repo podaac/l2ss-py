@@ -19,6 +19,7 @@ import xarray as xr
 import numpy as np
 from podaac.subsetter import subset
 
+
 def get_start_date(instrument_type):
     """
     returns the start date based on the instrument type
@@ -31,6 +32,7 @@ def get_start_date(instrument_type):
         return None
 
     return start_date
+
 
 def convert_to_datetime(dataset: xr.Dataset, time_vars: list, instrument_type: str) -> Tuple[xr.Dataset, datetime.datetime]:
     """
