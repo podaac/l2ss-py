@@ -14,8 +14,8 @@ datetime.datetime
 """
 
 import datetime
-import xarray as xr
 from typing import Tuple
+import xarray as xr
 import numpy as np
 from podaac.subsetter import subset
 
