@@ -242,6 +242,7 @@ def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
 
     walk_h5py(data_new, data_new.name)
 
+    # Get the instrument name from the file attributes
     instrument = data_new['__HDFEOS__ADDITIONAL__FILE_ATTRIBUTES'].attrs['InstrumentName'].decode("utf-8")
     if 'OMI' in instrument:
         hdf_type = 'OMI'
