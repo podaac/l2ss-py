@@ -1141,7 +1141,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
         lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
-        
+
     if '.HDF5' == file_extension:
         # GPM files will have a timeMidScan time variable present
         if '__FS__navigation__timeMidScan' in list(nc_dataset.variables.keys()):
