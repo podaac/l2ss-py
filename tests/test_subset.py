@@ -1576,8 +1576,8 @@ def test_transform_h5py_dataset(data_dir, subset_output_dir):
                     entry_lst.append(entry_str + "/" + group_keys)
                 key_lst.append(entry_str + "/" + group_keys)
 
-    nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
-
+    nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
+    assert 'OMI' == hdf_type
     nc_vars_flattened = list(nc_dataset.variables.keys())
     for i, entry in enumerate(entry_lst):  # go through all the datasets in h5py file
         input_variable = '__' + entry.replace('/', '__')
@@ -1788,8 +1788,9 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
         min_time = '2020-01-16T12:30:00Z'
         max_time = '2020-01-16T12:40:00Z'
 
-        nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
-
+        nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
+        assert has_groups == True
+        assert i[0] == hdf_type
         args = {
             'decode_coords': False,
             'mask_and_scale': False,
@@ -1811,8 +1812,9 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             )
             if 'BRO' in i:
                 assert any('utc' in x.lower() for x in time_var_names)
-
-            dataset, _ = subset.convert_to_datetime(dataset, time_var_names, i[1].split('.')[-1])
+            
+            file_ext = os.path.splitext(i[1])[1]
+            dataset, _ = subset.convert_to_datetime(dataset, time_var_names, file_ext)
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 def test_MLS_levels(data_dir, subset_output_dir, request):
@@ -1954,7 +1956,7 @@ def test_get_time_OMI(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'OMI', omi_file),
                     os.path.join(subset_output_dir, omi_file))
 
-    nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, omi_file))
+    nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, omi_file))
 
     args = {
         'decode_coords': False,

@@ -13,7 +13,7 @@ import numpy as np
 import xarray as xr
 
 GROUP_DELIM = '__'
-
+hdf_type = None
 
 def transform_grouped_dataset(nc_dataset: nc.Dataset, file_to_subset: str) -> nc.Dataset:
     """
@@ -242,6 +242,12 @@ def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
 
     walk_h5py(data_new, data_new.name)
 
+    instrument = data_new['__HDFEOS__ADDITIONAL__FILE_ATTRIBUTES'].attrs['InstrumentName'].decode("utf-8")
+    if 'OMI' in instrument:
+        hdf_type = 'OMI'
+    elif 'MLS' in instrument:
+        hdf_type = 'MLS'
+    
     for del_group in del_group_list:
         del data_new[del_group]
 
@@ -252,4 +258,4 @@ def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
 
     nc_dataset = nc.Dataset(finputnc, mode='r')
 
-    return nc_dataset, has_groups
+    return nc_dataset, has_groups, hdf_type
