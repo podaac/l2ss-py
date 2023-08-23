@@ -14,6 +14,7 @@ Functions which improve upon existing netCDF4 library existing functions
 import collections
 
 import netCDF4 as nc
+import xarray as xr
 
 
 def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
@@ -88,3 +89,21 @@ def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
         new_dup_var[dup_var_name][:] = dup_var[:]
 
     return nc_dataset
+
+
+def sync_dims_inplace(original_dataset: xr.Dataset, new_dataset: xr.Dataset) -> None:
+    """
+    Synchronize dimensions of variables in the new dataset with the original dataset.
+
+    Parameters:
+    original_dataset (xr.Dataset): The original dataset.
+    new_dataset (xr.Dataset): The new dataset with possibly additional dimensions.
+    """
+
+    for variable_name in new_dataset.variables:
+        original_variable_dims = original_dataset[variable_name].dims
+        new_variable_dims = new_dataset[variable_name].dims
+
+        for new_dim in new_variable_dims:
+            if new_dim not in original_variable_dims:
+                new_dataset[variable_name] = new_dataset[variable_name].isel({new_dim: 0})
