@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
-= [issue/182](https://github.com/podaac/l2ss-py/issues/182): Update code so doesn't remove '/' on attribute values.
+- [issue/182](https://github.com/podaac/l2ss-py/issues/182): Update code so doesn't remove '/' on attribute values.
 - [issue/178](https://github.com/podaac/l2ss-py/issues/178): Add function to make sure dimension in subset is same as original file
 ### Deprecated 
 ### Removed
