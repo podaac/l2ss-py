@@ -51,6 +51,8 @@ from podaac.subsetter import subset
 from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter import gpm_cleanup as gc
+from podaac.subsetter import time_converting as tc
 # from podaac.subsetter import dimension_cleanup as dc
 
 
@@ -1575,8 +1577,8 @@ def test_transform_h5py_dataset(data_dir, subset_output_dir):
                     entry_lst.append(entry_str + "/" + group_keys)
                 key_lst.append(entry_str + "/" + group_keys)
 
-    nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
-
+    nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
+    assert 'OMI' == hdf_type
     nc_vars_flattened = list(nc_dataset.variables.keys())
     for i, entry in enumerate(entry_lst):  # go through all the datasets in h5py file
         input_variable = '__' + entry.replace('/', '__')
@@ -1787,8 +1789,9 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
         min_time = '2020-01-16T12:30:00Z'
         max_time = '2020-01-16T12:40:00Z'
 
-        nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
-
+        nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
+        assert has_groups == True
+        assert i[0] == hdf_type
         args = {
             'decode_coords': False,
             'mask_and_scale': False,
@@ -1810,12 +1813,15 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             )
             if 'BRO' in i:
                 assert any('utc' in x.lower() for x in time_var_names)
-
-            dataset, _ = subset.convert_to_datetime(dataset, time_var_names)
+            
+            dataset, _ = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 def test_MLS_levels(data_dir, subset_output_dir, request):
-    """"""
+    """
+    Test that the unique groups are determined before bounding box
+    subsetting
+    """
     mls_dir = join(data_dir, 'MLS')
     mls_file = 'MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5'
     mls_file_input = 'input' + mls_file
@@ -1953,7 +1959,7 @@ def test_get_time_OMI(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'OMI', omi_file),
                     os.path.join(subset_output_dir, omi_file))
 
-    nc_dataset, _ = subset.h5file_transform(os.path.join(subset_output_dir, omi_file))
+    nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, omi_file))
 
     args = {
         'decode_coords': False,
@@ -2208,3 +2214,25 @@ def test_get_unique_groups():
     
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
+
+def test_gpm_dimension_map(data_dir, subset_output_dir, request):
+    """Test GPM files for dimension mapping and returns the expected netCDF
+       dataset without the phony dimensions"""
+    
+    gpm_dir = join(data_dir, 'GPM')
+    gpm_file = 'GPM_test_file.HDF5'
+    bbox = np.array(((-180, 180), (-90, 90)))
+    shutil.copyfile(
+        os.path.join(gpm_dir, gpm_file),
+        os.path.join(subset_output_dir, gpm_file)
+    )
+
+    nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
+
+    nc_dataset = gc.change_var_dims(nc_dataset)
+
+    for var_name, var in nc_dataset.variables.items():
+        dims = list(var.dimensions)
+        
+        for dim in dims:
+            assert 'phony' not in dim

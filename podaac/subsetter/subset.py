@@ -41,6 +41,8 @@ import xarray.coding.times
 from shapely.geometry import Point
 from shapely.ops import transform
 
+from podaac.subsetter import gpm_cleanup as gc
+from podaac.subsetter import time_converting as tc
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
@@ -532,7 +534,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if 'time' == var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
     # then check if any variables have 'time' in the string if the above loop doesn't return anything
@@ -1020,64 +1022,24 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     return lat_var_names, lon_var_names, time_var_names
 
 
-def convert_to_datetime(dataset: xr.Dataset, time_vars: list) -> Tuple[xr.Dataset, datetime.datetime]:
-    """
-    Converts the time variable to datetime if xarray doesn't decode times
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-    time_vars : list
-
-    Returns
-    -------
-    xr.Dataset
-    datetime.datetime
-    """
-
-    for var in time_vars:
-        start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
-
-        if np.issubdtype(dataset[var].dtype, np.dtype(float)) or np.issubdtype(dataset[var].dtype, np.float32):
-            # adjust the time values from the start date
-            if start_date:
-                dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
-                continue
-
-            utc_var_name = compute_utc_name(dataset)
-            if utc_var_name:
-                start_seconds = dataset[var].values[0]
-                dataset[var].values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in dataset[utc_var_name].values]
-                start_date = dataset[var].values[0] - np.timedelta64(int(start_seconds), 's')
-                return dataset, start_date
-
-        else:
-            pass
-
-    return dataset, start_date
-
-
 def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
     """Open netcdf file, and flatten groups if they exist."""
-    file_extension = filepath.split('.')[-1]
+    hdf_type = None
+    # Open dataset with netCDF4 first, so we can get group info
+    try:
+        nc_dataset = nc.Dataset(filepath, mode='r')
+        has_groups = bool(nc_dataset.groups)
 
-    if file_extension == 'he5':
-        nc_dataset, has_groups = h5file_transform(filepath)
-    else:
-        # Open dataset with netCDF4 first, so we can get group info
-        try:
-            nc_dataset = nc.Dataset(filepath, mode='r')
-            has_groups = bool(nc_dataset.groups)
+        # If dataset has groups, transform to work with xarray
+        if has_groups:
+            nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
 
-            # If dataset has groups, transform to work with xarray
-            if has_groups:
-                nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
-        except OSError:
-            nc_dataset, has_groups = h5file_transform(filepath)
+    except OSError:
+        nc_dataset, has_groups, hdf_type = h5file_transform(filepath)
 
     nc_dataset = dc.remove_duplicate_dims(nc_dataset)
 
-    return nc_dataset, has_groups, file_extension
+    return nc_dataset, has_groups, hdf_type
 
 
 def override_decode_cf_datetime() -> None:
@@ -1161,7 +1123,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
     """
-    nc_dataset, has_groups, file_extension = open_as_nc_dataset(file_to_subset)
+    file_extension = os.path.splitext(file_to_subset)[1]
+    nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
 
     override_decode_cf_datetime()
 
@@ -1178,6 +1141,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
         lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
+
+    if '.HDF5' == file_extension:
+        # GPM files will have a timeMidScan time variable present
+        if '__FS__navigation__timeMidScan' in list(nc_dataset.variables.keys()):
+            gc.change_var_dims(nc_dataset, variables)
+            hdf_type = 'GPM'
 
     args = {
         'decode_coords': False,
@@ -1203,9 +1172,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
+
         start_date = None
-        if file_extension == 'he5' and (min_time or max_time):
-            dataset, start_date = convert_to_datetime(dataset, time_var_names)
+        if hdf_type and (min_time or max_time):
+            dataset, start_date = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
+
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
@@ -1281,7 +1252,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     dataset_attr.setncatts(dataset.attrs)
 
         if has_groups:
-            recombine_grouped_datasets(datasets, output_file, start_date)
+            recombine_grouped_datasets(datasets, output_file, start_date, time_var_names)
             # Check if the spatial bounds are all 'None'. This means the
             # subset result is empty.
             if any(bound is None for bound in spatial_bounds):
