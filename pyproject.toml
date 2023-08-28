@@ -12,11 +12,7 @@
 
 [tool.poetry]
 name = "l2ss-py"
-<<<<<<< HEAD
-version = "2.7.0a0"
-=======
 version = "2.6.0rc1"
->>>>>>> release/2.6.0
 description = "L2 Subsetter Service"
 authors = ["podaac-tva <podaac-tva@jpl.nasa.gov>"]
 license = "Apache-2.0"
