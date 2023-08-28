@@ -142,7 +142,7 @@ jobs:
           git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
           git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
-        uses: podaac/cmr-umm-updater@0.3.0
+        uses: podaac/cmr-umm-updater@0.5.0
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
@@ -153,6 +153,8 @@ jobs:
           version: ${{ env.software_version }}
           timeout: 60
           disable_removal: 'true'
+          umm_type: 'umm-s'
+          use_associations: 'false'
         env:
           LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
           LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
