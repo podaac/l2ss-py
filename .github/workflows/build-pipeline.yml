@@ -147,7 +147,7 @@ jobs:
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
         with:
-          umm-s-json: 'cmr/l2ss_cmr_umm_s.json'
+          umm-json: 'cmr/l2ss_cmr_umm_s.json'
           provider: 'POCLOUD'
           env: ${{ env.venue }}
           version: ${{ env.software_version }}
