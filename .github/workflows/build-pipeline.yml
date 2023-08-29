@@ -102,6 +102,10 @@ jobs:
             -Dsonar.projectVersion=${{ env.software_version }}
             -Dsonar.python.version=3.8,3.9,3.10
         continue-on-error: true
+      - name: Wait to retry sonarcloud scan
+        if: steps.sonarcloud.outcome == 'failure'
+        run: |
+          sleep 20
       - name: SonarCloud Scan Retry
         id: sonarcloud-retry
         if: steps.sonarcloud.outcome == 'failure'
@@ -180,6 +184,10 @@ jobs:
           LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
           LAUNCHPAD_TOKEN_OPS: ${{secrets.LAUNCHPAD_TOKEN_OPS}}
         continue-on-error: true
+      - name: Wait to retry publishing umm-s
+        if: steps.publish-umm-s.outcome == 'failure'
+        run: |
+          sleep 20
       - name: Publish UMM-S with new version retry
         id: publish-umm-s-retry
         uses: podaac/cmr-umm-updater@0.5.0
