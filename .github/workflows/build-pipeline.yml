@@ -142,6 +142,7 @@ jobs:
           git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
           git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
+        id: publish-umm-s
         uses: podaac/cmr-umm-updater@0.5.0
         if: |
           github.ref == 'refs/heads/main'    ||
@@ -154,7 +155,26 @@ jobs:
           timeout: 60
           disable_removal: 'true'
           umm_type: 'umm-s'
-          use_associations: 'false'
+          use_associations: 'false'        
+        env:
+          LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
+          LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
+          LAUNCHPAD_TOKEN_OPS: ${{secrets.LAUNCHPAD_TOKEN_OPS}}
+        continue-on-error: true
+      - name: Publish UMM-S with new version retry
+        id: publish-umm-s-retry
+        uses: podaac/cmr-umm-updater@0.5.0
+        if: |
+          steps.publish-umm-s.outcome == 'failure'
+        with:
+          umm-json: 'cmr/l2ss_cmr_umm_s.json'
+          provider: 'POCLOUD'
+          env: ${{ env.venue }}
+          version: ${{ env.software_version }}
+          timeout: 60
+          disable_removal: 'true'
+          umm_type: 'umm-s'
+          use_associations: 'false'        
         env:
           LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
           LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
