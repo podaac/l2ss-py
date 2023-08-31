@@ -1085,7 +1085,7 @@ def open_dataset_test(file, args):
     try:
         test_xr_open = xr.open_dataset(file, **args)
         test_xr_open.close()
-    except ValueError:
+    except Exception:  # pylint: disable=broad-except
         traceback_str = traceback.format_exc()
 
         # Check for the specific OverflowError message

@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Fixed
 - [issue/119](https://github.com/podaac/l2ss-py/issues/119): GPM variable dimensions are renamed from "phony_dim" to the dimension names in the variable attribute "DimensionNames"
+- [issue/189](https://github.com/podaac/l2ss-py/issues/189): Fix temporal subsetting for SWOT collections, use mask_and_scale args for opening granule file if we have an overflow in time fill value, use original dataset encoding when writing file.
+
 ### Security
 
 
