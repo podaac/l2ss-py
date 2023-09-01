@@ -1257,28 +1257,28 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     lon_var_names=lon_var_names
                 ))
             else:
-                encoding = {}
-                compression = {"zlib": True, "complevel": 5}
-                if (min_time or max_time) and not all(
-                        dim_size == 1 for dim_size in dataset.dims.values()):
-                    encoding = {
-                        var_name: {
-                            'units': nc_dataset.variables[var_name].__dict__['units'],
-                            'zlib': True,
-                            "complevel": 5,
-                            "_FillValue": original_dataset[var_name].encoding.get('_FillValue')
-                        } for var_name in time_var_names
-                        if 'units' in nc_dataset.variables[var_name].__dict__
-                    }
                 for var in dataset.data_vars:
-                    if var not in encoding:
-                        encoding[var] = compression
-                        encoding[var]['_FillValue'] = original_dataset[var].encoding.get('_FillValue')
                     if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
                         dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
+                    # Preserve original encoding as much as possible
+                    valid_encodings = [
+                        "fletcher32",
+                        "contiguous",
+                        "shuffle",
+                        "compression"
+                    ]
+
+                    var_encoding = {
+                        "zlib": True, 
+                        "complevel": 5,
+                        "_FillValue": original_dataset[var].encoding.get('_FillValue')
+                    }
+
+                    original_encoding = {key: value for key, value in original_dataset[var].encoding.items() if key in valid_encodings}
                     data_var = dataset[var].copy()
-                    data_var.load().to_netcdf(output_file, 'a', encoding={var: encoding.get(var)})
+                    var_encoding.update(original_encoding)
+                    data_var.load().to_netcdf(output_file, 'a', encoding={var: var_encoding})
                     del data_var
 
                 with nc.Dataset(output_file, 'a') as dataset_attr:
