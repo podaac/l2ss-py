@@ -1270,7 +1270,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     ]
 
                     var_encoding = {
-                        "zlib": True, 
+                        "zlib": True,
                         "complevel": 5,
                         "_FillValue": original_dataset[var].encoding.get('_FillValue')
                     }
