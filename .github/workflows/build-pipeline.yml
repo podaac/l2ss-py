@@ -105,7 +105,7 @@ jobs:
       - name: Wait to retry sonarcloud scan
         if: steps.sonarcloud.outcome == 'failure'
         run: |
-          sleep 20
+          sleep 40
       - name: SonarCloud Scan Retry
         id: sonarcloud-retry
         if: steps.sonarcloud.outcome == 'failure'
@@ -187,7 +187,7 @@ jobs:
       - name: Wait to retry publishing umm-s
         if: steps.publish-umm-s.outcome == 'failure'
         run: |
-          sleep 20
+          sleep 120
       - name: Publish UMM-S with new version retry
         id: publish-umm-s-retry
         uses: podaac/cmr-umm-updater@0.5.0
