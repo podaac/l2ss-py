@@ -1261,23 +1261,13 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
                         dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
-                    # Preserve original encoding as much as possible
-                    valid_encodings = [
-                        "fletcher32",
-                        "contiguous",
-                        "shuffle",
-                        "compression"
-                    ]
-
                     var_encoding = {
                         "zlib": True,
                         "complevel": 5,
                         "_FillValue": original_dataset[var].encoding.get('_FillValue')
                     }
 
-                    original_encoding = {key: value for key, value in original_dataset[var].encoding.items() if key in valid_encodings}
                     data_var = dataset[var].copy()
-                    var_encoding.update(original_encoding)
                     data_var.load().to_netcdf(output_file, 'a', encoding={var: var_encoding})
                     del data_var
 
