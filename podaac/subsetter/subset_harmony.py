@@ -136,7 +136,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 harmony_bbox = message.subset.bbox
 
             if message.subset and message.subset.shape:
-                subset_params['shapefile_path'] = download(
+                subset_params['shapefile'] = download(
                     message.subset.shape.href,
                     temp_dir,
                     logger=self.logger,
