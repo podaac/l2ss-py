@@ -43,7 +43,6 @@ def transform_grouped_dataset(nc_dataset: nc.Dataset, file_to_subset: str) -> nc
     # Close the existing read-only dataset and reopen in append mode
     nc_dataset.close()
     nc_dataset = nc.Dataset(file_to_subset, 'r+')
-
     dimensions = {}
 
     def walk(group_node, path):

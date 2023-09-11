@@ -822,6 +822,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         Spatial bounds of Dataset after subset operation
     TODO - fix this docstring type and the type hint to match code (currently returning a list[xr.Dataset])
     """
+    print (variables)
     lon_bounds, lat_bounds = convert_bbox(bbox, dataset, lat_var_names[0], lon_var_names[0])
     # condition should be 'or' instead of 'and' when bbox lon_min > lon_max
     oper = operator.and_
@@ -845,6 +846,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     datasets = []
     total_list = []  # don't include repeated variables
+
+    #print (list(dataset.data_vars.keys()), 'datavars')
+    #print (list(dataset.coords.keys()), 'coords')
+    #print (list(dataset.dims.keys()), 'dimensions')
+
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names, diff_count
     ):
@@ -853,6 +859,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
             if diffs == -1:  # if the lat name is in the root group: take only the root group vars
                 group_vars = list(dataset.data_vars.keys())
+                # include the coordiante variables if user asks for
+                group_vars.extend([
+                        var for var in list(dataset.coords.keys())
+                        if var in variables and var not in group_vars
+                    ])
             else:
                 group_vars = [
                     var for var in dataset.data_vars.keys()
@@ -861,9 +872,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                 # include variables that aren't in a latitude group
                 if variables:
                     group_vars.extend([
-                        var for var in dataset.data_vars.keys()
+                        var for var in dataset.variables.keys()
                         if var in variables and var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
                     ])
+
                 else:
                     group_vars.extend([
                         var for var in dataset.data_vars.keys()
@@ -1029,7 +1041,6 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
     try:
         nc_dataset = nc.Dataset(filepath, mode='r')
         has_groups = bool(nc_dataset.groups)
-
         # If dataset has groups, transform to work with xarray
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
@@ -1172,6 +1183,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
+        #print (time_var_names)
 
         start_date = None
         if hdf_type and (min_time or max_time):
@@ -1191,8 +1203,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 and var_name not in lon_var_names
                 and var_name not in time_var_names
             ]
-
+            #print (vars_to_drop)
             dataset = dataset.drop_vars(vars_to_drop)
+            #print (list(dataset.variables.keys()))
         if shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
