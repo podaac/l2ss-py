@@ -1199,7 +1199,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 and var_name not in time_var_names
             ]
             dataset = dataset.drop_vars(vars_to_drop)
-            
+
         if shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
