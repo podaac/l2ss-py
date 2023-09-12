@@ -862,12 +862,19 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                 if variables:
                     group_vars.extend([
                         var for var in dataset.variables.keys()
-                        if var in variables and var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
+                        if (var in variables and
+                            var not in group_vars and
+                            var not in total_list and
+                            not var.startswith(tuple(unique_groups))
+                            )
                     ])
                 else:
                     group_vars.extend([
                         var for var in dataset.data_vars.keys()
-                        if var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
+                        if (var not in group_vars and
+                            var not in total_list and
+                            not var.startswith(tuple(unique_groups))
+                            )
                         ])
 
                 # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
