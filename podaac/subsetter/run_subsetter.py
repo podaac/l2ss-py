@@ -35,7 +35,7 @@ def parse_args(args: list) -> tuple:
     )
     parser.add_argument(
         '--bbox',
-        type=int,
+        type=float,
         default=[-180, -90, 180, 90],
         nargs=4,
         action='store',

@@ -24,7 +24,8 @@ import json
 import operator
 import os
 from itertools import zip_longest
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
+import traceback
 import dateutil
 from dateutil import parser
 
@@ -744,7 +745,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     return temporal_cond
 
 
-def get_base_group_names(lats):  # pylint: disable=too-many-branches
+def get_base_group_names(lats: List[str]) -> Tuple[List[str], List[Union[int, str]]]:  # pylint: disable=too-many-branches
     """Latitude groups may be at different depths. This function gets the level
     number that makes each latitude group unique from the other latitude names"""
     unique_groups = []
@@ -756,7 +757,7 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
     # put the groups in the same levels in the same list
     group_list_transpose = np.array(group_list).T.tolist()
 
-    diff_count = ['' for i in range(len(group_list))]
+    diff_count = ['' for _ in range(len(group_list))]
     group_count = 0
     # loop through each group level
     for my_list in group_list_transpose:
@@ -788,7 +789,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
                      time_var_names: list,
-                     variables=None,
+                     variables: Optional[List[str]] = None,
                      bbox: np.ndarray = None,
                      cut: bool = True,
                      min_time: str = None,
@@ -806,6 +807,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         Name of the longitude variables in the given dataset
     time_var_names : list
         Name of the time variables in the given dataset
+    variables : list[str]
+        List of variables to include in the result
     bbox : np.array
         Spatial bounding box to subset Dataset with.
     cut : bool
@@ -836,13 +839,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     else:
         unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
 
-    # get unique group names for latitude coordinates
-    diff_count = [-1]
-    if len(lat_var_names) > 1:
-        unique_groups, diff_count = get_base_group_names(lat_var_names)
-    else:
-        unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
-
     datasets = []
     total_list = []  # don't include repeated variables
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
@@ -853,6 +849,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
             if diffs == -1:  # if the lat name is in the root group: take only the root group vars
                 group_vars = list(dataset.data_vars.keys())
+                # include the coordinate variables if user asks for
+                group_vars.extend([
+                        var for var in list(dataset.coords.keys())
+                        if var in variables and var not in group_vars
+                    ])
             else:
                 group_vars = [
                     var for var in dataset.data_vars.keys()
@@ -861,13 +862,20 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                 # include variables that aren't in a latitude group
                 if variables:
                     group_vars.extend([
-                        var for var in dataset.data_vars.keys()
-                        if var in variables and var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
+                        var for var in dataset.variables.keys()
+                        if (var in variables and
+                            var not in group_vars and
+                            var not in total_list and
+                            not var.startswith(tuple(unique_groups))
+                            )
                     ])
                 else:
                     group_vars.extend([
                         var for var in dataset.data_vars.keys()
-                        if var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
+                        if (var not in group_vars and
+                            var not in total_list and
+                            not var.startswith(tuple(unique_groups))
+                            )
                         ])
 
                 # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
@@ -1065,6 +1073,33 @@ def override_decode_cf_datetime() -> None:
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
+def open_dataset_test(file, args):
+    """
+    Open a NetCDF dataset using xarray, handling specific exceptions.
+
+    This function attempts to open a NetCDF dataset using the provided arguments.
+    If an OverflowError with a specific message is encountered, it modifies the
+    'mask_and_scale' argument to True and retries opening the dataset.
+
+    Args:
+        file (str): Path to the NetCDF file.
+        args (dict): Dictionary of arguments to pass to xr.open_dataset.
+
+    Returns:
+        None: The function modifies the 'args' dictionary in place.
+
+    """
+    try:
+        test_xr_open = xr.open_dataset(file, **args)
+        test_xr_open.close()
+    except Exception:  # pylint: disable=broad-except
+        traceback_str = traceback.format_exc()
+
+        # Check for the specific OverflowError message
+        if "Python int too large to convert to C long" in traceback_str and "Failed to decode variable 'time': unable to decode time units" in traceback_str:
+            args["mask_and_scale"] = True
+
+
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            variables: Union[List[str], str, None] = (),
            # pylint: disable=too-many-branches, disable=too-many-statements
@@ -1162,10 +1197,15 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
+        open_dataset_test(file_to_subset, args)
+
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
+
+        original_dataset = dataset
+
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
@@ -1224,28 +1264,18 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     lon_var_names=lon_var_names
                 ))
             else:
-                encoding = {}
-                compression = {"zlib": True, "complevel": 5, "_FillValue": None}
-
-                if (min_time or max_time) and not all(
-                        dim_size == 1 for dim_size in dataset.dims.values()):
-                    encoding = {
-                        var_name: {
-                            'units': nc_dataset.variables[var_name].__dict__['units'],
-                            'zlib': True,
-                            "complevel": 5,
-                            "_FillValue": None
-                        } for var_name in time_var_names
-                        if 'units' in nc_dataset.variables[var_name].__dict__
-                    }
                 for var in dataset.data_vars:
-                    if var not in encoding:
-                        encoding[var] = compression
                     if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
                         dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
+                    var_encoding = {
+                        "zlib": True,
+                        "complevel": 5,
+                        "_FillValue": original_dataset[var].encoding.get('_FillValue')
+                    }
+
                     data_var = dataset[var].copy()
-                    data_var.load().to_netcdf(output_file, 'a', encoding={var: encoding.get(var)})
+                    data_var.load().to_netcdf(output_file, 'a', encoding={var: var_encoding})
                     del data_var
 
                 with nc.Dataset(output_file, 'a') as dataset_attr:

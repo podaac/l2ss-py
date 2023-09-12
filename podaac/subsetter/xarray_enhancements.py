@@ -54,7 +54,7 @@ def get_indexers_from_1d(cond: xr.Dataset) -> dict:
 
 def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     """
-    Get indexers from a dataset with more than 1 dimensions.
+    Get indexers from a dataset with more than one dimension.
 
     Parameters
     ----------

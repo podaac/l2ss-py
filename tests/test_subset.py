@@ -158,6 +158,24 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
                              decode_times=False,
                              decode_coords=False)
 
+
+    nc_in_ds = nc.Dataset(join(data_dir, test_file))
+    nc_out_ds = nc.Dataset(join(subset_output_dir, output_file))
+
+    time_var_name = None
+    try:
+        lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
+        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name])
+    except ValueError:
+        # unable to determine lon lat vars
+        pass
+
+    if time_var_name:
+        assert nc_in_ds[time_var_name].units == nc_out_ds[time_var_name].units
+
+    nc_in_ds.close()
+    nc_out_ds.close()
+
     for in_var, out_var in zip(in_ds.data_vars.items(), out_ds.data_vars.items()):
         # compare names
         assert in_var[0] == out_var[0]
@@ -2123,7 +2141,7 @@ def test_tropomi_utc_time(data_dir, subset_output_dir, request):
     """Verify that the time UTC values are conserved in S5P files"""
     trop_dir = join(data_dir, 'tropomi')
     trop_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
-    variable = ['/PRODUCT/time_utc']
+    variable = ['/PRODUCT/time_utc', '/PRODUCT/corner']
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, trop_file)
     shutil.copyfile(
@@ -2142,6 +2160,8 @@ def test_tropomi_utc_time(data_dir, subset_output_dir, request):
 
     assert in_nc_dataset.groups['PRODUCT'].variables['time_utc'][:].squeeze()[0] ==\
                     out_nc_dataset.groups['PRODUCT'].variables['time_utc'][:].squeeze()[0]
+
+    assert out_nc_dataset.groups['PRODUCT'].variables['corner']
 
 def test_bad_time_unit(subset_output_dir):
     """TODO: give this function a description

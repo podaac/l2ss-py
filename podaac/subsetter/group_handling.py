@@ -242,11 +242,18 @@ def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
     walk_h5py(data_new, data_new.name)
 
     # Get the instrument name from the file attributes
-    instrument = data_new['__HDFEOS__ADDITIONAL__FILE_ATTRIBUTES'].attrs['InstrumentName'].decode("utf-8")
+
+    additional_file_attributes = data_new.get('__HDFEOS__ADDITIONAL__FILE_ATTRIBUTES')
+    instrument = ""
+
+    if additional_file_attributes:
+        instrument = additional_file_attributes.attrs['InstrumentName'].decode("utf-8")
     if 'OMI' in instrument:
         hdf_type = 'OMI'
     elif 'MLS' in instrument:
         hdf_type = 'MLS'
+    else:
+        hdf_type = None
 
     for del_group in del_group_list:
         del data_new[del_group]
