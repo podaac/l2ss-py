@@ -25,6 +25,7 @@ import operator
 import os
 from itertools import zip_longest
 from typing import List, Tuple, Union
+import traceback
 import dateutil
 from dateutil import parser
 
@@ -1065,6 +1066,33 @@ def override_decode_cf_datetime() -> None:
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
+def open_dataset_test(file, args):
+    """
+    Open a NetCDF dataset using xarray, handling specific exceptions.
+
+    This function attempts to open a NetCDF dataset using the provided arguments.
+    If an OverflowError with a specific message is encountered, it modifies the
+    'mask_and_scale' argument to True and retries opening the dataset.
+
+    Args:
+        file (str): Path to the NetCDF file.
+        args (dict): Dictionary of arguments to pass to xr.open_dataset.
+
+    Returns:
+        None: The function modifies the 'args' dictionary in place.
+
+    """
+    try:
+        test_xr_open = xr.open_dataset(file, **args)
+        test_xr_open.close()
+    except Exception:  # pylint: disable=broad-except
+        traceback_str = traceback.format_exc()
+
+        # Check for the specific OverflowError message
+        if "Python int too large to convert to C long" in traceback_str and "Failed to decode variable 'time': unable to decode time units" in traceback_str:
+            args["mask_and_scale"] = True
+
+
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            variables: Union[List[str], str, None] = (),
            # pylint: disable=too-many-branches, disable=too-many-statements
@@ -1162,10 +1190,15 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
+        open_dataset_test(file_to_subset, args)
+
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
+
+        original_dataset = dataset
+
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
             lat_var_names=lat_var_names,
@@ -1224,28 +1257,18 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     lon_var_names=lon_var_names
                 ))
             else:
-                encoding = {}
-                compression = {"zlib": True, "complevel": 5, "_FillValue": None}
-
-                if (min_time or max_time) and not all(
-                        dim_size == 1 for dim_size in dataset.dims.values()):
-                    encoding = {
-                        var_name: {
-                            'units': nc_dataset.variables[var_name].__dict__['units'],
-                            'zlib': True,
-                            "complevel": 5,
-                            "_FillValue": None
-                        } for var_name in time_var_names
-                        if 'units' in nc_dataset.variables[var_name].__dict__
-                    }
                 for var in dataset.data_vars:
-                    if var not in encoding:
-                        encoding[var] = compression
                     if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
                         dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
 
+                    var_encoding = {
+                        "zlib": True,
+                        "complevel": 5,
+                        "_FillValue": original_dataset[var].encoding.get('_FillValue')
+                    }
+
                     data_var = dataset[var].copy()
-                    data_var.load().to_netcdf(output_file, 'a', encoding={var: encoding.get(var)})
+                    data_var.load().to_netcdf(output_file, 'a', encoding={var: var_encoding})
                     del data_var
 
                 with nc.Dataset(output_file, 'a') as dataset_attr:
