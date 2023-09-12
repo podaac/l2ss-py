@@ -24,7 +24,7 @@ import json
 import operator
 import os
 from itertools import zip_longest
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import traceback
 import dateutil
 from dateutil import parser
