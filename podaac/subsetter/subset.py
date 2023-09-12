@@ -24,7 +24,7 @@ import json
 import operator
 import os
 from itertools import zip_longest
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import traceback
 import dateutil
 from dateutil import parser
@@ -745,7 +745,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     return temporal_cond
 
 
-def get_base_group_names(lats):  # pylint: disable=too-many-branches
+def get_base_group_names(lats: List[str]) -> Tuple[List[str], List[Union[int, str]]]:  # pylint: disable=too-many-branches
     """Latitude groups may be at different depths. This function gets the level
     number that makes each latitude group unique from the other latitude names"""
     unique_groups = []
@@ -757,7 +757,7 @@ def get_base_group_names(lats):  # pylint: disable=too-many-branches
     # put the groups in the same levels in the same list
     group_list_transpose = np.array(group_list).T.tolist()
 
-    diff_count = ['' for i in range(len(group_list))]
+    diff_count = ['' for _ in range(len(group_list))]
     group_count = 0
     # loop through each group level
     for my_list in group_list_transpose:
@@ -789,7 +789,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
                      time_var_names: list,
-                     variables=None,
+                     variables: Optional[List[str]] = None,
                      bbox: np.ndarray = None,
                      cut: bool = True,
                      min_time: str = None,
@@ -807,6 +807,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         Name of the longitude variables in the given dataset
     time_var_names : list
         Name of the time variables in the given dataset
+    variables : list[str]
+        List of variables to include in the result
     bbox : np.array
         Spatial bounding box to subset Dataset with.
     cut : bool
@@ -837,13 +839,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     else:
         unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
 
-    # get unique group names for latitude coordinates
-    diff_count = [-1]
-    if len(lat_var_names) > 1:
-        unique_groups, diff_count = get_base_group_names(lat_var_names)
-    else:
-        unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
-
     datasets = []
     total_list = []  # don't include repeated variables
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
@@ -854,6 +849,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
             if diffs == -1:  # if the lat name is in the root group: take only the root group vars
                 group_vars = list(dataset.data_vars.keys())
+                # include the coordinate variables if user asks for
+                group_vars.extend([
+                        var for var in list(dataset.coords.keys())
+                        if var in variables and var not in group_vars
+                    ])
             else:
                 group_vars = [
                     var for var in dataset.data_vars.keys()
@@ -862,13 +862,20 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                 # include variables that aren't in a latitude group
                 if variables:
                     group_vars.extend([
-                        var for var in dataset.data_vars.keys()
-                        if var in variables and var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
+                        var for var in dataset.variables.keys()
+                        if (var in variables and
+                            var not in group_vars and
+                            var not in total_list and
+                            not var.startswith(tuple(unique_groups))
+                            )
                     ])
                 else:
                     group_vars.extend([
                         var for var in dataset.data_vars.keys()
-                        if var not in group_vars and var not in total_list and not var.startswith(tuple(unique_groups))
+                        if (var not in group_vars and
+                            var not in total_list and
+                            not var.startswith(tuple(unique_groups))
+                            )
                         ])
 
                 # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
