@@ -24,7 +24,7 @@ import json
 import operator
 import os
 from itertools import zip_longest
-from typing import List, Tuple, Union
+from typing import List, Optional, Tuple, Union
 import dateutil
 from dateutil import parser
 
@@ -744,7 +744,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     return temporal_cond
 
 
-def get_base_group_names(lats):  # pylint: disable=too-many-branches
+def get_base_group_names(lats: list[str]) -> Tuple[list[str], list[Union[int, str]]]:  # pylint: disable=too-many-branches
     """Latitude groups may be at different depths. This function gets the level
     number that makes each latitude group unique from the other latitude names"""
     unique_groups = []
@@ -788,7 +788,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
                      time_var_names: list,
-                     variables=None,
+                     variables: Optional[list[str]] = None,
                      bbox: np.ndarray = None,
                      cut: bool = True,
                      min_time: str = None,
@@ -806,6 +806,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         Name of the longitude variables in the given dataset
     time_var_names : list
         Name of the time variables in the given dataset
+    variables : list[str]
+        List of variables to include in the result
     bbox : np.array
         Spatial bounding box to subset Dataset with.
     cut : bool
