@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - [issue/182](https://github.com/podaac/l2ss-py/issues/182): Update code so doesn't remove '/' on attribute values.
 - [issue/178](https://github.com/podaac/l2ss-py/issues/178): Add function to make sure dimension in subset is same as original file
+- [issue/172](https://github.com/podaac/l2ss-py/issues/178): Fix shapefile subsetting by passing correct variable to subset function.
 ### Deprecated 
 ### Removed
 ### Fixed
