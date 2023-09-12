@@ -756,7 +756,7 @@ def get_base_group_names(lats: list[str]) -> Tuple[list[str], list[Union[int, st
     # put the groups in the same levels in the same list
     group_list_transpose = np.array(group_list).T.tolist()
 
-    diff_count = ['' for i in range(len(group_list))]
+    diff_count = ['' for _ in range(len(group_list))]
     group_count = 0
     # loop through each group level
     for my_list in group_list_transpose:
