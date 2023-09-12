@@ -836,13 +836,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     else:
         unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
 
-    # get unique group names for latitude coordinates
-    diff_count = [-1]
-    if len(lat_var_names) > 1:
-        unique_groups, diff_count = get_base_group_names(lat_var_names)
-    else:
-        unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
-
     datasets = []
     total_list = []  # don't include repeated variables
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
