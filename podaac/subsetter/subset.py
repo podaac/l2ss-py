@@ -25,7 +25,6 @@ import operator
 import os
 from itertools import zip_longest
 from typing import List, Tuple, Union
-import traceback
 import dateutil
 from dateutil import parser
 
@@ -1066,33 +1065,6 @@ def override_decode_cf_datetime() -> None:
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
-def open_dataset_test(file, args):
-    """
-    Open a NetCDF dataset using xarray, handling specific exceptions.
-
-    This function attempts to open a NetCDF dataset using the provided arguments.
-    If an OverflowError with a specific message is encountered, it modifies the
-    'mask_and_scale' argument to True and retries opening the dataset.
-
-    Args:
-        file (str): Path to the NetCDF file.
-        args (dict): Dictionary of arguments to pass to xr.open_dataset.
-
-    Returns:
-        None: The function modifies the 'args' dictionary in place.
-
-    """
-    try:
-        test_xr_open = xr.open_dataset(file, **args)
-        test_xr_open.close()
-    except Exception:  # pylint: disable=broad-except
-        traceback_str = traceback.format_exc()
-
-        # Check for the specific OverflowError message
-        if "Python int too large to convert to C long" in traceback_str and "Failed to decode variable 'time': unable to decode time units" in traceback_str:
-            args["mask_and_scale"] = True
-
-
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            variables: Union[List[str], str, None] = (),
            # pylint: disable=too-many-branches, disable=too-many-statements
@@ -1190,7 +1162,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
-        open_dataset_test(file_to_subset, args)
+        # check fill value and dtype, we know that this will cause an integer Overflow with xarray
+        if nc_dataset['time'].getncattr('_FillValue') == nc.default_fillvals.get('f8') and nc_dataset['time'].dtype == 'float64':
+            args['mask_and_scale'] = True
 
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
