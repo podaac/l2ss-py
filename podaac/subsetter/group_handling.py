@@ -93,7 +93,7 @@ def transform_grouped_dataset(nc_dataset: nc.Dataset, file_to_subset: str) -> nc
     return nc_dataset
 
 
-def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, start_date) -> None:  # pylint: disable=too-many-branches
+def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, start_date, time_vars) -> None:  # pylint: disable=too-many-branches
     """
     Given a list of xarray datasets, combine those datasets into a
     single netCDF4 Dataset and write to the disk. Each dataset has been
@@ -126,7 +126,7 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
             dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
 
         # Rename variables
-        _rename_variables(dataset, base_dataset, start_date)
+        _rename_variables(dataset, base_dataset, start_date, time_vars)
 
     # Remove group vars from base dataset
     for var_name in list(base_dataset.variables.keys()):
@@ -151,7 +151,7 @@ def _get_nested_group(dataset: nc.Dataset, group_path: str) -> nc.Group:
     return nested_group
 
 
-def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date) -> None:
+def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date, time_vars) -> None:
     for var_name in list(dataset.variables.keys()):
         new_var_name = var_name.split(GROUP_DELIM)[-1]
         var_group = _get_nested_group(base_dataset, var_name)
@@ -161,7 +161,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date)
                 dataset.variables[var_name].dtype, np.dtype(np.datetime64)
         ) or np.issubdtype(
             dataset.variables[var_name].dtype, np.dtype(np.timedelta64)
-        ):
+        ) and var_name in time_vars:  # check that time changes are done to a time variable
             if start_date:
                 dataset.variables[var_name].values = (dataset.variables[var_name].values - np.datetime64(start_date))/np.timedelta64(1, 's')
                 variable = dataset.variables[var_name]
@@ -241,6 +241,20 @@ def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
 
     walk_h5py(data_new, data_new.name)
 
+    # Get the instrument name from the file attributes
+
+    additional_file_attributes = data_new.get('__HDFEOS__ADDITIONAL__FILE_ATTRIBUTES')
+    instrument = ""
+
+    if additional_file_attributes:
+        instrument = additional_file_attributes.attrs['InstrumentName'].decode("utf-8")
+    if 'OMI' in instrument:
+        hdf_type = 'OMI'
+    elif 'MLS' in instrument:
+        hdf_type = 'MLS'
+    else:
+        hdf_type = None
+
     for del_group in del_group_list:
         del data_new[del_group]
 
@@ -251,4 +265,4 @@ def h5file_transform(finput: str) -> Tuple[nc.Dataset, bool]:
 
     nc_dataset = nc.Dataset(finputnc, mode='r')
 
-    return nc_dataset, has_groups
+    return nc_dataset, has_groups, hdf_type

@@ -86,6 +86,29 @@ jobs:
         run: |
           poetry run pytest --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
       - name: SonarCloud Scan
+        id: sonarcloud
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.organization=${{ github.repository_owner }}
+            -Dsonar.projectKey=${{ github.repository_owner }}_l2ss-py
+            -Dsonar.python.coverage.reportPaths=build/reports/coverage.xml
+            -Dsonar.sources=podaac/
+            -Dsonar.tests=tests/
+            -Dsonar.projectName=l2ss-py
+            -Dsonar.projectVersion=${{ env.software_version }}
+            -Dsonar.python.version=3.8,3.9,3.10
+        continue-on-error: true
+      - name: Wait to retry sonarcloud scan
+        if: steps.sonarcloud.outcome == 'failure'
+        run: |
+          sleep 40
+      - name: SonarCloud Scan Retry
+        id: sonarcloud-retry
+        if: steps.sonarcloud.outcome == 'failure'
         uses: sonarsource/sonarcloud-github-action@master
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -142,17 +165,43 @@ jobs:
           git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
           git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
-        uses: podaac/cmr-umm-updater@0.3.0
+        id: publish-umm-s
+        uses: podaac/cmr-umm-updater@0.5.0
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
         with:
-          umm-s-json: 'cmr/l2ss_cmr_umm_s.json'
+          umm-json: 'cmr/l2ss_cmr_umm_s.json'
           provider: 'POCLOUD'
           env: ${{ env.venue }}
           version: ${{ env.software_version }}
           timeout: 60
           disable_removal: 'true'
+          umm_type: 'umm-s'
+          use_associations: 'false'        
+        env:
+          LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
+          LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
+          LAUNCHPAD_TOKEN_OPS: ${{secrets.LAUNCHPAD_TOKEN_OPS}}
+        continue-on-error: true
+      - name: Wait to retry publishing umm-s
+        if: steps.publish-umm-s.outcome == 'failure'
+        run: |
+          sleep 120
+      - name: Publish UMM-S with new version retry
+        id: publish-umm-s-retry
+        uses: podaac/cmr-umm-updater@0.5.0
+        if: |
+          steps.publish-umm-s.outcome == 'failure'
+        with:
+          umm-json: 'cmr/l2ss_cmr_umm_s.json'
+          provider: 'POCLOUD'
+          env: ${{ env.venue }}
+          version: ${{ env.software_version }}
+          timeout: 60
+          disable_removal: 'true'
+          umm_type: 'umm-s'
+          use_associations: 'false'        
         env:
           LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
           LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}

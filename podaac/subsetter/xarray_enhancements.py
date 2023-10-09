@@ -24,6 +24,7 @@ from typing import Union
 
 import numpy as np
 import xarray as xr
+from podaac.subsetter import dimension_cleanup as dc
 
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
@@ -53,7 +54,7 @@ def get_indexers_from_1d(cond: xr.Dataset) -> dict:
 
 def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     """
-    Get indexers from a dataset with more than 1 dimensions.
+    Get indexers from a dataset with more than one dimension.
 
     Parameters
     ----------
@@ -208,7 +209,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
-
     subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
     # dataset with variables that need to be subsetted
@@ -276,4 +276,5 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
                                                             str(original_type), dask='allowed',
                                                             keep_attrs=True)
 
+    dc.sync_dims_inplace(dataset, new_dataset)
     return new_dataset
