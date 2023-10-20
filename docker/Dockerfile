@@ -10,7 +10,7 @@
 # such information to foreign countries or providing access to foreign
 # persons.
 
-FROM python:3.9-slim
+FROM python:3.12.0b1-slim
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
