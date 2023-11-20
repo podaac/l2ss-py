@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import xarray.coding.times
-from shapely.geometry import Point
+from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.ops import transform
 
 from podaac.subsetter import gpm_cleanup as gc
@@ -959,9 +959,6 @@ def subset_with_shapefile(dataset: xr.Dataset,
     # assumption that the shapefile is -180,180.
     if is_360(dataset[lon_var_name], lon_scale, lon_offset):
         # Transform
-        def convert_180_to_360(lon, lat):
-            return tuple(map(lambda value: value + 360 if value < 0 else value, lon)), lat
-
         def translate_longitude(geometry):
             def translate_point(point):
                 # Translate the point's x-coordinate (longitude) by adding 360
@@ -969,11 +966,11 @@ def subset_with_shapefile(dataset: xr.Dataset,
 
             def translate_polygon(polygon):
                 def translate_coordinates(coords):
-                    first_coord = coords[0]
                     if len(coords[0]) == 2:
-                        return [((x+360)%360, y) for x,y in coords]
-                    elif len(coords[0]) == 3:
-                        return [((x+360)%360, y, z) for x,y,z in coords]
+                        return [((x + 360) % 360, y) for x, y in coords]
+                    if len(coords[0]) == 3:
+                        return [((x + 360) % 360, y, z) for x, y, z in coords]
+                    return coords
 
                 exterior = translate_coordinates(polygon.exterior.coords)
 
@@ -984,7 +981,7 @@ def subset_with_shapefile(dataset: xr.Dataset,
 
                 return Polygon(exterior, interiors)
 
-            if isinstance(geometry, (Point, Polygon)):
+            if isinstance(geometry, (Point, Polygon)):  # pylint: disable=no-else-return
                 return translate_point(geometry) if isinstance(geometry, Point) else translate_polygon(geometry)
             elif isinstance(geometry, MultiPolygon):
                 # Translate each polygon in the MultiPolygon
