@@ -962,9 +962,39 @@ def subset_with_shapefile(dataset: xr.Dataset,
         def convert_180_to_360(lon, lat):
             return tuple(map(lambda value: value + 360 if value < 0 else value, lon)), lat
 
-        geometries = [transform(convert_180_to_360, geometry) for geometry in
-                      shapefile_df.geometry]
-        shapefile_df.geometry = geometries
+        def translate_longitude(geometry):
+            def translate_point(point):
+                # Translate the point's x-coordinate (longitude) by adding 360
+                return Point((point.x + 360) % 360, point.y)
+
+            def translate_polygon(polygon):
+                def translate_coordinates(coords):
+                    first_coord = coords[0]
+                    if len(coords[0]) == 2:
+                        return [((x+360)%360, y) for x,y in coords]
+                    elif len(coords[0]) == 3:
+                        return [((x+360)%360, y, z) for x,y,z in coords]
+
+                exterior = translate_coordinates(polygon.exterior.coords)
+
+                interiors = [
+                    translate_coordinates(ring.coords)
+                    for ring in polygon.interiors
+                ]
+
+                return Polygon(exterior, interiors)
+
+            if isinstance(geometry, (Point, Polygon)):
+                return translate_point(geometry) if isinstance(geometry, Point) else translate_polygon(geometry)
+            elif isinstance(geometry, MultiPolygon):
+                # Translate each polygon in the MultiPolygon
+                translated_polygons = [translate_longitude(subgeometry) for subgeometry in geometry]
+                return MultiPolygon(translated_polygons)
+            else:
+                # Handle other geometry types as needed
+                return geometry
+
+        shapefile_df.geometry = shapefile_df['geometry'].apply(translate_longitude)
 
     # Mask and scale shapefile
     def scale(lon, lat):
