@@ -10,8 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/209](https://github.com/podaac/l2ss-py/issues/209): Update code so dims are created if they don't already exists. 
+- Update way we modify shapefile from 180 to 360 lon lats.
 ### Security
-
 
 ## [2.6.0]
 ### Added
