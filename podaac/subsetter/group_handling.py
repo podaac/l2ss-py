@@ -110,7 +110,7 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
     """
 
     base_dataset = nc.Dataset(output_file, mode='w')
-
+    dim_total = []
     for dataset in datasets:
         group_lst = []
         for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
@@ -121,9 +121,13 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
             base_dataset.createGroup(group)
 
         for dim_name in list(dataset.dims.keys()):
-            new_dim_name = dim_name.split(GROUP_DELIM)[-1]
-            dim_group = _get_nested_group(base_dataset, dim_name)
-            dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
+            if dim_name not in dim_total:
+                new_dim_name = dim_name.split(GROUP_DELIM)[-1]
+                dim_group = _get_nested_group(base_dataset, dim_name)
+                dim_group.createDimension(new_dim_name, dataset.dims[dim_name])
+            else:
+                pass
+        dim_total.extend(list(dataset.dims.keys()))
 
         # Rename variables
         _rename_variables(dataset, base_dataset, start_date, time_vars)
@@ -180,7 +184,11 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date,
         comp_args = {"zlib": True, "complevel": 1}
 
         var_data = variable.data
-        if variable.dtype == object:
+        print (variable.dtype)
+        print (var_name)
+        #if variable.dtype == '|S27':
+        #    var_group.createVariable(new_var_name, variable.dtype, var_dims, fill_value=fill_value)
+        if variable.dtype in [object, '|S27']:
             comp_args = {"zlib": False, "complevel": 1}
             var_group.createVariable(new_var_name, 'S4', var_dims, fill_value=fill_value, **comp_args)
             var_data = np.array(variable.data)
@@ -196,7 +204,7 @@ def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date,
 
         # Copy data
         var_group.variables[new_var_name].set_auto_maskandscale(False)
-        if variable.dtype in ['|S1', '|S2']:
+        if variable.dtype in ['|S1', '|S2', '|S27']:
             var_group.variables[new_var_name][:] = variable.values
         else:
             var_group.variables[new_var_name][:] = var_data
