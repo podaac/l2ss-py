@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/205](https://github.com/podaac/l2ss-py/issues/205): Add coding capability for when groups have same dimension names but different values. Xarray rename dims is utilized
 ### Security
 
 
