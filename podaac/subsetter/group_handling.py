@@ -12,8 +12,6 @@ import netCDF4 as nc
 import numpy as np
 import xarray as xr
 
-from podaac.subsetter import dimension_cleanup as dc
-
 GROUP_DELIM = '__'
 
 
@@ -158,7 +156,6 @@ def _get_nested_group(dataset: nc.Dataset, group_path: str) -> nc.Group:
 
 
 def _rename_variables(dataset: xr.Dataset, base_dataset: nc.Dataset, start_date, time_vars) -> None:
-    count = 1
     for var_name in list(dataset.variables.keys()):
         new_var_name = var_name.split(GROUP_DELIM)[-1]
         var_group = _get_nested_group(base_dataset, var_name)

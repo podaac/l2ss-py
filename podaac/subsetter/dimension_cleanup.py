@@ -15,7 +15,6 @@ import collections
 
 import netCDF4 as nc
 import xarray as xr
-import numpy as np
 
 def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
     """
@@ -118,7 +117,6 @@ def recreate_pixcore_dimensions(datasets: list):
     for dataset in datasets:
         dim_list_shape = list(dataset.dims.values())
         current_dims = list(dataset.dims.keys())
-        new_dims = []
         rename_list = []
         for current_dim, dim_value in zip(current_dims, dim_list_shape):
             if current_dim not in dim_dict:
@@ -133,7 +131,7 @@ def recreate_pixcore_dimensions(datasets: list):
                     rename_list.append(dim_tup)
                 else:
                     pass
-        
+
         if len(rename_list) > 0:
             # xarray rename_dims funct with dict of old names (keys) to new names (values)
             rename_dict = dict(rename_list)
@@ -142,4 +140,3 @@ def recreate_pixcore_dimensions(datasets: list):
         count += 1
 
     return datasets
-
