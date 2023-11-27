@@ -915,8 +915,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         total_list.extend(group_vars)
         if diffs == -1:
             return datasets
-
-    return datasets
+    dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
+    return dim_cleaned_datasets
 
 
 def subset_with_shapefile(dataset: xr.Dataset,
