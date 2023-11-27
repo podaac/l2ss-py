@@ -16,6 +16,7 @@ import collections
 import netCDF4 as nc
 import xarray as xr
 
+
 def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
     """
     xarray cannot read netCDF4 datasets with duplicate dimensions.
@@ -106,6 +107,7 @@ def sync_dims_inplace(original_dataset: xr.Dataset, new_dataset: xr.Dataset) -> 
         for new_dim in new_variable_dims:
             if new_dim not in original_variable_dims:
                 new_dataset[variable_name] = new_dataset[variable_name].isel({new_dim: 0})
+
 
 def recreate_pixcore_dimensions(datasets: list):
     """
