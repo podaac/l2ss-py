@@ -1835,6 +1835,35 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             dataset, _ = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
+
+def test_omi_pixcor(data_dir, subset_output_dir, request):
+    """
+    OMI PIX COR collection has the same shape across groups but covers a different domain
+    group to group. Dimension names had to be changed in order for copying data back into
+    netCDF files. L2S developers not this collection was particularly tricky
+    """
+    omi_dir = join(data_dir, 'OMI')
+    omi_file = 'OMI-Aura_L2-OMPIXCOR_2020m0116t1207-o82471_v003-2020m0116t174929.he5'
+    omi_file_input = 'input' + omi_file
+    bbox = np.array(((-180, 180), (-30, 30)))
+    output_file = "{}_{}".format(request.node.name, omi_file)
+
+    shutil.copyfile(
+        os.path.join(omi_dir, omi_file),
+        os.path.join(subset_output_dir, omi_file)
+    )
+
+    _ = subset.subset(
+        file_to_subset=os.path.join(subset_output_dir, omi_file),
+        bbox=bbox,
+        output_file=os.path.join(subset_output_dir, output_file)
+    )
+
+    out_nc = nc.Dataset(join(subset_output_dir, output_file))
+
+    assert out_nc
+
+
 def test_MLS_levels(data_dir, subset_output_dir, request):
     """
     Test that the unique groups are determined before bounding box
