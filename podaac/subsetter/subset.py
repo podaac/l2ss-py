@@ -487,7 +487,7 @@ def get_spatial_bounds(dataset: xr.Dataset, lat_var_names: str, lon_var_names: s
     return np.array([[min_lon, max_lon], [min_lat, max_lat]])
 
 
-def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str:
+def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_time_vars: list) -> str:
     """
     Try to determine the name of the 'time' variable. This is done as
     follows:
@@ -512,7 +512,6 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
     ValueError
         If the time variable could not be determined
     """
-
     time_vars = find_matching_coords(dataset, ['time'])
     if time_vars:
         # There should only be one time var match (this is called once
@@ -523,10 +522,10 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
     time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
 
     for var_name in time_vars:
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
+        if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
+        if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
 
     # first check if any variables are named 'time'
@@ -534,7 +533,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if var_name not in total_time_vars and ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
     # then check if any variables have 'time' in the string if the above loop doesn't return anything
@@ -542,7 +541,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if var_name not in total_time_vars and 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
     raise ValueError('Unable to determine time variable')
@@ -942,7 +941,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             group_vars = list(dataset.keys())
 
         group_dataset = dataset[group_vars]
-
+        print (time_var_name)
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
 
@@ -1060,11 +1059,11 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     if not lat_var_names or not lon_var_names:
         lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
     if not time_var_names:
-        time_var_names = [
-            compute_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
+        time_var_names = []
+        for lat_var_name in lat_var_names:
+            time_var_names.append(compute_time_variable_name(dataset,
+                                                             dataset[lat_var_name],
+                                                             time_var_names)) #for lat_var_name in lat_var_names
         time_var_names.append(compute_utc_name(dataset))
         time_var_names = [x for x in time_var_names if x is not None]  # remove Nones and any duplicates
 

@@ -165,7 +165,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
     time_var_name = None
     try:
         lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
-        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name])
+        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name], [])
     except ValueError:
         # unable to determine lon lat vars
         pass
@@ -1263,7 +1263,7 @@ def test_get_time_variable_name(test_file, data_dir):
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
-    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
+    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name], [])
 
     assert time_var_name is not None
     assert 'time' in time_var_name
@@ -1506,7 +1506,7 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
+        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
         lat_dims = dataset[lat_var_name].squeeze().dims
         time_dims = dataset[time_var_name].squeeze().dims
         assert lat_dims == time_dims
@@ -1534,7 +1534,7 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
         lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
+        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
         oper = operator.and_
 
         cond = oper(
@@ -1725,11 +1725,11 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
-        time_var_names = [
-            subset.compute_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
+        time_var_names = []
+        for lat_var_name in lat_var_names:
+            time_var_names.append(subset.compute_time_variable_name(
+                    dataset, dataset[lat_var_name], time_var_names
+                ))
         epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
 
         assert epoch_time_var.split('__')[-1] == 'time'
@@ -2019,11 +2019,11 @@ def test_get_time_OMI(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
-        time_var_names = [
-            subset.compute_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
+        time_var_names = []
+        for lat_var_name in lat_var_names:
+            time_var_names.append(subset.compute_time_variable_name(
+                    dataset, dataset[lat_var_name], time_var_names
+                ))
         assert "Time" in time_var_names[0]
         assert "Latitude" in lat_var_names[0]
 
