@@ -1065,7 +1065,7 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
             time_var_names.append(compute_time_variable_name(dataset,
                                                              dataset[lat_var_name],
                                                              time_var_names))
-            
+
         time_var_names.append(compute_utc_name(dataset))
         time_var_names = [x for x in time_var_names if x is not None]  # remove Nones and any duplicates
 
