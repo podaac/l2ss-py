@@ -50,7 +50,7 @@ pytest-benchmark = "~4"
 moto = "4.2.10"
 jsonschema = "^4.20.0"
 m2r2 = "^0.3.2"
-sphinx-rtd-theme = "^1.3.0"
+sphinx-rtd-theme = "^2.0.0"
 
 [tool.pytest.ini_options]
 junit_family = "xunit2"
