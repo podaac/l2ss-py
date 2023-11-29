@@ -165,7 +165,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
     time_var_name = None
     try:
         lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
-        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name])
+        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name], [])
     except ValueError:
         # unable to determine lon lat vars
         pass
@@ -1263,7 +1263,7 @@ def test_get_time_variable_name(test_file, data_dir):
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
-    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name])
+    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name], [])
 
     assert time_var_name is not None
     assert 'time' in time_var_name
@@ -1506,7 +1506,7 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
+        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
         lat_dims = dataset[lat_var_name].squeeze().dims
         time_dims = dataset[time_var_name].squeeze().dims
         assert lat_dims == time_dims
@@ -1534,7 +1534,7 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
         lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name])
+        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
         oper = operator.and_
 
         cond = oper(
@@ -1725,11 +1725,11 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
-        time_var_names = [
-            subset.compute_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
+        time_var_names = []
+        for lat_var_name in lat_var_names:
+            time_var_names.append(subset.compute_time_variable_name(
+                    dataset, dataset[lat_var_name], time_var_names
+                ))
         epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
 
         assert epoch_time_var.split('__')[-1] == 'time'
@@ -1834,6 +1834,35 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             
             dataset, _ = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
+
+
+def test_omi_pixcor(data_dir, subset_output_dir, request):
+    """
+    OMI PIX COR collection has the same shape across groups but covers a different domain
+    group to group. Dimension names had to be changed in order for copying data back into
+    netCDF files. L2S developers not this collection was particularly tricky
+    """
+    omi_dir = join(data_dir, 'OMI')
+    omi_file = 'OMI-Aura_L2-OMPIXCOR_2020m0116t1207-o82471_v003-2020m0116t174929.he5'
+    omi_file_input = 'input' + omi_file
+    bbox = np.array(((-180, 180), (-30, 30)))
+    output_file = "{}_{}".format(request.node.name, omi_file)
+
+    shutil.copyfile(
+        os.path.join(omi_dir, omi_file),
+        os.path.join(subset_output_dir, omi_file)
+    )
+
+    _ = subset.subset(
+        file_to_subset=os.path.join(subset_output_dir, omi_file),
+        bbox=bbox,
+        output_file=os.path.join(subset_output_dir, output_file)
+    )
+
+    out_nc = nc.Dataset(join(subset_output_dir, output_file))
+
+    assert out_nc
+
 
 def test_MLS_levels(data_dir, subset_output_dir, request):
     """
@@ -1990,11 +2019,11 @@ def test_get_time_OMI(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
-        time_var_names = [
-            subset.compute_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
+        time_var_names = []
+        for lat_var_name in lat_var_names:
+            time_var_names.append(subset.compute_time_variable_name(
+                    dataset, dataset[lat_var_name], time_var_names
+                ))
         assert "Time" in time_var_names[0]
         assert "Latitude" in lat_var_names[0]
 
