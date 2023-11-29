@@ -494,6 +494,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
 
     - The variable name contains 'time'
     - The variable dimensions match the dimensions of the given lat var
+    - The variable that hasn't already been found
 
     Parameters
     ----------
