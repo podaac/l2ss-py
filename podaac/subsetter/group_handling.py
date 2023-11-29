@@ -110,7 +110,6 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
     """
 
     base_dataset = nc.Dataset(output_file, mode='w')
-    dim_total = []
     for dataset in datasets:
         group_lst = []
         for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
