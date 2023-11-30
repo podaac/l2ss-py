@@ -107,3 +107,38 @@ def sync_dims_inplace(original_dataset: xr.Dataset, new_dataset: xr.Dataset) -> 
         for new_dim in new_variable_dims:
             if new_dim not in original_variable_dims:
                 new_dataset[variable_name] = new_dataset[variable_name].isel({new_dim: 0})
+
+
+def recreate_pixcore_dimensions(datasets: list):
+    """
+    if dimensions have different values after subsetting,
+    then they better have different names
+    """
+    dim_dict = {}
+    count = 0
+    for dataset in datasets:
+        dim_list_shape = list(dataset.dims.values())
+        current_dims = list(dataset.dims.keys())
+        rename_list = []
+        for current_dim, dim_value in zip(current_dims, dim_list_shape):
+            if current_dim not in dim_dict:
+                dim_dict[current_dim] = dim_value
+            else:
+                # find dim name with conflicting values
+                if dim_dict[current_dim] != dim_value:
+                    # create a new name for the dim
+                    new_dim = current_dim+'_'+str(count)
+                    dim_tup = (current_dim, new_dim)
+                    # add the old and new name tuple to the list
+                    rename_list.append(dim_tup)
+                else:
+                    pass
+
+        if len(rename_list) > 0:
+            # xarray rename_dims funct with dict of old names (keys) to new names (values)
+            rename_dict = dict(rename_list)
+            datasets[count] = dataset.rename_dims(rename_dict)
+
+        count += 1
+
+    return datasets

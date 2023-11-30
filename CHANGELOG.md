@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - [issue/209](https://github.com/podaac/l2ss-py/issues/209): Update code so dims are created if they don't already exists. 
 - Update way we modify shapefile from 180 to 360 lon lats.
+- [issue/205](https://github.com/podaac/l2ss-py/issues/205): Add coding capability for when groups have same dimension names but different values. Xarray rename dims is utilized
+- [issue/220](https://github.com/podaac/l2ss-py/issues/220): Check if the time variables being found haven't already been found. Add time_vars as an extra arguement in compute_time_variable_name
 ### Security
 
 ## [2.6.0]
