@@ -41,6 +41,7 @@ import importlib_metadata
 import netCDF4 as nc
 import h5py
 import numpy as np
+import warnings
 import pandas as pd
 import pytest
 import xarray as xr
@@ -225,7 +226,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
     lats = out_ds[lat_var_name].values
     lons = out_ds[lon_var_name].values
 
-    np.warnings.filterwarnings('ignore')
+    warnings.filterwarnings('ignore')
 
     # Step 1: Get mask of values which aren't in the bounds.
 

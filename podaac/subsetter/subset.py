@@ -599,7 +599,7 @@ def translate_longitude(geometry):
         return translate_point(geometry) if isinstance(geometry, Point) else translate_polygon(geometry)
     elif isinstance(geometry, MultiPolygon):
         # Translate each polygon in the MultiPolygon
-        translated_polygons = [translate_longitude(subgeometry) for subgeometry in geometry]
+        translated_polygons = [translate_longitude(subgeometry) for subgeometry in geometry.geoms]
         return MultiPolygon(translated_polygons)
     else:
         # Handle other geometry types as needed
