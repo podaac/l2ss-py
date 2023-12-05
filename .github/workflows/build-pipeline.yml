@@ -21,10 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v4
         with:
-          python-version: 3.9
+          python-version: '3.10'
       - name: Install Poetry
         uses: abatilo/actions-poetry@v2.0.0
         with:
@@ -124,7 +124,7 @@ jobs:
             -Dsonar.projectVersion=${{ env.software_version }}
             -Dsonar.python.version=3.8,3.9,3.10
       - name: Run Snyk as a blocking step
-        uses: snyk/actions/python-3.8@master
+        uses: snyk/actions/python-3.10@master
         env:
             SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -135,7 +135,7 @@ jobs:
               --severity-threshold=high
               --fail-on=all
       - name: Run Snyk on Python
-        uses: snyk/actions/python-3.8@master
+        uses: snyk/actions/python-3.10@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
@@ -218,7 +218,7 @@ jobs:
       - name: Build Python Artifact
         run: |
           poetry build
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v3
         with:
           name: python-artifact
           path: dist/*

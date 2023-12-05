@@ -38,7 +38,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import xarray.coding.times
-from shapely.geometry import Point
+from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.ops import transform
 
 from podaac.subsetter import gpm_cleanup as gc
@@ -487,13 +487,14 @@ def get_spatial_bounds(dataset: xr.Dataset, lat_var_names: str, lon_var_names: s
     return np.array([[min_lon, max_lon], [min_lat, max_lat]])
 
 
-def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str:
+def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_time_vars: list) -> str:
     """
     Try to determine the name of the 'time' variable. This is done as
     follows:
 
     - The variable name contains 'time'
     - The variable dimensions match the dimensions of the given lat var
+    - The variable that hasn't already been found
 
     Parameters
     ----------
@@ -512,7 +513,6 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
     ValueError
         If the time variable could not be determined
     """
-
     time_vars = find_matching_coords(dataset, ['time'])
     if time_vars:
         # There should only be one time var match (this is called once
@@ -523,10 +523,10 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
     time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
 
     for var_name in time_vars:
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
+        if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
     for var_name in list(dataset.data_vars.keys()):
-        if "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
+        if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
 
     # first check if any variables are named 'time'
@@ -534,7 +534,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if var_name not in total_time_vars and ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
     # then check if any variables have 'time' in the string if the above loop doesn't return anything
@@ -542,7 +542,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable) -> str
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
-        if 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+        if var_name not in total_time_vars and 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
     raise ValueError('Unable to determine time variable')
@@ -557,6 +557,53 @@ def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
             return var_name
 
     return None
+
+
+def translate_longitude(geometry):
+    """
+    Translates the longitude values of a Shapely geometry from the range [-180, 180) to [0, 360).
+
+    Parameters
+    ----------
+    geometry : shapely.geometry.base.BaseGeometry
+        The input shape geometry to be translated
+
+    Returns
+    -------
+    geometry
+        The translated shape geometry
+    """
+
+    def translate_point(point):
+        # Translate the point's x-coordinate (longitude) by adding 360
+        return Point((point.x + 360) % 360, point.y)
+
+    def translate_polygon(polygon):
+        def translate_coordinates(coords):
+            if len(coords[0]) == 2:
+                return [((x + 360) % 360, y) for x, y in coords]
+            if len(coords[0]) == 3:
+                return [((x + 360) % 360, y, z) for x, y, z in coords]
+            return coords
+
+        exterior = translate_coordinates(polygon.exterior.coords)
+
+        interiors = [
+            translate_coordinates(ring.coords)
+            for ring in polygon.interiors
+        ]
+
+        return Polygon(exterior, interiors)
+
+    if isinstance(geometry, (Point, Polygon)):  # pylint: disable=no-else-return
+        return translate_point(geometry) if isinstance(geometry, Point) else translate_polygon(geometry)
+    elif isinstance(geometry, MultiPolygon):
+        # Translate each polygon in the MultiPolygon
+        translated_polygons = [translate_longitude(subgeometry) for subgeometry in geometry.geoms]
+        return MultiPolygon(translated_polygons)
+    else:
+        # Handle other geometry types as needed
+        return geometry
 
 
 def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
@@ -915,8 +962,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         total_list.extend(group_vars)
         if diffs == -1:
             return datasets
-
-    return datasets
+    dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
+    return dim_cleaned_datasets
 
 
 def subset_with_shapefile(dataset: xr.Dataset,
@@ -959,12 +1006,7 @@ def subset_with_shapefile(dataset: xr.Dataset,
     # assumption that the shapefile is -180,180.
     if is_360(dataset[lon_var_name], lon_scale, lon_offset):
         # Transform
-        def convert_180_to_360(lon, lat):
-            return tuple(map(lambda value: value + 360 if value < 0 else value, lon)), lat
-
-        geometries = [transform(convert_180_to_360, geometry) for geometry in
-                      shapefile_df.geometry]
-        shapefile_df.geometry = geometries
+        shapefile_df.geometry = shapefile_df['geometry'].apply(translate_longitude)
 
     # Mask and scale shapefile
     def scale(lon, lat):
@@ -1018,11 +1060,12 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     if not lat_var_names or not lon_var_names:
         lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
     if not time_var_names:
-        time_var_names = [
-            compute_time_variable_name(
-                dataset, dataset[lat_var_name]
-            ) for lat_var_name in lat_var_names
-        ]
+        time_var_names = []
+        for lat_var_name in lat_var_names:
+            time_var_names.append(compute_time_variable_name(dataset,
+                                                             dataset[lat_var_name],
+                                                             time_var_names))
+
         time_var_names.append(compute_utc_name(dataset))
         time_var_names = [x for x in time_var_names if x is not None]  # remove Nones and any duplicates
 
