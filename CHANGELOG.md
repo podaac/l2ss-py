@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
-- [pull/216](https://github.com/podaac/l2ss-py/pull/216): Updated all python to `python3.10-slim` and update all depencency versions
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
+## [2.7.0]
+### Added
+### Changed
+- [pull/216](https://github.com/podaac/l2ss-py/pull/216): Updated all python to 3.10 and update all depencency versions
 ### Deprecated 
 ### Removed
 ### Fixed
