@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- Fix shapefile subsetting if there is more than a 2d in lon lat in shapefile that includes a third dimension
 ### Security
 
 

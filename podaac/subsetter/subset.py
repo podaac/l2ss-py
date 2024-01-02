@@ -1009,7 +1009,7 @@ def subset_with_shapefile(dataset: xr.Dataset,
         shapefile_df.geometry = shapefile_df['geometry'].apply(translate_longitude)
 
     # Mask and scale shapefile
-    def scale(lon, lat):
+    def scale(lon, lat, extra=None):
         lon = tuple(map(functools.partial(apply_scale_offset, lon_scale, lon_offset), lon))
         lat = tuple(map(functools.partial(apply_scale_offset, lat_scale, lat_offset), lat))
         return lon, lat
