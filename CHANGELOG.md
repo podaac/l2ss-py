@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Fix shapefile subsetting if there is more than a 2d in lon lat in shapefile that includes a third dimension
 - [pull/227](https://github.com/podaac/l2ss-py/pull/227): Fix null time values in TEMPO results when spatial+temporal subsetting
+- [pull/231](https://github.com/podaac/l2ss-py/pull/231): Improve fix for null time values by ensuring null valuesdon't persist on edges of longest row of True values
 ### Security
 - Updated dependency versions to latest possible
 
