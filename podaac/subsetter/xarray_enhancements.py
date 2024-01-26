@@ -234,16 +234,7 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
                 if dim_name in dataset[variable_name].dims
             }
 
-            # Get the longest slice along the missing dimension, to use that for new conditional
-            missing_dim_slice_index = (
-                cond
-                .sum(
-                    axis=tuple(i for i, v in enumerate(cond.dims) if v != missing_dim)
-                )
-                .values.argmax()
-            )
-
-            var_cond = cond.sel({missing_dim: missing_dim_slice_index}).isel(**var_indexers)
+            var_cond = cond.any(axis=cond.dims.index(missing_dim)).isel(**var_indexers)
             indexed_var = dataset[variable_name].isel(**var_indexers)
             new_dataset[variable_name] = indexed_var.where(var_cond)
             variable = new_dataset[variable_name]
