@@ -1009,7 +1009,7 @@ def subset_with_shapefile(dataset: xr.Dataset,
         shapefile_df.geometry = shapefile_df['geometry'].apply(translate_longitude)
 
     # Mask and scale shapefile
-    def scale(lon, lat):
+    def scale(lon, lat, extra=None):  # pylint: disable=unused-argument
         lon = tuple(map(functools.partial(apply_scale_offset, lon_scale, lon_offset), lon))
         lat = tuple(map(functools.partial(apply_scale_offset, lat_scale, lat_offset), lat))
         return lon, lat
@@ -1212,11 +1212,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
-        # check fill value and dtype, we know that this will cause an integer Overflow with xarray
-        if 'time' in nc_dataset.variables.keys():
+        # check fill value and dtype; we know that this will cause an integer Overflow with xarray
+        for time_variable in [v for v in nc_dataset.variables.keys() if 'time' in v]:
             try:
-                if nc_dataset['time'].getncattr('_FillValue') == nc.default_fillvals.get('f8') and \
-                 nc_dataset['time'].dtype == 'float64':
+                if nc_dataset[time_variable].getncattr('_FillValue') == nc.default_fillvals.get('f8') and \
+                 (nc_dataset[time_variable].dtype == 'float64') or (nc_dataset[time_variable].dtype == 'float32'):
                     args['mask_and_scale'] = True
             except AttributeError:
                 pass

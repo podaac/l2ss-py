@@ -1421,6 +1421,33 @@ def test_duplicate_dims_tempo_ozone(data_dir, subset_output_dir, request):
         assert variable.shape == \
                out_nc.groups['support_data'].variables[var_name].shape
 
+def test_no_null_time_values_in_time_and_space_subset_for_tempo(data_dir, subset_output_dir, request):
+    """
+    Check if TEMPO time variable has no null values when subsetting by time and space simultaneously.
+    """
+    TEMPO_dir = join(data_dir, 'TEMPO')
+    tempo_no2_file = 'TEMPO_NO2_L2_V01_20231206T131913Z_S002G04.nc'
+
+    bbox = np.array(((-87, -83), (28.5, 33.7)))
+    output_file = "{}_{}".format(request.node.name, tempo_no2_file)
+    shutil.copyfile(
+        os.path.join(TEMPO_dir, tempo_no2_file),
+        os.path.join(subset_output_dir, tempo_no2_file)
+    )
+    _ = subset.subset(
+        file_to_subset=join(subset_output_dir, tempo_no2_file),
+        min_time="2023-12-06T13:00:00",
+        max_time="2023-12-06T15:00:00",
+        bbox=bbox,
+        output_file=join(subset_output_dir, output_file)
+    )
+    # check if the box_test is
+
+    in_nc = nc.Dataset(join(TEMPO_dir, tempo_no2_file))
+    out_nc = nc.Dataset(join(subset_output_dir, output_file))
+
+    assert np.isnan(out_nc.groups['geolocation']['time'][:]).any() == False
+
 
 def test_omi_novars_subset(data_dir, subset_output_dir, request):
     """
