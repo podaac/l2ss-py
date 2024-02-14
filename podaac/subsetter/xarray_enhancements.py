@@ -24,9 +24,7 @@ from typing import Union
 
 import numpy as np
 import xarray as xr
-import sys
 from podaac.subsetter import dimension_cleanup as dc
-#np.set_printoptions(threshold=sys.maxsize)
 
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
