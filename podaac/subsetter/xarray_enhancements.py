@@ -24,7 +24,9 @@ from typing import Union
 
 import numpy as np
 import xarray as xr
+import sys
 from podaac.subsetter import dimension_cleanup as dc
+#np.set_printoptions(threshold=sys.maxsize)
 
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
@@ -69,9 +71,15 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         Indexer dictionary for the provided condition.
     """
 
-    rows = np.any(cond.values.squeeze(), axis=1)
+    if cond.values.squeeze().ndim == 2:
+        x_axis = 1
+        y_axis = 0
+    else:
+        x_axis = 2
+        y_axis = 1
+    rows = np.any(cond.values.squeeze(), axis=x_axis)
     if cut:
-        cols = np.any(cond.values.squeeze(), axis=0)
+        cols = np.any(cond.values.squeeze(), axis=y_axis)
     else:
         cols = np.ones(len(cond.values[0]))
 
@@ -89,10 +97,18 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     for i in output:
         cond_list.pop(i)
 
-    indexers = {
-        cond_list[0]: np.where(rows)[0],
-        cond_list[1]: np.where(cols)[0]
-    }
+    if rows.ndim == 1:
+        indexers = {
+            cond_list[0]: np.where(rows)[0],
+            cond_list[1]: np.where(cols)[0]
+        }
+    else:
+        rows = rows[0]
+        cols = cols[0]
+        indexers = {
+            cond_list[1]: np.where(rows)[0],
+            cond_list[2]: np.where(cols)[0]
+        }  
 
     return indexers
 
@@ -195,6 +211,7 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
         indexers = get_indexers_from_1d(cond)
     else:
         indexers = get_indexers_from_nd(cond, cut)
+
     # If any of the indexer dimensions are empty, return an empty dataset
     if not all(len(value) > 0 for value in indexers.values()):
         return copy_empty_dataset(dataset)
