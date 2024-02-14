@@ -892,6 +892,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     ):
         if GROUP_DELIM in lat_var_name:
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
+
             if diffs == -1:  # if the lat name is in the root group: take only the root group vars
                 group_vars = list(dataset.data_vars.keys())
                 # include the coordinate variables if user asks for
@@ -1254,7 +1255,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             ]
 
             dataset = dataset.drop_vars(vars_to_drop)
-
         if shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
@@ -1271,7 +1271,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 min_time=min_time,
                 max_time=max_time
             )
-
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 

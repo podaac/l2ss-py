@@ -209,7 +209,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
         indexers = get_indexers_from_1d(cond)
     else:
         indexers = get_indexers_from_nd(cond, cut)
-
     # If any of the indexer dimensions are empty, return an empty dataset
     if not all(len(value) > 0 for value in indexers.values()):
         return copy_empty_dataset(dataset)
