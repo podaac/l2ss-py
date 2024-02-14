@@ -106,7 +106,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         indexers = {
             cond_list[1]: np.where(rows)[0],
             cond_list[2]: np.where(cols)[0]
-        }  
+        }
 
     return indexers
 
