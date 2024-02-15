@@ -101,7 +101,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
             cond_list[1]: np.where(cols)[0]
         }
     else:
-        # if the lat/lon had 3 dimensions the conditional array was identical in the z direction eg.
+        # if the lat/lon had 3 dimensions the conditional array was identical in the z direction - taking the first
         rows = rows[0]
         cols = cols[0]
         indexers = {
