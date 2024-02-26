@@ -210,7 +210,7 @@ jobs:
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
       - name: Publish Docs
-        uses: JamesIves/github-pages-deploy-action@4.5.0
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages # The branch the action should deploy to.
           folder: docs/_build/ # The folder the action should deploy.
