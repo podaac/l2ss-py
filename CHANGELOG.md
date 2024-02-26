@@ -10,8 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+### Security
+
+
+## [2.9.0]
+### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
 - [issue/234](https://github.com/podaac/l2ss-py/issues/234): allow indexing on lat/lon variables with 3 dimensions. Rows axis is 2, collumns axis is 1
 ### Security
+- Updated dependency versions to latest possible
 
 
 ## [2.8.0]

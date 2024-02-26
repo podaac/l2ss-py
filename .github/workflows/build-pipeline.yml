@@ -32,7 +32,7 @@ jobs:
       - name: Get version
         id: get-version
         run: |
-          echo "::set-output name=current_version::$(poetry version | awk '{print $2}')"
+          echo "current_version=$(poetry version | awk '{print $2}')" >> $GITHUB_OUTPUT
           echo "pyproject_name=$(poetry version | awk '{print $1}')" >> $GITHUB_ENV
       - name: Bump pre-alpha version
         # If triggered by push to a feature branch
@@ -210,7 +210,7 @@ jobs:
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
       - name: Publish Docs
-        uses: JamesIves/github-pages-deploy-action@4.1.5
+        uses: JamesIves/github-pages-deploy-action@4.5.0
         with:
           branch: gh-pages # The branch the action should deploy to.
           folder: docs/_build/ # The folder the action should deploy.
@@ -243,7 +243,7 @@ jobs:
         if: |
           steps.pypi-test-publish.conclusion == 'success' ||
           steps.pypi-publish.conclusion == 'success'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
