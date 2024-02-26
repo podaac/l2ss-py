@@ -154,16 +154,6 @@ jobs:
           git config --global user.email 'l2ss-py@noreply.github.com'
           git commit -am "/version ${{ env.software_version }}"
           git push
-      - name: Push Tag
-        if: |
-          github.ref == 'refs/heads/develop' ||
-          github.ref == 'refs/heads/main'    ||
-          startsWith(github.ref, 'refs/heads/release')
-        run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-          git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
-          git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
         id: publish-umm-s
         uses: podaac/cmr-umm-updater@0.6.0
@@ -294,3 +284,13 @@ jobs:
           image: ${{ steps.meta.outputs.tags[0] }}
           args: >
             --severity-threshold=high
+      - name: Push Tag
+        if: |
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
+          git push origin "${{ env.software_version }}"

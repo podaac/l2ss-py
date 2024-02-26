@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.9.0]
 ### Added
 ### Changed
+- Moved 'Push Tag' step to end of Github Action
 ### Deprecated 
 ### Removed
 ### Fixed
