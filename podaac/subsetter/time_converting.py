@@ -40,12 +40,13 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list, instrument_type: s
     Then convert the time variable from seconds since the start date to a datetime format
     """
     start_date = get_start_date(instrument_type)
-
+    
     for var in time_vars:
         if np.issubdtype(dataset[var].dtype, np.dtype(float)) or np.issubdtype(dataset[var].dtype, np.float32):
             # adjust the time values from the start date
             if start_date:
-                dataset[var].values = [start_date + datetime.timedelta(seconds=i) for i in dataset[var].values]
+                date_time_array = np.full(dataset[var].shape, start_date)
+                dataset[var].values = date_time_array.astype("datetime64[ns]") + dataset[var].astype('timedelta64[s]').values
                 continue
             # if there isn't a start_date, get it from the UTC variable
             utc_var_name = subset.compute_utc_name(dataset)
