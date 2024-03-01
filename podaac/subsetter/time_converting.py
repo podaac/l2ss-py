@@ -40,7 +40,6 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list, instrument_type: s
     Then convert the time variable from seconds since the start date to a datetime format
     """
     start_date = get_start_date(instrument_type)
-    
     for var in time_vars:
         if np.issubdtype(dataset[var].dtype, np.dtype(float)) or np.issubdtype(dataset[var].dtype, np.float32):
             # adjust the time values from the start date
