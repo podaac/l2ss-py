@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.9.0]
 ### Added
+- [issue/240](https://github.com/podaac/l2ss-py/issues/240): for time vars that need datetime conversion, allow numpy arrays of n dimension to be able to convert. Create the same shape array in start time, then add the seconds since the start date to get our datetime format for temporal subsetting.
 ### Changed
 - Moved 'Push Tag' step to end of Github Action
 ### Deprecated 
