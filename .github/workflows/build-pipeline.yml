@@ -32,7 +32,7 @@ jobs:
       - name: Get version
         id: get-version
         run: |
-          echo "::set-output name=current_version::$(poetry version | awk '{print $2}')"
+          echo "current_version=$(poetry version | awk '{print $2}')" >> $GITHUB_OUTPUT
           echo "pyproject_name=$(poetry version | awk '{print $1}')" >> $GITHUB_ENV
       - name: Bump pre-alpha version
         # If triggered by push to a feature branch
@@ -154,16 +154,6 @@ jobs:
           git config --global user.email 'l2ss-py@noreply.github.com'
           git commit -am "/version ${{ env.software_version }}"
           git push
-      - name: Push Tag
-        if: |
-          github.ref == 'refs/heads/develop' ||
-          github.ref == 'refs/heads/main'    ||
-          startsWith(github.ref, 'refs/heads/release')
-        run: |
-          git config user.name "${GITHUB_ACTOR}"
-          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
-          git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
-          git push origin "${{ env.software_version }}"
       - name: Publish UMM-S with new version
         id: publish-umm-s
         uses: podaac/cmr-umm-updater@0.6.0
@@ -210,7 +200,7 @@ jobs:
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
       - name: Publish Docs
-        uses: JamesIves/github-pages-deploy-action@4.1.5
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages # The branch the action should deploy to.
           folder: docs/_build/ # The folder the action should deploy.
@@ -243,7 +233,7 @@ jobs:
         if: |
           steps.pypi-test-publish.conclusion == 'success' ||
           steps.pypi-publish.conclusion == 'success'
-        uses: docker/login-action@v1
+        uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -294,3 +284,13 @@ jobs:
           image: ${{ steps.meta.outputs.tags[0] }}
           args: >
             --severity-threshold=high
+      - name: Push Tag
+        if: |
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
+        run: |
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
+          git push origin "${{ env.software_version }}"

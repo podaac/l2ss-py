@@ -68,10 +68,16 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     dict
         Indexer dictionary for the provided condition.
     """
-
-    rows = np.any(cond.values.squeeze(), axis=1)
+    # check if the lat/lon coordinate numpy array has 2 or more dimensions
+    if cond.values.squeeze().ndim == 2:
+        x_axis = 1
+        y_axis = 0
+    else:
+        x_axis = 2
+        y_axis = 1
+    rows = np.any(cond.values.squeeze(), axis=x_axis)
     if cut:
-        cols = np.any(cond.values.squeeze(), axis=0)
+        cols = np.any(cond.values.squeeze(), axis=y_axis)
     else:
         cols = np.ones(len(cond.values[0]))
 
@@ -89,10 +95,19 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     for i in output:
         cond_list.pop(i)
 
-    indexers = {
-        cond_list[0]: np.where(rows)[0],
-        cond_list[1]: np.where(cols)[0]
-    }
+    if rows.ndim == 1:
+        indexers = {
+            cond_list[0]: np.where(rows)[0],
+            cond_list[1]: np.where(cols)[0]
+        }
+    else:
+        # if the lat/lon had 3 dimensions the conditional array was identical in the z direction - taking the first
+        rows = rows[0]
+        cols = cols[0]
+        indexers = {
+            cond_list[1]: np.where(rows)[0],
+            cond_list[2]: np.where(cols)[0]
+        }
 
     return indexers
 
