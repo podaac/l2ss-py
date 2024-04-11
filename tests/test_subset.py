@@ -47,6 +47,7 @@ import pytest
 import xarray as xr
 from jsonschema import validate
 from shapely.geometry import Point
+from unittest.mock import patch
 
 from podaac.subsetter import subset
 from podaac.subsetter.group_handling import GROUP_DELIM
@@ -712,22 +713,17 @@ def test_get_coord_variable_names(data_dir):
     assert lat_var_name[0] == new_lat_var_name
     assert lon_var_name[0] == new_lon_var_name
 
-
 def test_cannot_get_coord_variable_names(data_dir):
     """
     Test that, when given a dataset with coord vars which are not
     expected, a ValueError is raised.
     """
-    file = 'MODIS_T-JPL-L2P-v2014.0.nc'
-    ds = xr.open_dataset(join(data_dir, file),
-                         decode_times=False,
-                         decode_coords=False,
-                         mask_and_scale=False)
 
-    old_lat_var_name = 'lat'
-    new_lat_var_name = 'foo'
+    ds = xr.Dataset({
+        'temperature': ([], 1.0),  # Example variable
+        'pressure': ([], 1000.0),   # Another example variable
+    })
 
-    ds = ds.rename({old_lat_var_name: new_lat_var_name})
     # Remove 'coordinates' attribute
     for _, var in ds.items():
         if 'coordinates' in var.attrs:
