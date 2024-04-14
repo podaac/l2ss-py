@@ -10,7 +10,7 @@
 # such information to foreign countries or providing access to foreign
 # persons.
 
-FROM python:3.10-slim
+FROM python:3.13.0a6-slim
 
 ## Create a new user
 RUN adduser --quiet --disabled-password --shell /bin/sh --home /home/dockeruser --gecos "" --uid 300 dockeruser
