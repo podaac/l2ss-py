@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- [pull/248](https://github.com/podaac/l2ss-py/pull/248): add Harmony extra_args.cut parameter to subset_params in service adapter 
 ### Deprecated 
 ### Removed
 ### Fixed
