@@ -537,6 +537,10 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
     # first check if any variables are named 'time'
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
+        print (var_name_time)
+        print (dataset[var_name].squeeze().dims)
+        print (lat_var.squeeze().dims)
+
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
         if var_name not in total_time_vars and ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
@@ -1199,7 +1203,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if '.HDF5' == file_extension:
         # GPM files will have a timeMidScan time variable present
-        if '__FS__navigation__timeMidScan' in list(nc_dataset.variables.keys()):
+        if 'timeMidScan' in [var.split('__')[-1] for var in list(nc_dataset.variables.keys())]:
             gc.change_var_dims(nc_dataset, variables)
             hdf_type = 'GPM'
 
