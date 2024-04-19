@@ -150,7 +150,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
 
-            if "extraArgs" in message.__dict__:
+            if "extraArgs" in message.__dict__ and message.extraArgs:
                 subset_params['cut'] = message.extraArgs['cut']
 
             if source.variables:
