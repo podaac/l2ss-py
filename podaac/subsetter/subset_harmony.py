@@ -152,7 +152,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             try:
                 subset_params['cut'] = message.extraArgs['cut']
-            except (KeyError, AttributeError):
+            except (KeyError, AttributeError, TypeError):
                 pass
 
             if source.variables:
