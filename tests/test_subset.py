@@ -2309,3 +2309,22 @@ def test_gpm_dimension_map(data_dir, subset_output_dir, request):
         
         for dim in dims:
             assert 'phony' not in dim
+
+def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
+    """Test GPM files that have scantime variable to compute the time for seconds
+    since 1980-01-06"""
+    
+    gpm_dir = join(data_dir, 'GPM')
+    gpm_file = 'GPM_test_file_3.HDF5'
+    bbox = np.array(((-180, 180), (-90, 90)))
+    shutil.copyfile(
+        os.path.join(gpm_dir, gpm_file),
+        os.path.join(subset_output_dir, gpm_file)
+    )
+
+    nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
+
+
+    time_data, time_unit = gc.compute_new_time_data("__FS__ScanTime", nc_dataset)
+
+    assert int(time_data[0]) == 1325120552
