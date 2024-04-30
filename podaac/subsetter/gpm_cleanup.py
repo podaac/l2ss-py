@@ -4,9 +4,10 @@ to nscan, nbin, nfreq by using the DimensionNames variable attribute
 """
 
 import datetime
-from netCDF4 import date2num # pylint: disable=no-name-in-module
+from netCDF4 import date2num  # pylint: disable=no-name-in-module
 
 dim_dict = {}
+
 
 def compute_new_time_data(time_group, nc_dataset):
     """
@@ -16,15 +17,15 @@ def compute_new_time_data(time_group, nc_dataset):
     # set the time unit for GPM
     time_unit_out = "seconds since 1980-01-06 00:00:00"
     # conver to a float, seconds variable
-    new_time_list = [date2num(datetime.datetime(nc_dataset[time_group+'__Year'][:][i],
-                                                nc_dataset[time_group+'__Month'][:][i],
-                                                nc_dataset[time_group+'__DayOfMonth'][:][i],
-                                                hour=nc_dataset[time_group+'__Hour'][:][i],
-                                                minute=nc_dataset[time_group+'__Minute'][:][i],
-                                                second=nc_dataset[time_group+'__Second'][:][i],
-                                                microsecond=nc_dataset[time_group+'__Second'][:][i]*1000),
-                                                time_unit_out)
-                                                for i in range(len(nc_dataset[time_group+'__Year'][:]))]
+    new_time_list = [date2num(datetime.datetime(
+        nc_dataset[time_group+'__Year'][:][i],
+        nc_dataset[time_group+'__Month'][:][i],
+        nc_dataset[time_group+'__DayOfMonth'][:][i],
+        hour=nc_dataset[time_group+'__Hour'][:][i],
+        minute=nc_dataset[time_group+'__Minute'][:][i],
+        second=nc_dataset[time_group+'__Second'][:][i],
+        microsecond=nc_dataset[time_group+'__Second'][:][i]*1000),
+        time_unit_out) for i in range(len(nc_dataset[time_group+'__Year'][:]))]
 
     return new_time_list, time_unit_out
 
