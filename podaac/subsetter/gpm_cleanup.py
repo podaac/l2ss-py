@@ -29,6 +29,7 @@ def compute_new_time_data(time_group, nc_dataset):
 
     return new_time_list, time_unit_out
 
+
 def change_var_dims(nc_dataset, variables=None):
     """
     Go through each variable and get the dimension names from attribute "DimensionNames
