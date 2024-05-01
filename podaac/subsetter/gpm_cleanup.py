@@ -24,7 +24,7 @@ def compute_new_time_data(time_group, nc_dataset):
         hour=nc_dataset[time_group+'__Hour'][:][i],
         minute=nc_dataset[time_group+'__Minute'][:][i],
         second=nc_dataset[time_group+'__Second'][:][i],
-        microsecond=nc_dataset[time_group+'__Second'][:][i]*1000),
+        microsecond=nc_dataset[time_group+'__MilliSecond'][:][i]*1000),
         time_unit_out) for i in range(len(nc_dataset[time_group+'__Year'][:]))]
 
     return new_time_list, time_unit_out

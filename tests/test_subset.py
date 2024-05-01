@@ -2315,7 +2315,7 @@ def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     since 1980-01-06"""
     
     gpm_dir = join(data_dir, 'GPM')
-    gpm_file = 'GPM_test_file_3.HDF5'
+    gpm_file = 'GPM_test_file_2.HDF5'
     bbox = np.array(((-180, 180), (-90, 90)))
     shutil.copyfile(
         os.path.join(gpm_dir, gpm_file),
@@ -2324,7 +2324,9 @@ def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
 
     nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
 
+    del nc_dataset.variables["__FS__ScanTime__timeMidScan"]
+    del nc_dataset.variables["__HS__ScanTime__timeMidScan"]
 
-    time_data, time_unit = gc.compute_new_time_data("__FS__ScanTime", nc_dataset)
+    nc_dataset = gc.change_var_dims(nc_dataset, variables=None)
 
-    assert int(time_data[0]) == 1325120552
+    assert int(nc_dataset["__FS__ScanTime__timeMidScan"][:][0]) == 1306403820

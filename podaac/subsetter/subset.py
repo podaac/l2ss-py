@@ -1226,6 +1226,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             except AttributeError:
                 pass
 
+    if hdf_type == 'GPM':
+        args['decode_times'] = False
+
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
