@@ -30,7 +30,7 @@ def compute_new_time_data(time_group, nc_dataset):
     return new_time_list, time_unit_out
 
 
-def change_var_dims(nc_dataset, variables=None):
+def change_var_dims(nc_dataset, variables=None, time_name="_timeMidScan"):
     """
     Go through each variable and get the dimension names from attribute "DimensionNames
     If the name is unique, add it as a dimension to the netCDF4 dataset. Then change the
@@ -86,14 +86,14 @@ def change_var_dims(nc_dataset, variables=None):
                 # copy the data to the new variable with dimension names
                 new_mapped_var[var_name][:] = var[:]
 
-    if not any("timeMidScan" in var for var in var_list):
+    if not any(time_name in var for var in var_list):
         # if there isn't any timeMidScan variables, create one
         scan_time_groups = ["__".join(i.split('__')[:-1]) for i in var_list if 'ScanTime' in i]
         for time_group in list(set(scan_time_groups)):
             # get the seconds since Jan 6, 1980
             time_data, time_unit = compute_new_time_data(time_group, nc_dataset)
             # make a new variable for each ScanTime group
-            new_time_var_name = time_group+'__timeMidScan'
+            new_time_var_name = time_group+time_name
             # copy dimensions from the Year variable
             var_dims = nc_dataset.variables[time_group+'__Year'].dimensions
             comp_args = {"zlib": True, "complevel": 1}

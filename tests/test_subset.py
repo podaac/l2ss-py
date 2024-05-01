@@ -2287,28 +2287,7 @@ def test_get_unique_groups():
     
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
-
-def test_gpm_dimension_map(data_dir, subset_output_dir, request):
-    """Test GPM files for dimension mapping and returns the expected netCDF
-       dataset without the phony dimensions"""
     
-    gpm_dir = join(data_dir, 'GPM')
-    gpm_file = 'GPM_test_file.HDF5'
-    bbox = np.array(((-180, 180), (-90, 90)))
-    shutil.copyfile(
-        os.path.join(gpm_dir, gpm_file),
-        os.path.join(subset_output_dir, gpm_file)
-    )
-
-    nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
-
-    nc_dataset = gc.change_var_dims(nc_dataset)
-
-    for var_name, var in nc_dataset.variables.items():
-        dims = list(var.dimensions)
-        
-        for dim in dims:
-            assert 'phony' not in dim
 
 def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     """Test GPM files that have scantime variable to compute the time for seconds
@@ -2316,7 +2295,6 @@ def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     
     gpm_dir = join(data_dir, 'GPM')
     gpm_file = 'GPM_test_file_2.HDF5'
-    bbox = np.array(((-180, 180), (-90, 90)))
     shutil.copyfile(
         os.path.join(gpm_dir, gpm_file),
         os.path.join(subset_output_dir, gpm_file)
@@ -2324,9 +2302,12 @@ def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
 
     nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
 
-    del nc_dataset.variables["__FS__ScanTime__timeMidScan"]
-    del nc_dataset.variables["__HS__ScanTime__timeMidScan"]
 
-    nc_dataset = gc.change_var_dims(nc_dataset, variables=None)
+    nc_dataset_new = gc.change_var_dims(nc_dataset, variables=None, time_name='__test_time')
+    assert int(nc_dataset_new.variables["__FS__ScanTime__test_time"][:][0]) == 1306403820
 
-    assert int(nc_dataset["__FS__ScanTime__timeMidScan"][:][0]) == 1306403820
+    for var_name, var in nc_dataset.variables.items():
+        dims = list(var.dimensions)
+        
+        for dim in dims:
+            assert 'phony' not in dim
