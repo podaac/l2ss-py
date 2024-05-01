@@ -2287,7 +2287,7 @@ def test_get_unique_groups():
     
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
-    
+
 
 def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     """Test GPM files that have scantime variable to compute the time for seconds
@@ -2301,7 +2301,6 @@ def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     )
 
     nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
-
 
     nc_dataset_new = gc.change_var_dims(nc_dataset, variables=None, time_name='__test_time')
     assert int(nc_dataset_new.variables["__FS__ScanTime__test_time"][:][0]) == 1306403820
