@@ -3,10 +3,34 @@ Module designed for mapping the dimensions in GPM. Phony dimensions are changed
 to nscan, nbin, nfreq by using the DimensionNames variable attribute
 """
 
+import datetime
+from netCDF4 import date2num  # pylint: disable=no-name-in-module
+
 dim_dict = {}
 
 
-def change_var_dims(nc_dataset, variables=None):
+def compute_new_time_data(time_group, nc_dataset):
+    """
+    create a time variable, timeMidScan, that is present in other
+    GPM collections but not the ENV collections.
+    """
+    # set the time unit for GPM
+    time_unit_out = "seconds since 1980-01-06 00:00:00"
+    # conver to a float, seconds variable
+    new_time_list = [date2num(datetime.datetime(
+        nc_dataset[time_group+'__Year'][:][i],
+        nc_dataset[time_group+'__Month'][:][i],
+        nc_dataset[time_group+'__DayOfMonth'][:][i],
+        hour=nc_dataset[time_group+'__Hour'][:][i],
+        minute=nc_dataset[time_group+'__Minute'][:][i],
+        second=nc_dataset[time_group+'__Second'][:][i],
+        microsecond=nc_dataset[time_group+'__MilliSecond'][:][i]*1000),
+        time_unit_out) for i in range(len(nc_dataset[time_group+'__Year'][:]))]
+
+    return new_time_list, time_unit_out
+
+
+def change_var_dims(nc_dataset, variables=None, time_name="_timeMidScan"):
     """
     Go through each variable and get the dimension names from attribute "DimensionNames
     If the name is unique, add it as a dimension to the netCDF4 dataset. Then change the
@@ -61,5 +85,21 @@ def change_var_dims(nc_dataset, variables=None):
 
                 # copy the data to the new variable with dimension names
                 new_mapped_var[var_name][:] = var[:]
+
+    if not any(time_name in var for var in var_list):
+        # if there isn't any timeMidScan variables, create one
+        scan_time_groups = ["__".join(i.split('__')[:-1]) for i in var_list if 'ScanTime' in i]
+        for time_group in list(set(scan_time_groups)):
+            # get the seconds since Jan 6, 1980
+            time_data, time_unit = compute_new_time_data(time_group, nc_dataset)
+            # make a new variable for each ScanTime group
+            new_time_var_name = time_group+time_name
+            # copy dimensions from the Year variable
+            var_dims = nc_dataset.variables[time_group+'__Year'].dimensions
+            comp_args = {"zlib": True, "complevel": 1}
+            nc_dataset.createVariable(new_time_var_name, 'f8', var_dims, **comp_args)
+            nc_dataset.variables[new_time_var_name].setncattr('unit', time_unit)
+            # copy the data in
+            nc_dataset.variables[new_time_var_name][:] = time_data
 
     return nc_dataset
