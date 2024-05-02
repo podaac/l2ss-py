@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issue/260](https://github.com/podaac/l2ss-py/pull/261): Add gpm cleanup function to add a timeMidScan variable if the timeMidScan variable isn't present. Function takes the years, months, days etc ScanTime variables and creates a single time variable using datetime.datetime library.
 ### Changed
 - Update code to determin lat lon time variables
 - Update xarray version
