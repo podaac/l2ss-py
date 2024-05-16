@@ -370,6 +370,13 @@ def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[s
             lat_coord_names = dataset.cf.coordinates.get('latitude', [])
             lon_coord_names = dataset.cf.coordinates.get('longitude', [])
 
+        if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+            try:
+                lat_coord_names = [dataset.cf["latitude"].name]
+                lon_coord_names = [dataset.cf["longitude"].name]
+            except KeyError:
+                pass
+
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
         raise ValueError('Could not determine coordinate variables')
 
@@ -513,6 +520,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
     ValueError
         If the time variable could not be determined
     """
+
     time_vars = find_matching_coords(dataset, ['time'])
     if time_vars:
         # There should only be one time var match (this is called once
@@ -523,9 +531,6 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
     time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
 
     for var_name in time_vars:
-        if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
-            return var_name
-    for var_name in list(dataset.data_vars.keys()):
         if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
             return var_name
 
@@ -1193,8 +1198,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
 
     if '.HDF5' == file_extension:
-        # GPM files will have a timeMidScan time variable present
-        if '__FS__navigation__timeMidScan' in list(nc_dataset.variables.keys()):
+        # GPM files will have a ScanTime group
+        if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
             gc.change_var_dims(nc_dataset, variables)
             hdf_type = 'GPM'
 
@@ -1220,6 +1225,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     args['mask_and_scale'] = True
             except AttributeError:
                 pass
+
+    if hdf_type == 'GPM':
+        args['decode_times'] = False
 
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),

@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [2.10.0]
+### Added
+- [issue/260](https://github.com/podaac/l2ss-py/pull/261): Add gpm cleanup function to add a timeMidScan variable if the timeMidScan variable isn't present. Function takes the years, months, days etc ScanTime variables and creates a single time variable using datetime.datetime library.
+### Changed
+- Update code to determin lat lon time variables
+- Update xarray version
+- [pull/248](https://github.com/podaac/l2ss-py/pull/248): add Harmony extra_args.cut parameter to subset_params in service adapter 
+### Deprecated 
+### Removed
+### Fixed
+- [issue/258](https://github.com/podaac/l2ss-py/issues/258): fix so that ScanTime is what determines a GPM file 
+### Security
+
+
 ## [2.9.0]
 ### Added
 - [issue/240](https://github.com/podaac/l2ss-py/issues/240): for time vars that need datetime conversion, allow numpy arrays of n dimension to be able to convert. Create the same shape array in start time, then add the seconds since the start date to get our datetime format for temporal subsetting.
