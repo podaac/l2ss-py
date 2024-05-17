@@ -69,6 +69,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         Indexer dictionary for the provided condition.
     """
     # check if the lat/lon coordinate numpy array has 2 or more dimensions
+    transpose = False
     if cond.values.squeeze().ndim == 2:
         x_axis = 1
         y_axis = 0
@@ -81,7 +82,6 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         else:
             x_axis = 2
             y_axis = 1
-            transpose = False
 
     rows = np.any(cond.values.squeeze(), axis=x_axis)
     if cut:
@@ -115,7 +115,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
             cols = cols.transpose()[0]
         else:
             rows = rows[0]
-            cols = cols[0]           
+            cols = cols[0]
         indexers = {
             cond_list[y_axis]: np.where(rows)[0],
             cond_list[x_axis]: np.where(cols)[0]
