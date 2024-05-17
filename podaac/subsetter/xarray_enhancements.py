@@ -121,8 +121,6 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
             cond_list[x_axis]: np.where(cols)[0]
         }
 
-        #print (indexers)
-
     return indexers
 
 

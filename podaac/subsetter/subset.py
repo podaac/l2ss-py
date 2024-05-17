@@ -103,7 +103,7 @@ def convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) ->
         var_values = coord_var.values
         if fill_value:
             var_values = np.where(var_values != fill_value, var_values, np.nan)
-        #print (var_values)
+
         var_min = np.nanmin(var_values)
         var_max = np.nanmax(var_values)
 
@@ -161,7 +161,6 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
     Assumption that the provided bounding box is always between
     -180 --> 180 for longitude and -90, 90 for latitude.
     """
-
     return np.array([convert_bound(bbox[0], 360, dataset[lon_var_name]),
                      convert_bound(bbox[1], 180, dataset[lat_var_name])])
 
@@ -952,6 +951,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+        
         group_dataset = xre.where(
             group_dataset,
             oper(
