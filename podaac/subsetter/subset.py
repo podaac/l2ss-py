@@ -951,7 +951,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
-        
+
         group_dataset = xre.where(
             group_dataset,
             oper(
