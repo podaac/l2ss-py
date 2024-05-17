@@ -103,7 +103,6 @@ def convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) ->
         var_values = coord_var.values
         if fill_value:
             var_values = np.where(var_values != fill_value, var_values, np.nan)
-
         var_min = np.nanmin(var_values)
         var_max = np.nanmax(var_values)
 
