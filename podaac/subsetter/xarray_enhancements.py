@@ -73,8 +73,16 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         x_axis = 1
         y_axis = 0
     else:
-        x_axis = 2
-        y_axis = 1
+        if any('xtrack' in dim for dim in list(cond.dims)) and\
+           any('atrack' in dim for dim in list(cond.dims)):
+            x_axis = list(cond.dims).index('xtrack')
+            y_axis = list(cond.dims).index('atrack')
+            transpose = True
+        else:
+            x_axis = 2
+            y_axis = 1
+            transpose = False
+
     rows = np.any(cond.values.squeeze(), axis=x_axis)
     if cut:
         cols = np.any(cond.values.squeeze(), axis=y_axis)
@@ -102,12 +110,18 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         }
     else:
         # if the lat/lon had 3 dimensions the conditional array was identical in the z direction - taking the first
-        rows = rows[0]
-        cols = cols[0]
+        if transpose:
+            rows = rows.transpose()[0]
+            cols = cols.transpose()[0]
+        else:
+            rows = rows[0]
+            cols = cols[0]           
         indexers = {
-            cond_list[1]: np.where(rows)[0],
-            cond_list[2]: np.where(cols)[0]
+            cond_list[y_axis]: np.where(rows)[0],
+            cond_list[x_axis]: np.where(cols)[0]
         }
+
+        #print (indexers)
 
     return indexers
 
