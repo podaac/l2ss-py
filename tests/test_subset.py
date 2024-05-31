@@ -1311,8 +1311,10 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     sndr_files = ['SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc',
                   'SNDR.AQUA.AIRS.20140110T0305.m06.g031.L2_CLIMCAPS_RET.std.v02_39.G.210131015806.nc',
                   'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc']
-    bbox = np.array(((-180, 180), (-90, 90)))
-    for sndr_file in sndr_files:
+    # do a longitude subset on these files that doesn't alter the resulting shape
+    sndr_spatial = [(-180,-150), (-15,180), (-180,30)]
+    for sndr_file, box in zip(sndr_files, sndr_spatial):
+        bbox = np.array(((box[0], box[1]), (-90, 90)))
         output_file = "{}_{}".format(request.node.name, sndr_file)
         shutil.copyfile(
             os.path.join(SNDR_dir, sndr_file),
@@ -1326,6 +1328,14 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
             min_time='2014-01-10T00:50:20Z',
             max_time='2021-02-24T01:09:55Z'
         )
+
+        out_ds = xr.open_dataset(join(subset_output_dir, output_file),
+                                    decode_coords=False)
+        in_ds = xr.open_dataset(join(SNDR_dir, sndr_file),
+                                    decode_coords=False)
+
+        # do a longitude subset that cuts down on the file but the shape should remain the same
+        assert out_ds['lon'].shape == in_ds['lon'].shape
 
         if not isinstance(box_test, np.ndarray):
             raise ValueError('Subset for SNDR not returned properly')

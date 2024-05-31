@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issue/267](https://github.com/podaac/l2ss-py/pull/261): Add xtrack and atrack dimension options for get_nd_indexers when bounding box subsetting is performed on SNDR.
 ### Changed
 ### Deprecated 
 ### Removed
