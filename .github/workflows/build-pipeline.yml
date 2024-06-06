@@ -201,10 +201,7 @@ jobs:
           poetry run sphinx-build -b html ./docs docs/_build/
       - name: Publish Docs
         uses: JamesIves/github-pages-deploy-action@v4
-        if: |
-          github.ref == 'refs/heads/develop' ||
-          github.ref == 'refs/heads/main'    ||
-          startsWith(github.ref, 'refs/heads/release')
+        if: ${{ github.actor != 'dependabot[bot]' }}
         with:
           branch: gh-pages # The branch the action should deploy to.
           folder: docs/_build/ # The folder the action should deploy.
