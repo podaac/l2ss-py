@@ -84,7 +84,7 @@ jobs:
           poetry run flake8 podaac
       - name: Test and coverage
         run: |
-          poetry run pytest --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
+          poetry run pytest -n auto --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
       - name: SonarCloud Scan
         id: sonarcloud
         uses: sonarsource/sonarcloud-github-action@master
