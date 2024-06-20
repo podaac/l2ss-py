@@ -39,6 +39,7 @@ importlib-metadata = "^7.0.1"
 h5py = "^3.6.0"
 cf-xarray = "*"
 numpy = "^1.26.3"
+pytest-rerunfailures = "^14.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^8.0.2"

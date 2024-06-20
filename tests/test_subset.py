@@ -1527,6 +1527,7 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
                     os.path.join(subset_output_dir, tropomi_file_name))
 
     nc_dataset = nc.Dataset(os.path.join(subset_output_dir, tropomi_file_name))
+    total_time_vars = ['__PRODUCT__time']
 
     args = {
         'decode_coords': False,
@@ -1540,7 +1541,8 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
+        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], total_time_vars)
+        print(time_var_name)
         lat_dims = dataset[lat_var_name].squeeze().dims
         time_dims = dataset[time_var_name].squeeze().dims
         assert lat_dims == time_dims
