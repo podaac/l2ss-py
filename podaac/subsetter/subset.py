@@ -23,6 +23,7 @@ import functools
 import json
 import operator
 import os
+import re
 from itertools import zip_longest
 from typing import List, Optional, Tuple, Union
 import dateutil
@@ -40,7 +41,6 @@ import xarray as xr
 import xarray.coding.times
 from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.ops import transform
-import re
 
 from podaac.subsetter import gpm_cleanup as gc
 from podaac.subsetter import time_converting as tc
@@ -546,12 +546,12 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
     time_units_pattern = re.compile(r"(days|d|hours|hr|h|minutes|min|m|seconds|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?")
     # Check variables for common time variable indicators
     for var_name, var in dataset.variables.items():
-        if ((('standard_name' in var.attrs and var.attrs['standard_name'] == 'time') or \
-           ('axis' in var.attrs and var.attrs['axis'] == 'T') or \
-           ('units' in var.attrs and time_units_pattern.match(var.attrs['units'])))) and var_name not in var_name not in total_time_vars:
-            print(var_name)
+        # pylint: disable=too-many-boolean-expressions
+        if ((('standard_name' in var.attrs and var.attrs['standard_name'] == 'time') or
+           ('axis' in var.attrs and var.attrs['axis'] == 'T') or
+           ('units' in var.attrs and time_units_pattern.match(var.attrs['units'])))) and var_name not in total_time_vars:
             return var_name
-    
+
     # then check if any variables have 'time' in the string if the above loop doesn't return anything
     for var_name in list(dataset.data_vars.keys()):
         var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
