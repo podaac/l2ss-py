@@ -1254,10 +1254,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
 
-        print("#############################################")
-        print(time_var_names)
-        print("#############################################")
-
         start_date = None
         if hdf_type and (min_time or max_time):
             dataset, start_date = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
