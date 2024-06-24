@@ -42,7 +42,7 @@ def bearer_token() -> str:
     return next(iter(tokens))
 
 if __name__ == "__main__":
-    
+
     parser = argparse.ArgumentParser(description="Update the service image tag.")
     parser.add_argument("--tag", help="The new tag version to update.", required=True)
     args = parser.parse_args()
@@ -58,7 +58,6 @@ if __name__ == "__main__":
         "tag": args.tag
     }
 
-    """
     response = requests.put(url, headers=headers, json=data)
 
     print(response.status_code)
@@ -66,4 +65,3 @@ if __name__ == "__main__":
         print(response.json())
     except json.JSONDecodeError:
         print("Response content is not in JSON format")
-    """
