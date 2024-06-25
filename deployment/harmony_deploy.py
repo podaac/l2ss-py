@@ -47,7 +47,7 @@ if __name__ == "__main__":
     parser.add_argument("--tag", help="The new tag version to update.", required=True)
     args = parser.parse_args()
 
-    url = f"https://harmony.{'uat.' if ENV == 'uat' else ''}earthdata.nasa.gov/service-image-tag/#podaac-l2-subsetter"
+    url = f"https://harmony.{'uat.' if ENV == 'uat' else ''}earthdata.nasa.gov/service-image-tag/podaac-l2-subsetter"
     token = bearer_token()
 
     headers = {
