@@ -30,7 +30,7 @@ def compute_new_time_data(time_group, nc_dataset):
     return new_time_list, time_unit_out
 
 
-def change_var_dims(nc_dataset, variables=None, time_name="_timeMidScan"):
+def change_var_dims(nc_dataset, variables=None, time_name="__timeMidScan"):
     """
     Go through each variable and get the dimension names from attribute "DimensionNames
     If the name is unique, add it as a dimension to the netCDF4 dataset. Then change the

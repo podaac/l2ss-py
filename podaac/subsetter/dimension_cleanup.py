@@ -117,8 +117,8 @@ def recreate_pixcore_dimensions(datasets: list):
     dim_dict = {}
     count = 0
     for dataset in datasets:
-        dim_list_shape = list(dataset.dims.values())
-        current_dims = list(dataset.dims.keys())
+        dim_list_shape = list(dataset.sizes.values())
+        current_dims = list(dataset.sizes.keys())
         rename_list = []
         for current_dim, dim_value in zip(current_dims, dim_list_shape):
             if current_dim not in dim_dict:
