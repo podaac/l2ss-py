@@ -1172,7 +1172,8 @@ def test_temporal_subset_modis_a(data_dir, subset_output_dir, request):
         bbox=bbox,
         output_file=join(subset_output_dir, output_file),
         min_time=min_time,
-        max_time=max_time
+        max_time=max_time,
+        time_var_names=['sst_dtime']
     )
 
     in_ds = xr.open_dataset(join(data_dir, file),
@@ -1527,6 +1528,7 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
                     os.path.join(subset_output_dir, tropomi_file_name))
 
     nc_dataset = nc.Dataset(os.path.join(subset_output_dir, tropomi_file_name))
+    total_time_vars = ['__PRODUCT__time']
 
     args = {
         'decode_coords': False,
@@ -1540,7 +1542,8 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
+        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], total_time_vars)
+        print(time_var_name)
         lat_dims = dataset[lat_var_name].squeeze().dims
         time_dims = dataset[time_var_name].squeeze().dims
         assert lat_dims == time_dims
@@ -1759,12 +1762,12 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
-        time_var_names = []
+        time_var_names = ['__PRODUCT__time']
         for lat_var_name in lat_var_names:
             time_var_names.append(subset.compute_time_variable_name(
                     dataset, dataset[lat_var_name], time_var_names
                 ))
-        epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
+        epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[1])
 
         assert epoch_time_var.split('__')[-1] == 'time'
 

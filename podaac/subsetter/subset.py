@@ -23,6 +23,7 @@ import functools
 import json
 import operator
 import os
+import re
 from itertools import zip_longest
 from typing import List, Optional, Tuple, Union
 import dateutil
@@ -270,11 +271,11 @@ def calculate_chunks(dataset: xr.Dataset) -> dict:
     """
     if len(dataset.dims) <= 3:
         chunk = {dim: 4000 for dim in dataset.dims
-                 if dataset.dims[dim] > 4000
+                 if dataset.sizes[dim] > 4000
                  and len(dataset.dims) > 1}
     else:
         chunk = {dim: 500 for dim in dataset.dims
-                 if dataset.dims[dim] > 500}
+                 if dataset.sizes[dim] > 500}
 
     return chunk
 
@@ -528,7 +529,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
         return time_vars[0]
 
     # Filter variables with 'time' in the name to avoid extra work
-    time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
+    time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.sizes.keys()))
 
     for var_name in time_vars:
         if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
@@ -540,6 +541,15 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
         if var_name not in total_time_vars and ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+            return var_name
+
+    time_units_pattern = re.compile(r"(days|d|hours|hr|h|minutes|min|m|seconds|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?")
+    # Check variables for common time variable indicators
+    for var_name, var in dataset.variables.items():
+        # pylint: disable=too-many-boolean-expressions
+        if ((('standard_name' in var.attrs and var.attrs['standard_name'] == 'time') or
+           ('axis' in var.attrs and var.attrs['axis'] == 'T') or
+           ('units' in var.attrs and time_units_pattern.match(var.attrs['units'])))) and var_name not in total_time_vars:
             return var_name
 
     # then check if any variables have 'time' in the string if the above loop doesn't return anything
