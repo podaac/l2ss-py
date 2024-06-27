@@ -108,7 +108,7 @@ def recombine_grouped_datasets(datasets: List[xr.Dataset], output_file: str, sta
         Name of the output file to write the resulting NetCDF file to.
     TODO: add docstring and type hint for `start_date` parameter.
     """
-    # 
+
     base_dataset = nc.Dataset(output_file, mode='w')
     for dataset in datasets:
         group_lst = []
