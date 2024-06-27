@@ -2,7 +2,7 @@
 Module designed for mapping the dimensions in GPM, and changing calendar time type
 to seconds since 1980-1-6 T00:00:00Z
 Problem: each variable will have unique phony dims. When time for subset_with_bbox
-is called, each unique group will have to have common dimensions. 
+is called, each unique group will have to have common dimensions.
 Solution: Phony dimensions are changed to nscan, nbin, nfreq and will have the same name for each
 unique group that will be subsetted.
 nscan, nbin, and nfreq are named in the variable attributes.
