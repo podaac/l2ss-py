@@ -1,6 +1,11 @@
 """
-Module designed for mapping the dimensions in GPM. Phony dimensions are changed
-to nscan, nbin, nfreq by using the DimensionNames variable attribute
+Module designed for mapping the dimensions in GPM, and changing calendar time type
+to seconds since 1980-1-6 T00:00:00Z
+Problem: each variable will have unique phony dims. When time for subset_with_bbox
+is called, each unique group will have to have common dimensions. 
+Solution: Phony dimensions are changed to nscan, nbin, nfreq and will have the same name for each
+unique group that will be subsetted.
+nscan, nbin, and nfreq are named in the variable attributes.
 """
 
 import datetime
@@ -14,9 +19,10 @@ def compute_new_time_data(time_group, nc_dataset):
     create a time variable, timeMidScan, that is present in other
     GPM collections but not the ENV collections.
     """
-    # set the time unit for GPM
+    # set the time unit for GPM - this is the case for all GPM collections
     time_unit_out = "seconds since 1980-01-06 00:00:00"
-    # conver to a float, seconds variable
+    # convert to a float variable, seconds since the above date
+    # this list will be a new time variable
     new_time_list = [date2num(datetime.datetime(
         nc_dataset[time_group+'__Year'][:][i],
         nc_dataset[time_group+'__Month'][:][i],
@@ -37,7 +43,7 @@ def change_var_dims(nc_dataset, variables=None, time_name="__timeMidScan"):
     dimensions to have the name in the DimensionName attribute rather than phony_dim
     """
     var_list = list(nc_dataset.variables.keys())
-    # loop through variable list to avoid netcdf4 runtime error
+    # loop through the entire variable list to avoid netcdf4 runtime error
     for var_name in var_list:
         # GPM will always need to be cleaned up via netCDF
         # generalizing coordinate variables in netCDF file to speed variable subsetting up
@@ -57,14 +63,16 @@ def change_var_dims(nc_dataset, variables=None, time_name="__timeMidScan"):
                 dim_prefix = var_name.split('__')[1]
                 # new dimension name
                 new_dim = '__'+dim_prefix+'__'+dim
-                length = var.shape[count]
+                # get dim size of the newly created variable
+                dim_size = var.shape[count]
                 # check if the dimension name created has already been created in the dataset
                 if new_dim not in dim_dict:
                     # create the new dimension
-                    nc_dataset.createDimension(new_dim, length)
-                    dim_dict[new_dim] = length
+                    nc_dataset.createDimension(new_dim, dim_size)
+                    dim_dict[new_dim] = dim_size
             # utilized from Dimension Cleanup module
             attrs_contents = {}
+            # new variable that will point to the updated dimensions
             new_mapped_var = {}
             # if the variable has attributes, get the attributes to then be copied to the new variable
             if len(var.ncattrs()) > 0:
@@ -99,7 +107,7 @@ def change_var_dims(nc_dataset, variables=None, time_name="__timeMidScan"):
             comp_args = {"zlib": True, "complevel": 1}
             nc_dataset.createVariable(new_time_var_name, 'f8', var_dims, **comp_args)
             nc_dataset.variables[new_time_var_name].setncattr('unit', time_unit)
-            # copy the data in
+            # copy the new time list into the new time variable
             nc_dataset.variables[new_time_var_name][:] = time_data
 
     return nc_dataset

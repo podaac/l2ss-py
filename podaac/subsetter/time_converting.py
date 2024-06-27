@@ -22,7 +22,8 @@ from podaac.subsetter import subset
 
 def get_start_date(instrument_type):
     """
-    returns the start date based on the instrument type
+    returns the start date based on the instrument type. Start date will calculate
+    seconds since this start date.
     """
     if instrument_type in ['OMI', 'MLS']:
         start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
@@ -51,6 +52,7 @@ def convert_to_datetime(dataset: xr.Dataset, time_vars: list, instrument_type: s
                 dataset[var].values = date_time_array.astype("datetime64[ns]") + dataset[var].astype('timedelta64[s]').values
                 continue
             # if there isn't a start_date, get it from the UTC variable
+            # subtracts the seconds from the first UTC time to get the date that seconds are from
             utc_var_name = subset.compute_utc_name(dataset)
             if utc_var_name:
                 start_seconds = dataset[var].values[0]
