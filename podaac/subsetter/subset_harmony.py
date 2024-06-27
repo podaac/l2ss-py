@@ -199,8 +199,10 @@ class L2SubsetterService(BaseHarmonyAdapter):
             if result_bbox is not None:
                 if message.subset:
                     message.subset.process('bbox')
-                result.bbox = podaac_to_harmony_bbox(result_bbox)
-                result.geometry = bbox_to_geometry(result.bbox)
+                    bounding_box_array = np.array(podaac_to_harmony_bbox(result_bbox))
+                    if not np.all(np.isnan(bounding_box_array)):
+                        result.bbox = podaac_to_harmony_bbox(result_bbox)
+                        result.geometry = bbox_to_geometry(result.bbox)
 
             # Return the STAC record
             return result
