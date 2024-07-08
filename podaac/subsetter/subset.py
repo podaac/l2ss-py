@@ -791,7 +791,12 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
-        return compare(dataset[time_var_name], timestamp)
+        time_data = dataset[time_var_name]
+        if dataset[time_var_name].long_name == "reference time of sst file":
+            timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
+            time_data = dataset[time_var_name] + timedelta_seconds
+
+        return compare(time_data, timestamp)
 
     temporal_conds = []
     if min_time:
@@ -1094,7 +1099,6 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
     try:
         nc_dataset = nc.Dataset(filepath, mode='r')
         has_groups = bool(nc_dataset.groups)
-
         # If dataset has groups, transform to work with xarray
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
@@ -1212,7 +1216,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
             gc.change_var_dims(nc_dataset, variables)
             hdf_type = 'GPM'
-
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
@@ -1232,6 +1235,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             try:
                 if nc_dataset[time_variable].getncattr('_FillValue') == nc.default_fillvals.get('f8') and \
                  (nc_dataset[time_variable].dtype == 'float64') or (nc_dataset[time_variable].dtype == 'float32'):
+                    args['mask_and_scale'] = True
+            except AttributeError:
+                pass
+
+            try:
+                if nc_dataset[time_variable].long_name == "reference time of sst file":
                     args['mask_and_scale'] = True
             except AttributeError:
                 pass

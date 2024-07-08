@@ -350,13 +350,15 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
 
     # Ensure all variables are present but empty.
     for _, variable in empty_dataset.data_vars.items():
-        try:
-            assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
-        except Exception as ex:
-            # if there is no fill value and type is integer then don't raise exception
-            fill_value = variable.attrs.get('_FillValue', np.nan)
-            if not (np.isnan(fill_value) and np.issubdtype(variable.dtype, np.integer)):
-                raise(ex)
+        fill_value = variable.attrs.get('_FillValue', np.nan)
+        data = variable.data
+        
+        # Perform the main check
+        condition = np.all(data == fill_value) or np.all(np.isnan(data))
+        
+        # Handle the specific integer dtype case
+        if not condition and not (np.isnan(fill_value) and np.issubdtype(variable.dtype, np.integer)):
+            assert condition, f"Data does not match fill value for variable: {variable}"
 
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
 
