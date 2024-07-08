@@ -792,9 +792,12 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
         time_data = dataset[time_var_name]
-        if dataset[time_var_name].long_name == "reference time of sst file":
-            timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
-            time_data = dataset[time_var_name] + timedelta_seconds
+        try:
+            if dataset[time_var_name].long_name == "reference time of sst file":
+                timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
+                time_data = dataset[time_var_name] + timedelta_seconds
+        except AttributeError:
+            pass
 
         return compare(time_data, timestamp)
 
