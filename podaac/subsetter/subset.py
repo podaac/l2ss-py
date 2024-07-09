@@ -791,7 +791,12 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
-        return compare(dataset[time_var_name], timestamp)
+        time_data = dataset[time_var_name]
+        if getattr(time_data, 'long_name', None) == "reference time of sst file":
+            timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
+            time_data = time_data + timedelta_seconds
+
+        return compare(time_data, timestamp)
 
     temporal_conds = []
     if min_time:
@@ -1227,14 +1232,16 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
-        # check fill value and dtype; we know that this will cause an integer Overflow with xarray
-        for time_variable in [v for v in nc_dataset.variables.keys() if 'time' in v]:
-            try:
-                if nc_dataset[time_variable].getncattr('_FillValue') == nc.default_fillvals.get('f8') and \
-                 (nc_dataset[time_variable].dtype == 'float64') or (nc_dataset[time_variable].dtype == 'float32'):
-                    args['mask_and_scale'] = True
-            except AttributeError:
-                pass
+        float_dtypes = ['float64', 'float32']
+        fill_value_f8 = nc.default_fillvals.get('f8')
+
+        for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
+            time_var = nc_dataset[time_variable]
+
+            if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
+               (getattr(time_var, 'long_name', None) == "reference time of sst file"):
+                args['mask_and_scale'] = True
+                break
 
     if hdf_type == 'GPM':
         args['decode_times'] = False
