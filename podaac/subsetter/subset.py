@@ -1162,7 +1162,7 @@ def test_access_sst_dtime_values(datafile):
             # pylint: disable=pointless-statement
             dataset['sst_dtime'].values
             return True
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, KeyError):
         return False
 
 
@@ -1271,7 +1271,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
             if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
                (getattr(time_var, 'long_name', None) == "reference time of sst file"):
-                args['mask_and_scale'] = test_access_sst_dtime_values(file_to_subset)
+                args['mask_and_scale'] = True
+                if getattr(time_var, 'long_name', None) == "reference time of sst file":
+                    args['mask_and_scale'] = test_access_sst_dtime_values(file_to_subset)
                 break
 
     if hdf_type == 'GPM':
