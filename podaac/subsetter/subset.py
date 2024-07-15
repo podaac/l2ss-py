@@ -1135,6 +1135,37 @@ def override_decode_cf_datetime() -> None:
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
+def test_access_sst_dtime_values(datafile):
+    """
+    Test accessing values of 'sst_dtime' variable in a NetCDF file.
+
+    Parameters
+    ----------
+    datafile (str): Path to the NetCDF file.
+
+    Returns
+    -------
+    access_successful (bool): True if 'sst_dtime' values are accessible, False otherwise.
+    """
+
+    nc_dataset, _, _ = open_as_nc_dataset(datafile)
+    args = {
+        'decode_coords': False,
+        'mask_and_scale': True,
+        'decode_times': True
+    }
+    try:
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+            # pylint: disable=pointless-statement
+            dataset['sst_dtime'].values
+            return True
+    except (TypeError, ValueError):
+        return False
+
+
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            variables: Union[List[str], str, None] = (),
            # pylint: disable=too-many-branches, disable=too-many-statements
@@ -1240,7 +1271,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
             if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
                (getattr(time_var, 'long_name', None) == "reference time of sst file"):
-                args['mask_and_scale'] = True
+                args['mask_and_scale'] = test_access_sst_dtime_values(file_to_subset)
                 break
 
     if hdf_type == 'GPM':
