@@ -1160,10 +1160,11 @@ def test_access_sst_dtime_values(datafile):
                 **args
         ) as dataset:
             # pylint: disable=pointless-statement
-            dataset['sst_dtime'].values
-            return True
+            for var_name in dataset.variables:
+                dataset[var_name].values
     except (TypeError, ValueError, KeyError):
         return False
+    return True
 
 
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
