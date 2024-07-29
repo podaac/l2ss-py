@@ -6,8 +6,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
+## [2.11.0]
+### Added
 - [issue/267](https://github.com/podaac/l2ss-py/pull/261): Add xtrack and atrack dimension options for get_nd_indexers when bounding box subsetting is performed on SNDR.
 - Fix temporal subsetting ghrsst dataset by adding time delta to time variable.
+- Add a function to test ghrsst dataset ability to access variables when mask_and_scale is true. 
 ### Changed
 ### Deprecated 
 ### Removed
