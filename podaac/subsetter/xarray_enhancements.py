@@ -145,8 +145,8 @@ def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     # Create a dict object where each key is a variable in the dataset and the value is an
     # array initialized to the fill value for that variable or NaN if there is no fill value
     # attribute for the variable
-    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan)) for k, v in
-                  dataset.items()}
+
+    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan), dtype=v.dtype) for k, v in dataset.items()}
 
     # Create a copy of the dataset filled with the empty data. Then select the first index along each
     # dimension and return the result

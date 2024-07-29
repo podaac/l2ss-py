@@ -1099,7 +1099,6 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
     try:
         nc_dataset = nc.Dataset(filepath, mode='r')
         has_groups = bool(nc_dataset.groups)
-
         # If dataset has groups, transform to work with xarray
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
@@ -1249,7 +1248,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
             gc.change_var_dims(nc_dataset, variables)
             hdf_type = 'GPM'
-
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
