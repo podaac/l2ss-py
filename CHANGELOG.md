@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Deprecated 
 ### Removed
+- Removed old cmr association files, Dockerfile, and cmr updater script
 ### Fixed
 ### Security
 
