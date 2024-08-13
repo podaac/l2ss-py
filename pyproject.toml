@@ -32,10 +32,10 @@ netCDF4 = "^1.5"
 xarray = {version = "*", extras = ["parallel"]}
 geopandas ="^0.14.1"
 Shapely = "^2.0.2"
-harmony-service-lib = { version = "^1.0.26", optional = true }
+harmony-service-lib = { version = "^1.0.27", optional = true }
 pystac = { version = "^0.5.3", optional = true }
 julian = "^0.14"
-importlib-metadata = "^7.0.1"
+importlib-metadata = "^8.2.0"
 h5py = "^3.6.0"
 cf-xarray = "*"
 numpy = "^1.26.3"
