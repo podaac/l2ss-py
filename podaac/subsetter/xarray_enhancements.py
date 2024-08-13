@@ -69,12 +69,20 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         Indexer dictionary for the provided condition.
     """
     # check if the lat/lon coordinate numpy array has 2 or more dimensions
+    transpose = False
     if cond.values.squeeze().ndim == 2:
         x_axis = 1
         y_axis = 0
     else:
-        x_axis = 2
-        y_axis = 1
+        if any('xtrack' in dim for dim in list(cond.dims)) and\
+           any('atrack' in dim for dim in list(cond.dims)):
+            x_axis = list(cond.dims).index('xtrack')
+            y_axis = list(cond.dims).index('atrack')
+            transpose = True
+        else:
+            x_axis = 2
+            y_axis = 1
+
     rows = np.any(cond.values.squeeze(), axis=x_axis)
     if cut:
         cols = np.any(cond.values.squeeze(), axis=y_axis)
@@ -102,11 +110,15 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         }
     else:
         # if the lat/lon had 3 dimensions the conditional array was identical in the z direction - taking the first
-        rows = rows[0]
-        cols = cols[0]
+        if transpose:
+            rows = rows.transpose()[0]
+            cols = cols.transpose()[0]
+        else:
+            rows = rows[0]
+            cols = cols[0]
         indexers = {
-            cond_list[1]: np.where(rows)[0],
-            cond_list[2]: np.where(cols)[0]
+            cond_list[y_axis]: np.where(rows)[0],
+            cond_list[x_axis]: np.where(cols)[0]
         }
 
     return indexers
@@ -133,8 +145,8 @@ def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     # Create a dict object where each key is a variable in the dataset and the value is an
     # array initialized to the fill value for that variable or NaN if there is no fill value
     # attribute for the variable
-    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan)) for k, v in
-                  dataset.items()}
+
+    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan), dtype=v.dtype) for k, v in dataset.items()}
 
     # Create a copy of the dataset filled with the empty data. Then select the first index along each
     # dimension and return the result

@@ -350,7 +350,15 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
 
     # Ensure all variables are present but empty.
     for _, variable in empty_dataset.data_vars.items():
-        assert np.all(variable.data == variable.attrs.get('_FillValue', np.nan) or np.isnan(variable.data))
+        fill_value = variable.attrs.get('_FillValue', np.nan)
+        data = variable.data
+        
+        # Perform the main check
+        condition = np.all(data == fill_value) or np.all(np.isnan(data))
+        
+        # Handle the specific integer dtype case
+        if not condition and not (np.isnan(fill_value) and np.issubdtype(variable.dtype, np.integer)):
+            assert condition, f"Data does not match fill value for variable: {variable}"
 
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
 
@@ -1172,7 +1180,8 @@ def test_temporal_subset_modis_a(data_dir, subset_output_dir, request):
         bbox=bbox,
         output_file=join(subset_output_dir, output_file),
         min_time=min_time,
-        max_time=max_time
+        max_time=max_time,
+        time_var_names=['sst_dtime']
     )
 
     in_ds = xr.open_dataset(join(data_dir, file),
@@ -1311,8 +1320,10 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     sndr_files = ['SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc',
                   'SNDR.AQUA.AIRS.20140110T0305.m06.g031.L2_CLIMCAPS_RET.std.v02_39.G.210131015806.nc',
                   'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc']
-    bbox = np.array(((-180, 180), (-90, 90)))
-    for sndr_file in sndr_files:
+    # do a longitude subset on these files that doesn't alter the resulting shape
+    sndr_spatial = [(-180,-150), (-15,180), (-180,30)]
+    for sndr_file, box in zip(sndr_files, sndr_spatial):
+        bbox = np.array(((box[0], box[1]), (-90, 90)))
         output_file = "{}_{}".format(request.node.name, sndr_file)
         shutil.copyfile(
             os.path.join(SNDR_dir, sndr_file),
@@ -1326,6 +1337,14 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
             min_time='2014-01-10T00:50:20Z',
             max_time='2021-02-24T01:09:55Z'
         )
+
+        out_ds = xr.open_dataset(join(subset_output_dir, output_file),
+                                    decode_coords=False)
+        in_ds = xr.open_dataset(join(SNDR_dir, sndr_file),
+                                    decode_coords=False)
+
+        # do a longitude subset that cuts down on the file but the shape should remain the same
+        assert out_ds['lon'].shape == in_ds['lon'].shape
 
         if not isinstance(box_test, np.ndarray):
             raise ValueError('Subset for SNDR not returned properly')
@@ -1517,6 +1536,7 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
                     os.path.join(subset_output_dir, tropomi_file_name))
 
     nc_dataset = nc.Dataset(os.path.join(subset_output_dir, tropomi_file_name))
+    total_time_vars = ['__PRODUCT__time']
 
     args = {
         'decode_coords': False,
@@ -1530,7 +1550,8 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
+        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], total_time_vars)
+        print(time_var_name)
         lat_dims = dataset[lat_var_name].squeeze().dims
         time_dims = dataset[time_var_name].squeeze().dims
         assert lat_dims == time_dims
@@ -1749,12 +1770,12 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
             **args
     ) as dataset:
         lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
-        time_var_names = []
+        time_var_names = ['__PRODUCT__time']
         for lat_var_name in lat_var_names:
             time_var_names.append(subset.compute_time_variable_name(
                     dataset, dataset[lat_var_name], time_var_names
                 ))
-        epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
+        epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[1])
 
         assert epoch_time_var.split('__')[-1] == 'time'
 

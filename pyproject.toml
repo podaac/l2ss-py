@@ -12,7 +12,7 @@
 
 [tool.poetry]
 name = "l2ss-py"
-version = "2.10.0"
+version = "2.11.0rc9"
 description = "L2 Subsetter Service"
 authors = ["podaac-tva <podaac-tva@jpl.nasa.gov>"]
 license = "Apache-2.0"
@@ -32,10 +32,10 @@ netCDF4 = "^1.5"
 xarray = {version = "*", extras = ["parallel"]}
 geopandas ="^0.14.1"
 Shapely = "^2.0.2"
-harmony-service-lib = { version = "^1.0.26", optional = true }
+harmony-service-lib = { version = "^1.0.27", optional = true }
 pystac = { version = "^0.5.3", optional = true }
 julian = "^0.14"
-importlib-metadata = "^7.0.1"
+importlib-metadata = "^8.2.0"
 h5py = "^3.6.0"
 cf-xarray = "*"
 numpy = "^1.26.3"
@@ -47,10 +47,12 @@ pytest-cov = "~5"
 pylint = "^3.0.2"
 sphinx = "^7.2.6"
 pytest-benchmark = "~4"
-moto = "5.0.2"
+moto = "^5.0.2"
 jsonschema = "^4.20.0"
 m2r2 = "^0.3.2"
 sphinx-rtd-theme = "^2.0.0"
+pytest-rerunfailures = "^14.0"
+pytest-xdist = "^3.6.1"
 
 [tool.pytest.ini_options]
 junit_family = "xunit2"

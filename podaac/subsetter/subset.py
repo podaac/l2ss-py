@@ -23,6 +23,7 @@ import functools
 import json
 import operator
 import os
+import re
 from itertools import zip_longest
 from typing import List, Optional, Tuple, Union
 import dateutil
@@ -270,11 +271,11 @@ def calculate_chunks(dataset: xr.Dataset) -> dict:
     """
     if len(dataset.dims) <= 3:
         chunk = {dim: 4000 for dim in dataset.dims
-                 if dataset.dims[dim] > 4000
+                 if dataset.sizes[dim] > 4000
                  and len(dataset.dims) > 1}
     else:
         chunk = {dim: 500 for dim in dataset.dims
-                 if dataset.dims[dim] > 500}
+                 if dataset.sizes[dim] > 500}
 
     return chunk
 
@@ -528,7 +529,7 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
         return time_vars[0]
 
     # Filter variables with 'time' in the name to avoid extra work
-    time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.dims.keys()))
+    time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.sizes.keys()))
 
     for var_name in time_vars:
         if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
@@ -540,6 +541,15 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
         if len(dataset[var_name].squeeze().dims) == 0:
             continue
         if var_name not in total_time_vars and ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
+            return var_name
+
+    time_units_pattern = re.compile(r"(days|d|hours|hr|h|minutes|min|m|seconds|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?")
+    # Check variables for common time variable indicators
+    for var_name, var in dataset.variables.items():
+        # pylint: disable=too-many-boolean-expressions
+        if ((('standard_name' in var.attrs and var.attrs['standard_name'] == 'time') or
+           ('axis' in var.attrs and var.attrs['axis'] == 'T') or
+           ('units' in var.attrs and time_units_pattern.match(var.attrs['units'])))) and var_name not in total_time_vars:
             return var_name
 
     # then check if any variables have 'time' in the string if the above loop doesn't return anything
@@ -781,7 +791,12 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
-        return compare(dataset[time_var_name], timestamp)
+        time_data = dataset[time_var_name]
+        if getattr(time_data, 'long_name', None) == "reference time of sst file":
+            timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
+            time_data = time_data + timedelta_seconds
+
+        return compare(time_data, timestamp)
 
     temporal_conds = []
     if min_time:
@@ -1084,7 +1099,6 @@ def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
     try:
         nc_dataset = nc.Dataset(filepath, mode='r')
         has_groups = bool(nc_dataset.groups)
-
         # If dataset has groups, transform to work with xarray
         if has_groups:
             nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
@@ -1118,6 +1132,38 @@ def override_decode_cf_datetime() -> None:
             return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
 
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
+
+
+def test_access_sst_dtime_values(datafile):
+    """
+    Test accessing values of 'sst_dtime' variable in a NetCDF file.
+
+    Parameters
+    ----------
+    datafile (str): Path to the NetCDF file.
+
+    Returns
+    -------
+    access_successful (bool): True if 'sst_dtime' values are accessible, False otherwise.
+    """
+
+    nc_dataset, _, _ = open_as_nc_dataset(datafile)
+    args = {
+        'decode_coords': False,
+        'mask_and_scale': True,
+        'decode_times': True
+    }
+    try:
+        with xr.open_dataset(
+                xr.backends.NetCDF4DataStore(nc_dataset),
+                **args
+        ) as dataset:
+            # pylint: disable=pointless-statement
+            for var_name in dataset.variables:
+                dataset[var_name].values
+    except (TypeError, ValueError, KeyError):
+        return False
+    return True
 
 
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
@@ -1202,7 +1248,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
             gc.change_var_dims(nc_dataset, variables)
             hdf_type = 'GPM'
-
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
@@ -1217,14 +1262,18 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
-        # check fill value and dtype; we know that this will cause an integer Overflow with xarray
-        for time_variable in [v for v in nc_dataset.variables.keys() if 'time' in v]:
-            try:
-                if nc_dataset[time_variable].getncattr('_FillValue') == nc.default_fillvals.get('f8') and \
-                 (nc_dataset[time_variable].dtype == 'float64') or (nc_dataset[time_variable].dtype == 'float32'):
-                    args['mask_and_scale'] = True
-            except AttributeError:
-                pass
+        float_dtypes = ['float64', 'float32']
+        fill_value_f8 = nc.default_fillvals.get('f8')
+
+        for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
+            time_var = nc_dataset[time_variable]
+
+            if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
+               (getattr(time_var, 'long_name', None) == "reference time of sst file"):
+                args['mask_and_scale'] = True
+                if getattr(time_var, 'long_name', None) == "reference time of sst file":
+                    args['mask_and_scale'] = test_access_sst_dtime_values(file_to_subset)
+                break
 
     if hdf_type == 'GPM':
         args['decode_times'] = False

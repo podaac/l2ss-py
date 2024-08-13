@@ -84,7 +84,7 @@ jobs:
           poetry run flake8 podaac
       - name: Test and coverage
         run: |
-          poetry run pytest --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
+          poetry run pytest -n auto --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
       - name: SonarCloud Scan
         id: sonarcloud
         uses: sonarsource/sonarcloud-github-action@master
@@ -201,6 +201,7 @@ jobs:
           poetry run sphinx-build -b html ./docs docs/_build/
       - name: Publish Docs
         uses: JamesIves/github-pages-deploy-action@v4
+        if: ${{ github.actor != 'dependabot[bot]' }}
         with:
           branch: gh-pages # The branch the action should deploy to.
           folder: docs/_build/ # The folder the action should deploy.
@@ -294,3 +295,15 @@ jobs:
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
           git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
           git push origin "${{ env.software_version }}"
+
+      - name: Deploy Harmony
+        env:
+            ENV: ${{ env.venue }}
+            CMR_USER: ${{ secrets.CMR_USER }}
+            CMR_PASS: ${{ secrets.CMR_PASS }}
+        if: |
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
+        working-directory: deployment
+        run: 
+          poetry run python harmony_deploy.py --tag ${{ env.software_version }} 

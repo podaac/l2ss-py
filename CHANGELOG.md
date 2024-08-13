@@ -13,11 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [2.11.0]
+### Added
+- [issue/267](https://github.com/podaac/l2ss-py/pull/261): Add xtrack and atrack dimension options for get_nd_indexers when bounding box subsetting is performed on SNDR.
+- Fix temporal subsetting ghrsst dataset by adding time delta to time variable.
+- Add a function to test ghrsst dataset ability to access variables when mask_and_scale is true. 
+- Update l2ss-py to allow the return of empty granules.
+### Changed
+### Deprecated 
+### Removed
+- Removed old cmr association files, Dockerfile, and cmr updater script
+### Fixed
+### Security
+
+
 ## [2.10.0]
 ### Added
 - [issue/260](https://github.com/podaac/l2ss-py/pull/261): Add gpm cleanup function to add a timeMidScan variable if the timeMidScan variable isn't present. Function takes the years, months, days etc ScanTime variables and creates a single time variable using datetime.datetime library.
 ### Changed
-- Update code to determin lat lon time variables
+- Update code to determine lat lon time variables
 - Update xarray version
 - [pull/248](https://github.com/podaac/l2ss-py/pull/248): add Harmony extra_args.cut parameter to subset_params in service adapter 
 ### Deprecated 
