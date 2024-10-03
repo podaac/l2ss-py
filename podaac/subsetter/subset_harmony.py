@@ -28,11 +28,11 @@ from typing import List, Union
 import pystac
 from pystac import Asset
 
-import harmony
+import harmony_service_lib
 import numpy as np
-from harmony import BaseHarmonyAdapter
-from harmony.util import download, stage, generate_output_filename, bbox_to_geometry
-from harmony.exceptions import HarmonyException
+from harmony_service_lib import BaseHarmonyAdapter
+from harmony_service_lib.util import download, stage, generate_output_filename, bbox_to_geometry
+from harmony_service_lib.exceptions import HarmonyException
 
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
@@ -111,7 +111,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
         self.data_dir = os.getenv(DATA_DIRECTORY_ENV, '/home/dockeruser/data')
 
-    def process_item(self, item: pystac.Item, source: harmony.message.Source) -> pystac.Item:
+    def process_item(self, item: pystac.Item, source: harmony_service_lib.message.Source) -> pystac.Item:
         """
         Performs variable and bounding box subsetting on the input STAC Item's data, returning
         an output STAC item
@@ -264,7 +264,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
         return result_str.split("\n")
 
 
-def main(config: harmony.util.Config = None) -> None:
+def main(config: harmony_service_lib.util.Config = None) -> None:
     """Parse command line arguments and invoke the service to respond to
     them.
 
@@ -278,10 +278,10 @@ def main(config: harmony.util.Config = None) -> None:
     """
     parser = argparse.ArgumentParser(prog=SERVICE_NAME,
                                      description='Run the l2_subsetter service')
-    harmony.setup_cli(parser)
+    harmony_service_lib.setup_cli(parser)
     args = parser.parse_args()
-    if harmony.is_harmony_cli(args):
-        harmony.run_cli(parser, args, L2SubsetterService, cfg=config)
+    if harmony_service_lib.is_harmony_cli(args):
+        harmony_service_lib.run_cli(parser, args, L2SubsetterService, cfg=config)
     else:
         parser.error("Only --harmony CLIs are supported")
 
