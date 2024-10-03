@@ -22,6 +22,7 @@ import os
 import subprocess
 import shutil
 from tempfile import mkdtemp
+import traceback
 from typing import List, Union
 
 import pystac
@@ -31,11 +32,32 @@ import harmony
 import numpy as np
 from harmony import BaseHarmonyAdapter
 from harmony.util import download, stage, generate_output_filename, bbox_to_geometry
+from harmony.exceptions import HarmonyException
 
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
 
 DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
+
+
+class L2SSException(HarmonyException):
+    """Base class for exceptions in the Harmony GDAL Adapter."""
+
+    def __init__(self, original_exception):
+        # Extract the last traceback entry (most recent call) for the error location
+        tb = traceback.extract_tb(original_exception.__traceback__)[-1]
+
+        # Get the error details: file, line, function, and message
+        filename = tb.filename
+        lineno = tb.lineno
+        funcname = tb.name
+        error_msg = str(original_exception)
+
+        # Format the error message to be more readable
+        readable_message = (f"Error in file '{filename}', line {lineno}, in function '{funcname}': "
+                            f"{error_msg}")
+
+        super().__init__(readable_message, 'nasa/harmony-gdal-adapter')
 
 
 def podaac_to_harmony_bbox(bbox: np.ndarray) -> Union[np.ndarray, float]:
@@ -206,6 +228,8 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             # Return the STAC record
             return result
+        except Exception as ex:
+            raise L2SSException(ex) from ex
         finally:
             # Clean up any intermediate resources
             shutil.rmtree(temp_dir)
