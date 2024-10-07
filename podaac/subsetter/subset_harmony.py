@@ -22,20 +22,42 @@ import os
 import subprocess
 import shutil
 from tempfile import mkdtemp
+import traceback
 from typing import List, Union
 
 import pystac
 from pystac import Asset
 
-import harmony
+import harmony_service_lib
 import numpy as np
-from harmony import BaseHarmonyAdapter
-from harmony.util import download, stage, generate_output_filename, bbox_to_geometry
+from harmony_service_lib import BaseHarmonyAdapter
+from harmony_service_lib.util import download, stage, generate_output_filename, bbox_to_geometry
+from harmony_service_lib.exceptions import HarmonyException
 
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
 
 DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
+
+
+class L2SSException(HarmonyException):
+    """Base class for exceptions in the Harmony GDAL Adapter."""
+
+    def __init__(self, original_exception):
+        # Extract the last traceback entry (most recent call) for the error location
+        tb = traceback.extract_tb(original_exception.__traceback__)[-1]
+
+        # Get the error details: file, line, function, and message
+        filename = tb.filename
+        lineno = tb.lineno
+        funcname = tb.name
+        error_msg = str(original_exception)
+
+        # Format the error message to be more readable
+        readable_message = (f"Error in file '{filename}', line {lineno}, in function '{funcname}': "
+                            f"{error_msg}")
+
+        super().__init__(readable_message, 'nasa/harmony-gdal-adapter')
 
 
 def podaac_to_harmony_bbox(bbox: np.ndarray) -> Union[np.ndarray, float]:
@@ -89,7 +111,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
         self.data_dir = os.getenv(DATA_DIRECTORY_ENV, '/home/dockeruser/data')
 
-    def process_item(self, item: pystac.Item, source: harmony.message.Source) -> pystac.Item:
+    def process_item(self, item: pystac.Item, source: harmony_service_lib.message.Source) -> pystac.Item:
         """
         Performs variable and bounding box subsetting on the input STAC Item's data, returning
         an output STAC item
@@ -206,6 +228,8 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             # Return the STAC record
             return result
+        except Exception as ex:
+            raise L2SSException(ex) from ex
         finally:
             # Clean up any intermediate resources
             shutil.rmtree(temp_dir)
@@ -240,7 +264,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
         return result_str.split("\n")
 
 
-def main(config: harmony.util.Config = None) -> None:
+def main(config: harmony_service_lib.util.Config = None) -> None:
     """Parse command line arguments and invoke the service to respond to
     them.
 
@@ -254,10 +278,10 @@ def main(config: harmony.util.Config = None) -> None:
     """
     parser = argparse.ArgumentParser(prog=SERVICE_NAME,
                                      description='Run the l2_subsetter service')
-    harmony.setup_cli(parser)
+    harmony_service_lib.setup_cli(parser)
     args = parser.parse_args()
-    if harmony.is_harmony_cli(args):
-        harmony.run_cli(parser, args, L2SubsetterService, cfg=config)
+    if harmony_service_lib.is_harmony_cli(args):
+        harmony_service_lib.run_cli(parser, args, L2SubsetterService, cfg=config)
     else:
         parser.error("Only --harmony CLIs are supported")
 
