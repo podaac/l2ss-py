@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
+## [2.12.0]
+### Added
 - Added custom exception to progate error messages to harmony.
 ### Changed
 ### Deprecated 
