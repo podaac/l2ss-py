@@ -316,4 +316,5 @@ jobs:
           tag_name: "2.12.0a3"  # Use the tag that triggered the action
           release_name: Release test tag 2.12.0a3
           draft: true
+          generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
