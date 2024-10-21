@@ -307,3 +307,13 @@ jobs:
         working-directory: deployment
         run: 
           poetry run python harmony_deploy.py --tag ${{ env.software_version }} 
+
+
+      - name: Create Draft Release
+        id: create_release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "2.12.0a3"  # Use the tag that triggered the action
+          release_name: Release test tag 2.12.0a3
+          draft: true
+          token: ${{ secrets.GITHUB_TOKEN }}
