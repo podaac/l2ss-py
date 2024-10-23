@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Added custom exception to progate error messages to harmony.
+- Added a automated release step for main branch in github actions. 
 ### Changed
 ### Deprecated 
 ### Removed
