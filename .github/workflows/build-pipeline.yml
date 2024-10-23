@@ -307,3 +307,15 @@ jobs:
         working-directory: deployment
         run: 
           poetry run python harmony_deploy.py --tag ${{ env.software_version }} 
+
+      - name: Create Release
+        id: create_release
+        if: |
+          github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: "${{ env.software_version }}"  # Use the tag that triggered the action
+          release_name: Release v{{ env.software_version }}
+          draft: false
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
