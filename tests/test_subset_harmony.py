@@ -28,7 +28,7 @@ from unittest.mock import patch, MagicMock
 
 import podaac.subsetter
 from podaac.subsetter.subset_harmony import L2SubsetterService
-from harmony.util import config
+from harmony_service_lib.util import config
 
 
 @pytest.fixture()
