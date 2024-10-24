@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.12.0]
 ### Added
 - Added custom exception to progate error messages to harmony.
-- Added an automated release step for main branch in github actions. 
+- Added an automated release step for main branch in github actions.
 - Handle OB.DAAC files, which do not have time variables
 ### Changed
 ### Deprecated 
