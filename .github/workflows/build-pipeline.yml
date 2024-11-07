@@ -312,7 +312,7 @@ jobs:
         id: create_release
         if: |
           github.ref == 'refs/heads/main'
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: "${{ env.software_version }}"  # Use the tag that triggered the action
           release_name: Release v{{ env.software_version }}
