@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [2.12.0]
+### Added
+- Added custom exception to progate error messages to harmony.
+- Added an automated release step for main branch in github actions.
+- Handle OB.DAAC files, which do not have time variables
+- Update harmony library from 1.0 to 2.0 which changes the import harmony structure
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
 ## [2.11.0]
 ### Added
 - [issue/267](https://github.com/podaac/l2ss-py/pull/261): Add xtrack and atrack dimension options for get_nd_indexers when bounding box subsetting is performed on SNDR.

@@ -22,7 +22,7 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       - name: Install Poetry
@@ -209,7 +209,7 @@ jobs:
       - name: Build Python Artifact
         run: |
           poetry build
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: python-artifact
           path: dist/*
@@ -244,7 +244,7 @@ jobs:
           steps.pypi-test-publish.conclusion == 'success' ||
           steps.pypi-publish.conclusion == 'success'
         id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -261,7 +261,7 @@ jobs:
         if: |
           steps.pypi-test-publish.conclusion == 'success' ||
           steps.pypi-publish.conclusion == 'success'
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile
@@ -307,3 +307,15 @@ jobs:
         working-directory: deployment
         run: 
           poetry run python harmony_deploy.py --tag ${{ env.software_version }} 
+
+      - name: Create Release
+        id: create_release
+        if: |
+          github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ env.software_version }}"  # Use the tag that triggered the action
+          release_name: Release v{{ env.software_version }}
+          draft: false
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}

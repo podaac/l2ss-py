@@ -63,7 +63,9 @@ confidence=
 disable=too-many-lines,
         too-many-arguments,
         too-many-locals,
-        no-member
+        no-member,
+        too-many-positional-arguments,
+        too-many-statements
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option
