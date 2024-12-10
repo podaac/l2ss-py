@@ -70,7 +70,8 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     """
     # check if the lat/lon coordinate numpy array has 2 or more dimensions
     transpose = False
-    if cond.values.squeeze().ndim == 2:
+    num_dimensions = cond.values.squeeze().ndim
+    if num_dimensions == 2:
         x_axis = 1
         y_axis = 0
     else:
@@ -79,6 +80,10 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
             x_axis = list(cond.dims).index('xtrack')
             y_axis = list(cond.dims).index('atrack')
             transpose = True
+        elif any('xdim_grid' in dim for dim in list(cond.dims)) and\
+            any('ydim_grid' in dim for dim in list(cond.dims)):
+            x_axis = list(cond.dims).index('xdim_grid')
+            y_axis = list(cond.dims).index('ydim_grid')
         else:
             x_axis = 2
             y_axis = 1
@@ -90,11 +95,11 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         cols = np.ones(len(cond.values[0]))
 
     # If the subsetted area is equal to the original area
-    if np.all(rows) & np.all(cols):
+    if np.all(rows) and np.all(cols):
         logging.info("Subsetted area equal to the original granule.")
 
     # If the subsetted area is empty
-    if not np.any(rows) | np.any(cols):
+    if not np.any(rows) or not np.any(cols):
         logging.info("No data within the given bounding box.")
 
     cond_shape_list = list(cond.shape)
@@ -113,7 +118,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         if transpose:
             rows = rows.transpose()[0]
             cols = cols.transpose()[0]
-        else:
+        elif num_dimensions == 2:
             rows = rows[0]
             cols = cols[0]
         indexers = {
