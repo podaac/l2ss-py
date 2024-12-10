@@ -66,7 +66,7 @@ def parse_args(args: list) -> tuple:
     )
     parser.add_argument(
         '--cut',
-        default=False,
+        default=True,
         action='store_true',
         help='If provided, scanline will be cut'
     )

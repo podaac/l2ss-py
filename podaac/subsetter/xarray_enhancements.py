@@ -190,7 +190,7 @@ def get_variables_with_indexers(dataset, indexers):
     return subset_vars, no_subset_vars
 
 
-def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool) -> xr.Dataset:
+def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool, longitude=None, latitude=None, pixel_subset=False) -> xr.Dataset:
     """
     Return a dataset which meets the given condition.
 
@@ -238,13 +238,30 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     indexed_ds = dataset.isel(**indexers)
     subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
-    # dataset with variables that need to be subsetted
-    new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
-    # data with variables that shouldn't be subsetted
+    # Variables to subset
+    subset_vars_to_process = (
+        [var for var in subset_vars if var not in {longitude, latitude}]
+        if pixel_subset
+        else subset_vars
+    )
+
+    print(subset_vars_to_process)
+    print(non_subset_vars)
+    print(longitude)
+    print(latitude)
+    print(list(indexed_ds.variables))
+    new_dataset_sub = indexed_ds[subset_vars_to_process].where(indexed_cond)
+
+    # Variables to retain without subsetting
     new_dataset_non_sub = indexed_ds[non_subset_vars]
 
-    # merge the datasets
-    new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
+    # Add longitude and latitude if pixel_subset is True
+    datasets_to_merge = [new_dataset_non_sub, new_dataset_sub]
+    if pixel_subset:
+        datasets_to_merge.append(indexed_ds[[longitude, latitude]])
+
+    # Merge datasets
+    new_dataset = xr.merge(datasets_to_merge)
 
     # Cast all variables to their original type
     for variable_name, variable in new_dataset.data_vars.items():
@@ -306,3 +323,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
     dc.sync_dims_inplace(dataset, new_dataset)
     return new_dataset
+
+
+

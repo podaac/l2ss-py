@@ -979,7 +979,9 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             (group_dataset[lat_var_name] >= lat_bounds[0]) &
             (group_dataset[lat_var_name] <= lat_bounds[1]) &
             temporal_cond,
-            cut
+            cut,
+            longitude=lon_var_name,
+            latitude=lat_var_name
         )
 
         datasets.append(group_dataset)
