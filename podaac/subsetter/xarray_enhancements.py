@@ -69,20 +69,19 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         Indexer dictionary for the provided condition.
     """
     # check if the lat/lon coordinate numpy array has 2 or more dimensions
-    transpose = False
+    transpose = dim_grid = False
     if cond.values.squeeze().ndim == 2:
         x_axis = 1
         y_axis = 0
     else:
-        if any('xtrack' in dim for dim in list(cond.dims)) and\
-           any('atrack' in dim for dim in list(cond.dims)):
-            x_axis = list(cond.dims).index('xtrack')
-            y_axis = list(cond.dims).index('atrack')
+        if 'xtrack' in cond.dims and 'atrack' in cond.dims:
+            x_axis = cond.dims.index('xtrack')
+            y_axis = cond.dims.index('atrack')
             transpose = True
-        elif any('xdim_grid' in dim for dim in list(cond.dims)) and\
-             any('ydim_grid' in dim for dim in list(cond.dims)):
-                x_axis = list(cond.dims).index('xdim_grid')
-                y_axis = list(cond.dims).index('ydim_grid')
+        elif 'xdim_grid' in cond.dims and 'ydim_grid' in cond.dims:
+            x_axis = cond.dims.index('xdim_grid')
+            y_axis = cond.dims.index('ydim_grid')
+            dim_grid = x_axis == 1 and y_axis == 0
         else:
             x_axis = 2
             y_axis = 1
@@ -116,9 +115,8 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         # if the lat/lon had 3 dimensions the conditional array was identical in the z direction - taking the first
         if transpose:
             rows, cols = rows.transpose()[0], cols.transpose()[0]
-        else:
-            if not (cond.values.squeeze().ndim == 3 and x_axis == 1 and y_axis == 0):
-                rows, cols = rows[0], cols[0]
+        elif not dim_grid:
+            rows, cols = rows[0], cols[0]
         indexers = {
             cond_list[y_axis]: np.where(rows)[0],
             cond_list[x_axis]: np.where(cols)[0]
