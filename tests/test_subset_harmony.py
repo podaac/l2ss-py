@@ -84,7 +84,8 @@ def test_service_invoke(mock_environ, temp_dir):
     test_args = [
         podaac.subsetter.subset_harmony.__file__,
         "--harmony-action", "invoke",
-        "--harmony-input", json.dumps(input_json)
+        "--harmony-input", json.dumps(input_json),
+        "--harmony-metadata-dir", temp_dir
     ]
 
     process_item_spy = spy_on(L2SubsetterService.process_item)
@@ -134,7 +135,8 @@ def test_service_invoke(mock_environ, temp_dir):
     test_args = [
         podaac.subsetter.subset_harmony.__file__,
         "--harmony-action", "invoke",
-        "--harmony-input", json.dumps(input_json)
+        "--harmony-input", json.dumps(input_json),
+        "--harmony-metadata-dir", temp_dir
     ]
 
     process_item_spy = spy_on(L2SubsetterService.process_item)
@@ -192,7 +194,8 @@ def test_service_invoke_coord_vars(mock_environ, temp_dir):
     test_args = [
         podaac.subsetter.subset_harmony.__file__,
         "--harmony-action", "invoke",
-        "--harmony-input", json.dumps(input_json)
+        "--harmony-input", json.dumps(input_json),
+        "--harmony-metadata-dir", temp_dir
     ]
 
     process_item_spy = spy_on(L2SubsetterService.process_item)
