@@ -59,9 +59,6 @@ if __name__ == "__main__":
     }
 
     response = requests.put(url, headers=headers, json=data)
+    response.raise_for_status()
 
-    print(response.status_code)
-    try:
-        print(response.json())
-    except json.JSONDecodeError:
-        print("Response content is not in JSON format")
+    print(f"Response JSON: {response.json()}")
