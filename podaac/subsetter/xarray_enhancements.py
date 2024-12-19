@@ -69,57 +69,50 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         Indexer dictionary for the provided condition.
     """
     # check if the lat/lon coordinate numpy array has 2 or more dimensions
-    transpose = False
-    if cond.values.squeeze().ndim == 2:
-        x_axis = 1
-        y_axis = 0
+    transpose = dim_grid = False
+    ndim = cond.values.squeeze().ndim
+
+    # Determine axes and flags
+    if ndim == 2:
+        x_axis, y_axis = 1, 0
     else:
-        if any('xtrack' in dim for dim in list(cond.dims)) and\
-           any('atrack' in dim for dim in list(cond.dims)):
-            x_axis = list(cond.dims).index('xtrack')
-            y_axis = list(cond.dims).index('atrack')
+        if 'xtrack' in cond.dims and 'atrack' in cond.dims:
+            x_axis, y_axis = cond.dims.index('xtrack'), cond.dims.index('atrack')
             transpose = True
+        elif 'xdim_grid' in cond.dims and 'ydim_grid' in cond.dims:
+            x_axis, y_axis = cond.dims.index('xdim_grid'), cond.dims.index('ydim_grid')
+            dim_grid = x_axis == 1 and y_axis == 0
         else:
-            x_axis = 2
-            y_axis = 1
+            x_axis, y_axis = 2, 1
 
-    rows = np.any(cond.values.squeeze(), axis=x_axis)
-    if cut:
-        cols = np.any(cond.values.squeeze(), axis=y_axis)
-    else:
-        cols = np.ones(len(cond.values[0]))
+    # Compute rows and columns
+    squeezed_values = cond.values.squeeze()
+    rows = np.any(squeezed_values, axis=x_axis)
+    cols = np.any(squeezed_values, axis=y_axis) if cut else np.ones(len(squeezed_values[0]))
 
-    # If the subsetted area is equal to the original area
-    if np.all(rows) & np.all(cols):
+    # Log information about subsetted area
+    if np.all(rows) and np.all(cols):
         logging.info("Subsetted area equal to the original granule.")
-
-    # If the subsetted area is empty
-    if not np.any(rows) | np.any(cols):
+    if not np.any(rows) or not np.any(cols):
         logging.info("No data within the given bounding box.")
 
-    cond_shape_list = list(cond.shape)
-    cond_list = list(cond.dims)
-    output = [idx for idx, element in enumerate(cond_shape_list) if element == 1]
-    for i in output:
-        cond_list.pop(i)
+    # Determine dimensions and clean them up
+    cond_dims = list(cond.dims)
+    cond_shape = list(cond.shape)
+    cond_dims = [dim for dim, size in zip(cond_dims, cond_shape) if size > 1]
 
-    if rows.ndim == 1:
-        indexers = {
-            cond_list[0]: np.where(rows)[0],
-            cond_list[1]: np.where(cols)[0]
-        }
-    else:
-        # if the lat/lon had 3 dimensions the conditional array was identical in the z direction - taking the first
+    # Adjust for 3D data
+    if rows.ndim > 1:
         if transpose:
-            rows = rows.transpose()[0]
-            cols = cols.transpose()[0]
-        else:
-            rows = rows[0]
-            cols = cols[0]
-        indexers = {
-            cond_list[y_axis]: np.where(rows)[0],
-            cond_list[x_axis]: np.where(cols)[0]
-        }
+            rows, cols = rows.transpose()[0], cols.transpose()[0]
+        elif not dim_grid:
+            rows, cols = rows[0], cols[0]
+
+    # Generate indexers
+    indexers = {
+        cond_dims[y_axis]: np.where(rows)[0],
+        cond_dims[x_axis]: np.where(cols)[0]
+    }
 
     return indexers
 
