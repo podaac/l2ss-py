@@ -2849,4 +2849,4 @@ harmony = ["harmony-service-lib", "pystac"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "0fd8e023498c232831d947d79ea859651b206a4f316fb272f2d9c87d5021de37"
+content-hash = "d2b1462d8ad582c783a49841ed51c971f4ec7c65ee5909d3dc6a4eac0046f842"
