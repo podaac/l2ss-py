@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+### Security
+
+
+## [2.13.0]
+### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
 - Updated xarray enhancement get_indexers_from_nd function for SMAP_RSS_L2_SSS_V6.
 - Fix minor bug in checking for empty indexers and same data bounds.
 ### Security
