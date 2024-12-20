@@ -560,6 +560,8 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
         if var_name not in total_time_vars and 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
+    return None
+
 
 def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
     """
