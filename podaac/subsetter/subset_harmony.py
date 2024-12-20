@@ -57,7 +57,7 @@ class L2SSException(HarmonyException):
         readable_message = (f"Error in file '{filename}', line {lineno}, in function '{funcname}': "
                             f"{error_msg}")
 
-        super().__init__(readable_message, 'nasa/harmony-gdal-adapter')
+        super().__init__(readable_message, 'podaac/l2-subsetter')
 
 
 def podaac_to_harmony_bbox(bbox: np.ndarray) -> Union[np.ndarray, float]:

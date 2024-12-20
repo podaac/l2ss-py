@@ -560,12 +560,6 @@ def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_
         if var_name not in total_time_vars and 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
             return var_name
 
-    # OB.DAAC data does not have a time variable. Returning the following field of a composite time value to avoid exceptions.
-    if '__scan_line_attributes__day' in dataset.data_vars:
-        return '__scan_line_attributes__day'
-
-    raise ValueError('Unable to determine time variable')
-
 
 def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
     """
@@ -1295,6 +1289,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
+
+        if not time_var_names and (min_time or max_time):
+            raise ValueError('Could not determine time variable')
 
         start_date = None
         if hdf_type and (min_time or max_time):
