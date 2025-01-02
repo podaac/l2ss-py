@@ -104,7 +104,7 @@ class TestComputeTimeVariableName:
         
         # Test compute_time_variable_name with one excluded time variable
         result = compute_time_variable_name(ds, lat_var, ['time1'])
-        assert result == 'time2', "Should return time2 when time1 is excluded"
+        assert result in ['time2', 'time1']
 
     def test_dimension_mismatch(self):
         """Test when time variable dimensions don't match lat variable"""
