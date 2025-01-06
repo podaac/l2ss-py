@@ -87,7 +87,7 @@ jobs:
           poetry run pytest -n auto --junitxml=build/reports/pytest.xml --cov=podaac/ --cov-report=xml:build/reports/coverage.xml -m "not aws and not integration" tests/
       - name: SonarCloud Scan
         id: sonarcloud
-        uses: sonarsource/sonarcloud-github-action@master
+        uses: sonarsource/sonarqube-scan-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -109,7 +109,7 @@ jobs:
       - name: SonarCloud Scan Retry
         id: sonarcloud-retry
         if: steps.sonarcloud.outcome == 'failure'
-        uses: sonarsource/sonarcloud-github-action@master
+        uses: sonarsource/sonarqube-scan-action@v4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -314,8 +314,8 @@ jobs:
           github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: "${{ env.software_version }}"  # Use the tag that triggered the action
-          name: Release v{{ env.software_version }}
+          tag_name: ${{ env.software_version }}  # Use the tag that triggered the action
+          name: Release v${{ env.software_version }}
           draft: false
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
