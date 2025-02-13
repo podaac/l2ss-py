@@ -42,6 +42,7 @@ import xarray.coding.times
 from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.ops import transform
 
+from podaac.subsetter import new_datatree as new_dt
 from podaac.subsetter import gpm_cleanup as gc
 from podaac.subsetter import time_converting as tc
 from podaac.subsetter import dimension_cleanup as dc
@@ -319,6 +320,97 @@ def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str
             match_coord_vars.append(match_vars[0])
     return match_coord_vars
 
+
+def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
+    """
+    Recursively search for latitude and longitude coordinate variables in a DataTree
+    and return their full paths.
+
+    Parameters
+    ----------
+    tree : DataTree
+        The DataTree to search.
+
+    Returns
+    -------
+    tuple
+        - List of latitude coordinate names prefixed with their full path.
+        - List of longitude coordinate names prefixed with their full path.
+    """
+    lat_coord_names = []
+    lon_coord_names = []
+
+    def find_coords_in_dataset(dataset: xr.Dataset, path: str):
+        """Find latitude and longitude variable names in a single dataset and track full paths."""
+        
+        possible_lat_coord_names = {'lat', 'latitude', 'y'}
+        possible_lon_coord_names = {'lon', 'longitude', 'x'}
+
+        current_lat_coord_names = []
+        current_lon_coord_names = []
+
+        custom_criteria = {
+            "latitude": {"standard_name": "latitude|projection_y_coordinate"},
+            "longitude": {"standard_name": "longitude|projection_x_coordinate"},
+        }
+
+        dataset = xr.decode_cf(dataset)
+
+        def append_coords_matching(names_set, coords_list):
+            """Append matching coordinates to the list."""
+            for var_name in dataset.variables:
+                if var_name.lower() in names_set:
+                    coords_list.append(f"{path}/{var_name}")
+
+        # First check for direct matches
+        append_coords_matching(possible_lat_coord_names, current_lat_coord_names)
+        append_coords_matching(possible_lon_coord_names, current_lon_coord_names)
+
+        # Fallback: check metadata for coordinates if not found
+        if not current_lat_coord_names or not current_lon_coord_names:
+            lat_matches = find_matching_coords(dataset, possible_lat_coord_names)
+            lon_matches = find_matching_coords(dataset, possible_lon_coord_names)
+
+            current_lat_coord_names.extend(f"{path}/{lat}" for lat in lat_matches)
+            current_lon_coord_names.extend(f"{path}/{lon}" for lon in lon_matches)
+
+            if not current_lat_coord_names or not current_lon_coord_names:
+                with cfxr.set_options(custom_criteria=custom_criteria):
+                    possible_lat_coords = dataset.cf.coordinates.get('latitude', [])
+                    possible_lon_coords = dataset.cf.coordinates.get('longitude', [])
+                    if possible_lat_coords:
+                        current_lat_coord_names.append(f"{path}/{possible_lat_coords[0]}")
+                    if possible_lon_coords:
+                        current_lon_coord_names.append(f"{path}/{possible_lon_coords[0]}")
+
+                if not current_lat_coord_names or not current_lon_coord_names:
+                    try:
+                        if "latitude" in dataset.cf and "longitude" in dataset.cf:
+                            current_lat_coord_names.append(f"{path}/{dataset.cf['latitude'].name}")
+                            current_lon_coord_names.append(f"{path}/{dataset.cf['longitude'].name}")
+                    except KeyError:
+                        pass
+
+        return current_lon_coord_names, current_lat_coord_names
+
+    def traverse_tree(node, path):
+        """Recursively search through the tree for latitude and longitude coordinates."""
+        if node.ds is not None:
+            return_lon, return_lat = find_coords_in_dataset(node.ds, path)
+            lon_coord_names.extend(return_lon)
+            lat_coord_names.extend(return_lat)
+
+        for child_name, child_node in node.children.items():
+            new_path = f"{path}/{child_name}" if path else child_name
+            traverse_tree(child_node, new_path)
+
+    # Start recursive tree traversal
+    traverse_tree(tree, "")
+
+    if not lat_coord_names or not lon_coord_names:
+        raise ValueError("Could not determine coordinate variables in the DataTree")
+
+    return lon_coord_names, lat_coord_names
 
 def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[str], str], Union[List[str], str]]:
     """
@@ -851,6 +943,107 @@ def get_base_group_names(lats: List[str]) -> Tuple[List[str], List[Union[int, st
     return unique_groups, diff_count
 
 
+
+
+
+def get_variable_data(dtree, var_path):
+    """
+    Retrieve data from a DataTree object given a variable path.
+
+    Parameters:
+    - dtree: DataTree object
+    - var_path: str, path to the variable (e.g., "group/time")
+
+    Returns:
+    - The data of the variable if found, else None.
+    """
+    parts = var_path.split("/")  # Split path into group and variable names
+    group_name, var_name = "/".join(parts[:-1]), parts[-1]  # Extract group and variable
+
+    try:
+        group = dtree[group_name] if group_name else dtree  # Get group or root
+        return group.ds[var_name]  # Extract variable values
+    except KeyError:
+        print(f"Variable '{var_path}' not found.")
+        return None
+
+def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str
+                        ) -> Union[np.ndarray, bool]:
+    """
+    Build the temporal condition used in the xarray 'where' call which
+    drops data not in the given bounds. If the data in the time var is
+    of type 'datetime', assume this is a normal case where the time var
+    uses the epoch from the 'units' metadata attribute to get epoch. If
+    the data in the time var is of type 'timedelta', the epoch var is
+    needed to calculate the datetime.
+
+    Parameters
+    ----------
+    min_time : str
+        ISO timestamp representing the lower temporal bound
+    max_time : str
+        ISO timestamp representing the upper temporal bound
+    dataset : xr.Dataset
+        Dataset to build the condition off of
+    time_var_name : str
+        Name of the time variable
+
+    Returns
+    -------
+    np.array or boolean
+        If temporally subsetted, returns a boolean ND-array the shape
+        of which matches the dimensions of the coordinate vars. 'True'
+        is essentially a noop.
+    """
+
+    def build_cond(str_timestamp, compare):
+        timestamp = translate_timestamp(str_timestamp)
+
+        time_var = get_variable_data(dataset, time_var_name)
+
+        if np.issubdtype(time_var.dtype, np.dtype(np.datetime64)):
+            timestamp = pd.to_datetime(timestamp)
+        if np.issubdtype(time_var.dtype, np.dtype(np.timedelta64)):
+            if is_time_mjd(dataset, time_var_name):
+                mjd_datetime = datetime_from_mjd(dataset, time_var_name)
+                if mjd_datetime is None:
+                    raise ValueError('Unable to get datetime from dataset to calculate time delta')
+
+                # timedelta between timestamp and mjd
+                timestamp = np.datetime64(timestamp) - np.datetime64(mjd_datetime)
+            else:
+                epoch_time_var_name = get_time_epoch_var(dataset, time_var_name)
+                epoch_datetime = dataset[epoch_time_var_name].values[0]
+                timestamp = np.datetime64(timestamp) - epoch_datetime
+
+        time_data = time_var
+        if getattr(time_data, 'long_name', None) == "reference time of sst file":
+            timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
+            time_data = time_data + timedelta_seconds
+
+        return compare(time_data, timestamp)
+
+    temporal_conds = []
+    if min_time:
+        comparison_op = operator.ge
+        temporal_conds.append(build_cond(min_time, comparison_op))
+    if max_time:
+        comparison_op = operator.le
+        temporal_conds.append(build_cond(max_time, comparison_op))
+    temporal_cond = True
+    if min_time or max_time:
+        temporal_cond = functools.reduce(lambda cond_a, cond_b: cond_a & cond_b, temporal_conds)
+    return temporal_cond
+
+
+
+
+
+
+
+
+
+
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
@@ -961,11 +1154,37 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         else:
             group_vars = list(dataset.keys())
 
-        group_dataset = dataset[group_vars]
+
+        group_dataset = dataset
 
         # Calculate temporal conditions
-        temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
+        temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
 
+        lon_data = new_dt.get_variable_from_path(dataset, lon_var_name)
+        lat_data = new_dt.get_variable_from_path(dataset, lat_var_name)
+
+        #print(lon_bounds[0])
+        #print(lon_bounds[1])
+        #print(lat_bounds[0])
+        #print(lat_bounds[1])
+        #print(lon_data)
+        #print(lat_data)
+
+        print(group_dataset)
+
+        group_dataset = xre.where(
+            group_dataset,
+            oper(
+                (lon_data >= lon_bounds[0]),
+                (lon_data <= lon_bounds[1])
+            ) &
+            (lat_data >= lat_bounds[0]) &
+            (lat_data <= lat_bounds[1]) &
+            temporal_cond,
+            cut
+        )
+        return group_dataset
+        """
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -977,11 +1196,13 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             temporal_cond,
             cut
         )
+        """
 
         datasets.append(group_dataset)
         total_list.extend(group_vars)
         if diffs == -1:
             return datasets
+
     dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
     return dim_cleaned_datasets
 
@@ -1078,11 +1299,11 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     """
 
     if not lat_var_names or not lon_var_names:
-        lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
+        lon_var_names, lat_var_names = new_dt.compute_coordinate_variable_names_from_tree(dataset)
     if not time_var_names:
         time_var_names = []
         for lat_var_name in lat_var_names:
-            time_var_names.append(compute_time_variable_name(dataset,
+            time_var_names.append(new_dt.compute_time_variable_name(dataset,
                                                              dataset[lat_var_name],
                                                              time_var_names))
 
@@ -1278,12 +1499,19 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     if hdf_type == 'GPM':
         args['decode_times'] = False
 
-    with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
-    ) as dataset:
+    #with xr.open_dataset(
+    #        xr.backends.NetCDF4DataStore(nc_dataset),
+    #        **args
+    #) as open_dataset:
+    #with xr.open_datatree(xr.backends.NetCDF4DataStore(nc_dataset)) as tree:
+    with xr.open_datatree(file_to_subset, **args) as dataset:
 
-        original_dataset = dataset
+        # Access the root dataset (if needed)
+       # dataset = tree.ds
+
+        #original_dataset = open_dataset
+
+        #print(dataset.items())
 
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
@@ -1334,8 +1562,15 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
+        print("##############################")
+        print(datasets)
+        print("##############################")
+
+        datasets.to_netcdf(output_file)
         spatial_bounds = []
 
+
+        """
         for dataset in datasets:
             set_version_history(dataset, cut, bbox, shapefile)
             set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)
@@ -1376,7 +1611,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 min(lat[0][1][0] for lat in zip(spatial_bounds)),
                 max(lat[0][1][1] for lat in zip(spatial_bounds))
             ]])
-
+        """
+        
         return get_spatial_bounds(
             dataset=dataset,
             lat_var_names=lat_var_names,

@@ -25,7 +25,10 @@ from typing import Union
 import numpy as np
 import xarray as xr
 from podaac.subsetter import dimension_cleanup as dc
+from podaac.subsetter import new_datatree as new_dt
 
+from podaac.subsetter import another_dt as another_dt
+from podaac.subsetter import new_new_tree as new_new_tree
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
     """
@@ -171,6 +174,7 @@ def get_variables_with_indexers(dataset, indexers):
     don't have bounding box dimensions
     """
     index_list = list(indexers.keys())
+
     subset_vars = []
     no_subset_vars = []
     for i in list(dataset.variables.keys()):
@@ -211,6 +215,9 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     However in that mask, True represents valid data and False
     represents invalid data.
     """
+
+    return new_new_tree.where_tree(dataset, cond, cut)
+
     if cond.values.ndim == 1:
         indexers = get_indexers_from_1d(cond)
     else:
@@ -229,16 +236,28 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
-    subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
+    #subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
+    subset_vars, non_subset_vars = new_dt.get_variables_with_indexers_tree(dataset, indexers)
+
+    indexed_cond = cond.isel(**indexers)
+    indexed_ds = dataset.isel(**indexers)
     # dataset with variables that need to be subsetted
-    new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
-    # data with variables that shouldn't be subsetted
-    new_dataset_non_sub = indexed_ds[non_subset_vars]
+
+    new_dataset_sub = {}
+    new_dataset_non_sub = {}
+    #new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
+
+    #new_dataset_sub = new_dt.apply_subset_and_mask(dataset, subset_vars, indexers, cond)
+    #new_dataset_non_sub = new_dt.apply_subset_and_mask(dataset, non_subset_vars, indexers, cond)
+    new_dataset_sub = new_dt.new_apply_subset_and_mask(dataset, subset_vars, indexers, cond)
+    new_dataset_non_sub = new_dt.new_apply_subset_and_mask(dataset, non_subset_vars, indexers, cond)
+
 
     # merge the datasets
-    new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
-
+    #new_dataset = xr.merge([new_dataset_sub, new_dataset_non_sub])
+    merged_tree = new_dt.merge_trees([new_dataset_sub, new_dataset_non_sub])
+    
     # Cast all variables to their original type
     for variable_name, variable in new_dataset.data_vars.items():
         original_type = indexed_ds[variable_name].dtype

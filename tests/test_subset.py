@@ -131,6 +131,7 @@ def data_files():
     """Get all the netCDF files from the test data directory."""
     test_dir = dirname(realpath(__file__))
     test_data_dir = join(test_dir, 'data')
+    #return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")][2:3]
     return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")]
 
 
@@ -182,7 +183,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
         # compare names
         assert in_var[0] == out_var[0]
 
-        # compare attributes
+        # compare attributes    
         np.testing.assert_equal(in_var[1].attrs, out_var[1].attrs)
 
         # compare type and dimension names
