@@ -42,13 +42,15 @@ import xarray.coding.times
 from shapely.geometry import Point, Polygon, MultiPolygon
 from shapely.ops import transform
 
-from podaac.subsetter import new_datatree as new_dt
 from podaac.subsetter import gpm_cleanup as gc
 from podaac.subsetter import time_converting as tc
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
     h5file_transform
+
+from podaac.subsetter import new_new_tree as new_new_tree
+
 
 SERVICE_NAME = 'l2ss-py'
 
@@ -321,96 +323,7 @@ def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str
     return match_coord_vars
 
 
-def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
-    """
-    Recursively search for latitude and longitude coordinate variables in a DataTree
-    and return their full paths.
 
-    Parameters
-    ----------
-    tree : DataTree
-        The DataTree to search.
-
-    Returns
-    -------
-    tuple
-        - List of latitude coordinate names prefixed with their full path.
-        - List of longitude coordinate names prefixed with their full path.
-    """
-    lat_coord_names = []
-    lon_coord_names = []
-
-    def find_coords_in_dataset(dataset: xr.Dataset, path: str):
-        """Find latitude and longitude variable names in a single dataset and track full paths."""
-        
-        possible_lat_coord_names = {'lat', 'latitude', 'y'}
-        possible_lon_coord_names = {'lon', 'longitude', 'x'}
-
-        current_lat_coord_names = []
-        current_lon_coord_names = []
-
-        custom_criteria = {
-            "latitude": {"standard_name": "latitude|projection_y_coordinate"},
-            "longitude": {"standard_name": "longitude|projection_x_coordinate"},
-        }
-
-        dataset = xr.decode_cf(dataset)
-
-        def append_coords_matching(names_set, coords_list):
-            """Append matching coordinates to the list."""
-            for var_name in dataset.variables:
-                if var_name.lower() in names_set:
-                    coords_list.append(f"{path}/{var_name}")
-
-        # First check for direct matches
-        append_coords_matching(possible_lat_coord_names, current_lat_coord_names)
-        append_coords_matching(possible_lon_coord_names, current_lon_coord_names)
-
-        # Fallback: check metadata for coordinates if not found
-        if not current_lat_coord_names or not current_lon_coord_names:
-            lat_matches = find_matching_coords(dataset, possible_lat_coord_names)
-            lon_matches = find_matching_coords(dataset, possible_lon_coord_names)
-
-            current_lat_coord_names.extend(f"{path}/{lat}" for lat in lat_matches)
-            current_lon_coord_names.extend(f"{path}/{lon}" for lon in lon_matches)
-
-            if not current_lat_coord_names or not current_lon_coord_names:
-                with cfxr.set_options(custom_criteria=custom_criteria):
-                    possible_lat_coords = dataset.cf.coordinates.get('latitude', [])
-                    possible_lon_coords = dataset.cf.coordinates.get('longitude', [])
-                    if possible_lat_coords:
-                        current_lat_coord_names.append(f"{path}/{possible_lat_coords[0]}")
-                    if possible_lon_coords:
-                        current_lon_coord_names.append(f"{path}/{possible_lon_coords[0]}")
-
-                if not current_lat_coord_names or not current_lon_coord_names:
-                    try:
-                        if "latitude" in dataset.cf and "longitude" in dataset.cf:
-                            current_lat_coord_names.append(f"{path}/{dataset.cf['latitude'].name}")
-                            current_lon_coord_names.append(f"{path}/{dataset.cf['longitude'].name}")
-                    except KeyError:
-                        pass
-
-        return current_lon_coord_names, current_lat_coord_names
-
-    def traverse_tree(node, path):
-        """Recursively search through the tree for latitude and longitude coordinates."""
-        if node.ds is not None:
-            return_lon, return_lat = find_coords_in_dataset(node.ds, path)
-            lon_coord_names.extend(return_lon)
-            lat_coord_names.extend(return_lat)
-
-        for child_name, child_node in node.children.items():
-            new_path = f"{path}/{child_name}" if path else child_name
-            traverse_tree(child_node, new_path)
-
-    # Start recursive tree traversal
-    traverse_tree(tree, "")
-
-    if not lat_coord_names or not lon_coord_names:
-        raise ValueError("Could not determine coordinate variables in the DataTree")
-
-    return lon_coord_names, lat_coord_names
 
 def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[str], str], Union[List[str], str]]:
     """
@@ -944,8 +857,6 @@ def get_base_group_names(lats: List[str]) -> Tuple[List[str], List[Union[int, st
 
 
 
-
-
 def get_variable_data(dtree, var_path):
     """
     Retrieve data from a DataTree object given a variable path.
@@ -1160,8 +1071,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         # Calculate temporal conditions
         temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
 
-        lon_data = new_dt.get_variable_from_path(dataset, lon_var_name)
-        lat_data = new_dt.get_variable_from_path(dataset, lat_var_name)
+        lon_data = new_new_tree.get_variable_from_path(dataset, lon_var_name)
+        lat_data = new_new_tree.get_variable_from_path(dataset, lat_var_name)
 
         #print(lon_bounds[0])
         #print(lon_bounds[1])
@@ -1299,16 +1210,24 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     """
 
     if not lat_var_names or not lon_var_names:
-        lon_var_names, lat_var_names = new_dt.compute_coordinate_variable_names_from_tree(dataset)
+        lon_var_names, lat_var_names = new_new_tree.compute_coordinate_variable_names_from_tree(dataset)
     if not time_var_names:
         time_var_names = []
         for lat_var_name in lat_var_names:
-            time_var_names.append(new_dt.compute_time_variable_name(dataset,
-                                                             dataset[lat_var_name],
-                                                             time_var_names))
+
+            parent_path = '/'.join(lat_var_name.split('/')[:-1])  # gives "data_20/c"
+
+            subtree = dataset[parent_path]  # Gets the subtree at data_20/c
+            variable = dataset[lat_var_name]  # Gets the latitude variable
+            time_name = new_new_tree.compute_time_variable_name_tree(subtree,
+                                                             variable,
+                                                             time_var_names)
+            time_var = f"{parent_path}{time_name}"
+            time_var_names.append(time_var)
 
         time_var_names.append(compute_utc_name(dataset))
-        time_var_names = [x for x in time_var_names if x is not None]  # remove Nones and any duplicates
+        seen = set()
+        time_var_names = [x for x in time_var_names if x is not None and not (x in seen or seen.add(x))]
 
     return lat_var_names, lon_var_names, time_var_names
 

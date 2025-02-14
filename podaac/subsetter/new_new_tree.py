@@ -3,9 +3,18 @@ import numpy as np
 from typing import Union, Dict, Tuple, List
 from xarray import DataTree
 from typing import Union, Dict, Tuple, List, Any
+import cf_xarray as cfxr
 
 import logging
+import xarray as xr
+import re
 
+import xarray as xr
+import re
+from typing import List, Optional
+from typing import Optional, Set
+
+GROUP_DELIM = "/"  # Adjust based on actual dataset structure
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
     """
@@ -687,3 +696,399 @@ def cast_variables_to_original_types(new_dataset, indexed_ds, dataset, indexers,
                 )
     
     return new_dataset
+
+
+def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
+    """
+    Recursively search for latitude and longitude coordinate variables in a DataTree
+    and return their full paths.
+
+    Parameters
+    ----------
+    tree : DataTree
+        The DataTree to search.
+
+    Returns
+    -------
+    tuple
+        - List of latitude coordinate names prefixed with their full path.
+        - List of longitude coordinate names prefixed with their full path.
+    """
+    lat_coord_names = []
+    lon_coord_names = []
+
+    def find_coords_in_dataset(dataset: xr.Dataset, path: str):
+        """Find latitude and longitude variable names in a single dataset and track full paths."""
+        
+        possible_lat_coord_names = {'lat', 'latitude', 'y'}
+        possible_lon_coord_names = {'lon', 'longitude', 'x'}
+
+        current_lat_coord_names = []
+        current_lon_coord_names = []
+
+        custom_criteria = {
+            "latitude": {"standard_name": "latitude|projection_y_coordinate"},
+            "longitude": {"standard_name": "longitude|projection_x_coordinate"},
+        }
+
+        dataset = xr.decode_cf(dataset)
+
+        def append_coords_matching(names_set, coords_list):
+            """Append matching coordinates to the list."""
+            for var_name in dataset.variables:
+                if var_name.lower() in names_set:
+                    coords_list.append(f"{path}/{var_name}")
+
+        # First check for direct matches
+        append_coords_matching(possible_lat_coord_names, current_lat_coord_names)
+        append_coords_matching(possible_lon_coord_names, current_lon_coord_names)
+
+        # Fallback: check metadata for coordinates if not found
+        if not current_lat_coord_names or not current_lon_coord_names:
+            lat_matches = find_matching_coords(dataset, possible_lat_coord_names)
+            lon_matches = find_matching_coords(dataset, possible_lon_coord_names)
+
+            current_lat_coord_names.extend(f"{path}/{lat}" for lat in lat_matches)
+            current_lon_coord_names.extend(f"{path}/{lon}" for lon in lon_matches)
+
+            if not current_lat_coord_names or not current_lon_coord_names:
+                with cfxr.set_options(custom_criteria=custom_criteria):
+                    possible_lat_coords = dataset.cf.coordinates.get('latitude', [])
+                    possible_lon_coords = dataset.cf.coordinates.get('longitude', [])
+                    if possible_lat_coords:
+                        current_lat_coord_names.append(f"{path}/{possible_lat_coords[0]}")
+                    if possible_lon_coords:
+                        current_lon_coord_names.append(f"{path}/{possible_lon_coords[0]}")
+
+                if not current_lat_coord_names or not current_lon_coord_names:
+                    try:
+                        if "latitude" in dataset.cf and "longitude" in dataset.cf:
+                            current_lat_coord_names.append(f"{path}/{dataset.cf['latitude'].name}")
+                            current_lon_coord_names.append(f"{path}/{dataset.cf['longitude'].name}")
+                    except KeyError:
+                        pass
+
+        return current_lon_coord_names, current_lat_coord_names
+
+    def traverse_tree(node, path):
+        """Recursively search through the tree for latitude and longitude coordinates."""
+        if node.ds is not None:
+            return_lon, return_lat = find_coords_in_dataset(node.ds, path)
+            lon_coord_names.extend(return_lon)
+            lat_coord_names.extend(return_lat)
+
+        for child_name, child_node in node.children.items():
+            new_path = f"{path}/{child_name}" if path else child_name
+            traverse_tree(child_node, new_path)
+
+    # Start recursive tree traversal
+    traverse_tree(tree, "")
+
+    if not lat_coord_names or not lon_coord_names:
+        raise ValueError("Could not determine coordinate variables in the DataTree")
+
+    return lon_coord_names, lat_coord_names
+
+def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str]:
+    """
+    As a backup for finding a coordinate var, look at the 'coordinates'
+    metadata attribute of all data vars in the granule. Return any
+    coordinate vars that have name matches with the provided
+    'match_list'
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Dataset to search data variable coordinate metadata attribute
+    match_list : list (str)
+        List of possible matches to search for. For example,
+        ['lat', 'latitude'] would search for variables in the
+        'coordinates' metadata attribute containing either 'lat'
+        or 'latitude'
+
+    Returns
+    -------
+    list (str)
+        List of matching coordinate variables names
+    """
+    coord_attrs = [
+        var.attrs['coordinates'] for var_name, var in dataset.data_vars.items()
+        if 'coordinates' in var.attrs
+    ]
+    coord_attrs = list(set(coord_attrs))
+    match_coord_vars = []
+    for coord_attr in coord_attrs:
+        coords = coord_attr.split(' ')
+        match_vars = [
+            coord for coord in coords
+            if any(coord_cand in coord for coord_cand in match_list)
+        ]
+        if match_vars and match_vars[0] in dataset:
+            # Check if the var actually exists in the dataset
+            match_coord_vars.append(match_vars[0])
+    return match_coord_vars
+
+
+
+
+def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
+
+    time_coord_name = []
+
+    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, path: str, total_time_vars: Set[str]) -> Optional[str]:
+        """
+        Find the time variable name in a dataset using various criteria.
+
+        The search is performed in order of reliability:
+        1. Coordinates with 'time' in name
+        2. Variables with explicit time metadata
+        3. Variables with 'time' in name matching lat dimensions
+        4. Variables with specific time-related names
+
+        Parameters
+        ----------
+        dataset : xr.Dataset
+            xarray dataset to search
+        lat_var : xr.Variable
+            Latitude variable for dimension matching
+        total_time_vars : Set[str]
+            Set of previously found time variables to exclude
+
+        Returns
+        -------
+        Optional[str]
+            Name of found time variable or None if not found
+        """
+        lat_dims = lat_var.squeeze().dims
+        
+        # Cache squeezed dimensions to avoid repeated computations
+        dim_cache = {}
+        def get_squeezed_dims(var_name: str) -> tuple:
+            if var_name not in dim_cache:
+                dim_cache[var_name] = dataset[var_name].squeeze().dims
+            return dim_cache[var_name]
+
+        # Check coordinates first (most likely location)
+        for coord_name in dataset.coords:
+            if 'time' in coord_name.lower() and coord_name not in total_time_vars:
+                if get_squeezed_dims(coord_name) == lat_dims:
+                    return coord_name
+
+        # Compile regex pattern once
+        time_units_pattern = re.compile(
+            r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?",
+            re.IGNORECASE
+        )
+
+        # Check variables with time-related metadata
+        for var_name, var in dataset.variables.items():
+            if var_name in total_time_vars:
+                continue
+                
+            # Check metadata indicators
+            if any([
+                var.attrs.get('standard_name') == 'time',
+                var.attrs.get('axis') == 'T',
+                ('units' in var.attrs and time_units_pattern.match(var.attrs['units']))
+            ]):
+                return var_name
+
+        # Check variables with 'time' in name and matching dimensions
+        for var_name in dataset.variables:
+            if var_name in total_time_vars:
+                continue
+                
+            dims = get_squeezed_dims(var_name)
+            if not dims:  # Skip dimensionless variables
+                continue
+                
+            var_basename = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1].lower()
+            
+            # Check for exact time variable names first
+            if var_basename in {'time', 'timemidscan'} and dims[0] in lat_dims:
+                return var_name
+                
+            # Then check for 'time' in name
+            if 'time' in var_basename and dims[0] in lat_dims:
+                return var_name
+
+        return None
+
+    def traverse_tree(node, path):
+        print(node)
+        """Recursively search through the tree for latitude and longitude coordinates."""
+        if node.ds is not None:
+            return_time = find_time_in_dataset(node.ds, lat_var, path, total_time_vars)
+            if return_time:
+                print("FOUND TIME")
+                time_var = f"{path}/{return_time}"
+                return time_var
+                #print(time_var)
+                #time_coord_name.append(time_var)
+
+        for child_name, child_node in node.children.items():
+            new_path = f"{path}/{child_name}" if path else child_name
+            traverse_tree(child_node, new_path)
+
+    # Start recursive tree traversal
+    return traverse_tree(tree, "")
+
+def compute_lon_lat_time_variable_name_tree(tree, total_time_vars):
+
+    lat_coord_names = []
+    lon_coord_names = []
+    time_coord_names = []
+
+    def find_coords_in_dataset(dataset: xr.Dataset, path: str):
+        """Find latitude and longitude variable names in a single dataset and track full paths."""
+        
+        possible_lat_coord_names = {'lat', 'latitude', 'y'}
+        possible_lon_coord_names = {'lon', 'longitude', 'x'}
+
+        current_lat_coord_names = []
+        current_lon_coord_names = []
+
+        custom_criteria = {
+            "latitude": {"standard_name": "latitude|projection_y_coordinate"},
+            "longitude": {"standard_name": "longitude|projection_x_coordinate"},
+        }
+
+        dataset = xr.decode_cf(dataset)
+
+        def append_coords_matching(names_set, coords_list):
+            """Append matching coordinates to the list."""
+            for var_name in dataset.variables:
+                if var_name.lower() in names_set:
+                    coords_list.append(f"{path}/{var_name}")
+
+        # First check for direct matches
+        append_coords_matching(possible_lat_coord_names, current_lat_coord_names)
+        append_coords_matching(possible_lon_coord_names, current_lon_coord_names)
+
+        # Fallback: check metadata for coordinates if not found
+        if not current_lat_coord_names or not current_lon_coord_names:
+            lat_matches = find_matching_coords(dataset, possible_lat_coord_names)
+            lon_matches = find_matching_coords(dataset, possible_lon_coord_names)
+
+            current_lat_coord_names.extend(f"{path}/{lat}" for lat in lat_matches)
+            current_lon_coord_names.extend(f"{path}/{lon}" for lon in lon_matches)
+
+            if not current_lat_coord_names or not current_lon_coord_names:
+                with cfxr.set_options(custom_criteria=custom_criteria):
+                    possible_lat_coords = dataset.cf.coordinates.get('latitude', [])
+                    possible_lon_coords = dataset.cf.coordinates.get('longitude', [])
+                    if possible_lat_coords:
+                        current_lat_coord_names.append(f"{path}/{possible_lat_coords[0]}")
+                    if possible_lon_coords:
+                        current_lon_coord_names.append(f"{path}/{possible_lon_coords[0]}")
+
+                if not current_lat_coord_names or not current_lon_coord_names:
+                    try:
+                        if "latitude" in dataset.cf and "longitude" in dataset.cf:
+                            current_lat_coord_names.append(f"{path}/{dataset.cf['latitude'].name}")
+                            current_lon_coord_names.append(f"{path}/{dataset.cf['longitude'].name}")
+                    except KeyError:
+                        pass
+
+        return current_lon_coord_names, current_lat_coord_names
+
+    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, path: str, total_time_vars: Set[str]) -> Optional[str]:
+        """
+        Find the time variable name in a dataset using various criteria.
+
+        The search is performed in order of reliability:
+        1. Coordinates with 'time' in name
+        2. Variables with explicit time metadata
+        3. Variables with 'time' in name matching lat dimensions
+        4. Variables with specific time-related names
+
+        Parameters
+        ----------
+        dataset : xr.Dataset
+            xarray dataset to search
+        lat_var : xr.Variable
+            Latitude variable for dimension matching
+        total_time_vars : Set[str]
+            Set of previously found time variables to exclude
+
+        Returns
+        -------
+        Optional[str]
+            Name of found time variable or None if not found
+        """
+        lat_dims = lat_var.squeeze().dims
+        
+        # Cache squeezed dimensions to avoid repeated computations
+        dim_cache = {}
+        def get_squeezed_dims(var_name: str) -> tuple:
+            if var_name not in dim_cache:
+                dim_cache[var_name] = dataset[var_name].squeeze().dims
+            return dim_cache[var_name]
+
+        # Check coordinates first (most likely location)
+        for coord_name in dataset.coords:
+            if 'time' in coord_name.lower() and coord_name not in total_time_vars:
+                if get_squeezed_dims(coord_name) == lat_dims:
+                    return coord_name
+
+        # Compile regex pattern once
+        time_units_pattern = re.compile(
+            r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?",
+            re.IGNORECASE
+        )
+
+        # Check variables with time-related metadata
+        for var_name, var in dataset.variables.items():
+            if var_name in total_time_vars:
+                continue
+                
+            # Check metadata indicators
+            if any([
+                var.attrs.get('standard_name') == 'time',
+                var.attrs.get('axis') == 'T',
+                ('units' in var.attrs and time_units_pattern.match(var.attrs['units']))
+            ]):
+                return var_name
+
+        # Check variables with 'time' in name and matching dimensions
+        for var_name in dataset.variables:
+            if var_name in total_time_vars:
+                continue
+                
+            dims = get_squeezed_dims(var_name)
+            if not dims:  # Skip dimensionless variables
+                continue
+                
+            var_basename = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1].lower()
+            
+            # Check for exact time variable names first
+            if var_basename in {'time', 'timemidscan'} and dims[0] in lat_dims:
+                return var_name
+                
+            # Then check for 'time' in name
+            if 'time' in var_basename and dims[0] in lat_dims:
+                return var_name
+
+        return None
+
+    def traverse_tree(node, path):
+        """Recursively search through the tree for latitude and longitude coordinates."""
+        if node.ds is not None:
+            return_lon, return_lat = find_coords_in_dataset(node.ds, path)
+            lon_coord_names.extend(return_lon)
+            lat_coord_names.extend(return_lat)
+
+            if return_lat:
+                return_time = find_time_in_dataset(node.ds, return_lat, path, total_time_vars)
+                if return_time:
+                    time_var = f"{path}/{return_time}"
+                    time_coord_name.append(time_var)
+
+
+        for child_name, child_node in node.children.items():
+            new_path = f"{path}/{child_name}" if path else child_name
+            traverse_tree(child_node, new_path)
+
+    # Start recursive tree traversal
+    traverse_tree(tree, "")
+

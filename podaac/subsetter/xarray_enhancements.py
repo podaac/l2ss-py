@@ -25,9 +25,6 @@ from typing import Union
 import numpy as np
 import xarray as xr
 from podaac.subsetter import dimension_cleanup as dc
-from podaac.subsetter import new_datatree as new_dt
-
-from podaac.subsetter import another_dt as another_dt
 from podaac.subsetter import new_new_tree as new_new_tree
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
