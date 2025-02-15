@@ -1074,6 +1074,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         lon_data = new_new_tree.get_variable_from_path(dataset, lon_var_name)
         lat_data = new_new_tree.get_variable_from_path(dataset, lat_var_name)
 
+        print(lon_var_name)
+        print(lat_var_name)
+        print(lon_data)
+        print(lat_data)
         #print(lon_bounds[0])
         #print(lon_bounds[1])
         #print(lat_bounds[0])

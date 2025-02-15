@@ -933,162 +933,53 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     # Start recursive tree traversal
     return traverse_tree(tree, "")
 
-def compute_lon_lat_time_variable_name_tree(tree, total_time_vars):
-
-    lat_coord_names = []
-    lon_coord_names = []
-    time_coord_names = []
-
-    def find_coords_in_dataset(dataset: xr.Dataset, path: str):
-        """Find latitude and longitude variable names in a single dataset and track full paths."""
-        
-        possible_lat_coord_names = {'lat', 'latitude', 'y'}
-        possible_lon_coord_names = {'lon', 'longitude', 'x'}
-
-        current_lat_coord_names = []
-        current_lon_coord_names = []
-
-        custom_criteria = {
-            "latitude": {"standard_name": "latitude|projection_y_coordinate"},
-            "longitude": {"standard_name": "longitude|projection_x_coordinate"},
-        }
-
-        dataset = xr.decode_cf(dataset)
-
-        def append_coords_matching(names_set, coords_list):
-            """Append matching coordinates to the list."""
-            for var_name in dataset.variables:
-                if var_name.lower() in names_set:
-                    coords_list.append(f"{path}/{var_name}")
-
-        # First check for direct matches
-        append_coords_matching(possible_lat_coord_names, current_lat_coord_names)
-        append_coords_matching(possible_lon_coord_names, current_lon_coord_names)
-
-        # Fallback: check metadata for coordinates if not found
-        if not current_lat_coord_names or not current_lon_coord_names:
-            lat_matches = find_matching_coords(dataset, possible_lat_coord_names)
-            lon_matches = find_matching_coords(dataset, possible_lon_coord_names)
-
-            current_lat_coord_names.extend(f"{path}/{lat}" for lat in lat_matches)
-            current_lon_coord_names.extend(f"{path}/{lon}" for lon in lon_matches)
-
-            if not current_lat_coord_names or not current_lon_coord_names:
-                with cfxr.set_options(custom_criteria=custom_criteria):
-                    possible_lat_coords = dataset.cf.coordinates.get('latitude', [])
-                    possible_lon_coords = dataset.cf.coordinates.get('longitude', [])
-                    if possible_lat_coords:
-                        current_lat_coord_names.append(f"{path}/{possible_lat_coords[0]}")
-                    if possible_lon_coords:
-                        current_lon_coord_names.append(f"{path}/{possible_lon_coords[0]}")
-
-                if not current_lat_coord_names or not current_lon_coord_names:
-                    try:
-                        if "latitude" in dataset.cf and "longitude" in dataset.cf:
-                            current_lat_coord_names.append(f"{path}/{dataset.cf['latitude'].name}")
-                            current_lon_coord_names.append(f"{path}/{dataset.cf['longitude'].name}")
-                    except KeyError:
-                        pass
-
-        return current_lon_coord_names, current_lat_coord_names
-
-    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, path: str, total_time_vars: Set[str]) -> Optional[str]:
-        """
-        Find the time variable name in a dataset using various criteria.
-
-        The search is performed in order of reliability:
-        1. Coordinates with 'time' in name
-        2. Variables with explicit time metadata
-        3. Variables with 'time' in name matching lat dimensions
-        4. Variables with specific time-related names
-
-        Parameters
-        ----------
-        dataset : xr.Dataset
-            xarray dataset to search
-        lat_var : xr.Variable
-            Latitude variable for dimension matching
-        total_time_vars : Set[str]
-            Set of previously found time variables to exclude
-
-        Returns
-        -------
-        Optional[str]
-            Name of found time variable or None if not found
-        """
-        lat_dims = lat_var.squeeze().dims
-        
-        # Cache squeezed dimensions to avoid repeated computations
-        dim_cache = {}
-        def get_squeezed_dims(var_name: str) -> tuple:
-            if var_name not in dim_cache:
-                dim_cache[var_name] = dataset[var_name].squeeze().dims
-            return dim_cache[var_name]
-
-        # Check coordinates first (most likely location)
-        for coord_name in dataset.coords:
-            if 'time' in coord_name.lower() and coord_name not in total_time_vars:
-                if get_squeezed_dims(coord_name) == lat_dims:
-                    return coord_name
-
-        # Compile regex pattern once
-        time_units_pattern = re.compile(
-            r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?",
-            re.IGNORECASE
-        )
-
-        # Check variables with time-related metadata
-        for var_name, var in dataset.variables.items():
-            if var_name in total_time_vars:
-                continue
-                
-            # Check metadata indicators
-            if any([
-                var.attrs.get('standard_name') == 'time',
-                var.attrs.get('axis') == 'T',
-                ('units' in var.attrs and time_units_pattern.match(var.attrs['units']))
-            ]):
-                return var_name
-
-        # Check variables with 'time' in name and matching dimensions
-        for var_name in dataset.variables:
-            if var_name in total_time_vars:
-                continue
-                
-            dims = get_squeezed_dims(var_name)
-            if not dims:  # Skip dimensionless variables
-                continue
-                
-            var_basename = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1].lower()
-            
-            # Check for exact time variable names first
-            if var_basename in {'time', 'timemidscan'} and dims[0] in lat_dims:
-                return var_name
-                
-            # Then check for 'time' in name
-            if 'time' in var_basename and dims[0] in lat_dims:
-                return var_name
-
+def get_variable_from_path(datatree: Any, path: str) -> Optional[Union[xr.DataArray, xr.Dataset]]:
+    """
+    Get a variable from a datatree object using a path-like string.
+    
+    Parameters
+    ----------
+    datatree : Any
+        The datatree object to search through
+    path : str
+        Path to the variable using '/' as delimiter
+        Example: "group1/subgroup/variable_name"
+    
+    Returns
+    -------
+    Optional[Union[xr.DataArray, xr.Dataset]]
+        The variable found at the specified path, or None if not found
+    
+    """
+    # Handle empty path
+    if not path:
         return None
-
-    def traverse_tree(node, path):
-        """Recursively search through the tree for latitude and longitude coordinates."""
-        if node.ds is not None:
-            return_lon, return_lat = find_coords_in_dataset(node.ds, path)
-            lon_coord_names.extend(return_lon)
-            lat_coord_names.extend(return_lat)
-
-            if return_lat:
-                return_time = find_time_in_dataset(node.ds, return_lat, path, total_time_vars)
-                if return_time:
-                    time_var = f"{path}/{return_time}"
-                    time_coord_name.append(time_var)
-
-
-        for child_name, child_node in node.children.items():
-            new_path = f"{path}/{child_name}" if path else child_name
-            traverse_tree(child_node, new_path)
-
-    # Start recursive tree traversal
-    traverse_tree(tree, "")
-
+        
+    # Clean path by removing leading/trailing slashes and whitespace
+    clean_path = path.strip().strip('/')
+    
+    # Split path into components
+    path_components = clean_path.split('/')
+    
+    # Start at root
+    current = datatree
+    
+    try:
+        # Traverse through path components
+        for component in path_components:
+            # Skip empty components
+            if not component:
+                continue
+                
+            # Check if component exists
+            if not hasattr(current, component):
+                return None
+                
+            # Move to next level
+            current = getattr(current, component)
+            
+        return current
+        
+    except (AttributeError, TypeError):
+        # Return None if any error occurs during traversal
+        return None
