@@ -184,6 +184,11 @@ def get_variables_with_indexers(dataset, indexers):
     return subset_vars, no_subset_vars
 
 
+def tree_where(dataset, cond_dictionary, cut) -> xr.Dataset:
+
+    return new_new_tree.where_tree(dataset, None, cut, cond_dictionary)
+
+
 def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool) -> xr.Dataset:
     """
     Return a dataset which meets the given condition.

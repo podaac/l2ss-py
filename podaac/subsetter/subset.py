@@ -164,8 +164,12 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
     Assumption that the provided bounding box is always between
     -180 --> 180 for longitude and -90, 90 for latitude.
     """
-    return np.array([convert_bound(bbox[0], 360, dataset[lon_var_name]),
-                     convert_bound(bbox[1], 180, dataset[lat_var_name])])
+
+    lon_data = new_new_tree.get_variable_from_path(dataset, lon_var_name)
+    lat_data = new_new_tree.get_variable_from_path(dataset, lat_var_name)
+
+    return np.array([convert_bound(bbox[0], 360, lon_data),
+                     convert_bound(bbox[1], 180, lat_data)])
 
 
 def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
@@ -947,12 +951,10 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
     return temporal_cond
 
 
-
-
-
-
-
-
+def get_path(s):
+    """Extracts the path by removing the last part after the final '/'."""
+    path = s.rsplit('/', 1)[0] if '/' in s else s
+    return f"/{path}"
 
 
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
@@ -1011,6 +1013,48 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     datasets = []
     total_list = []  # don't include repeated variables
+
+    print(lat_bounds[0])
+    print(lat_bounds[1])
+    print(lon_bounds[0])
+    print(lon_bounds[1])
+
+    subset_dictionary = {}
+    for lat_var_name, lon_var_name, time_var_name in zip(lat_var_names, lon_var_names, time_var_names):
+
+        lat_path = get_path(lat_var_name)
+        lon_path = get_path(lon_var_name)
+        time_path = get_path(time_var_name)
+
+        temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
+
+        lon_data = new_new_tree.get_variable_from_path(dataset, lon_var_name)
+        lat_data = new_new_tree.get_variable_from_path(dataset, lat_var_name)
+
+        operation = (
+            oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
+            (lat_data >= lat_bounds[0]) &
+            (lat_data <= lat_bounds[1]) &
+            temporal_cond
+        )
+
+
+        if lat_path == lon_path and lat_path == time_path and lon_path == time_path:
+            print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            print(lon_data)
+            print(lat_data)
+            print(operation)
+            print(lat_path)
+            print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            subset_dictionary[lat_path] = operation
+
+    print("##########################")
+    print(subset_dictionary)
+    print("##########################")
+
+    return_dataset = xre.tree_where(dataset, subset_dictionary, cut)
+    return return_dataset
+    """
     for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
             lat_var_names, lon_var_names, time_var_names, diff_count
     ):
@@ -1074,18 +1118,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         lon_data = new_new_tree.get_variable_from_path(dataset, lon_var_name)
         lat_data = new_new_tree.get_variable_from_path(dataset, lat_var_name)
 
-        print(lon_var_name)
-        print(lat_var_name)
-        print(lon_data)
-        print(lat_data)
-        #print(lon_bounds[0])
-        #print(lon_bounds[1])
-        #print(lat_bounds[0])
-        #print(lat_bounds[1])
+        #print(lon_var_name)
+        #print(lat_var_name)
         #print(lon_data)
         #print(lat_data)
-
-        print(group_dataset)
+        #print(group_dataset)
 
         group_dataset = xre.where(
             group_dataset,
@@ -1099,7 +1136,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             cut
         )
         return group_dataset
-        """
+        
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -1111,14 +1148,13 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             temporal_cond,
             cut
         )
-        """
-
+        
         datasets.append(group_dataset)
         total_list.extend(group_vars)
         if diffs == -1:
             return datasets
-
-    dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
+        """
+    #dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
     return dim_cleaned_datasets
 
 
@@ -1485,9 +1521,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
-        print("##############################")
-        print(datasets)
-        print("##############################")
+        #print("##############################")
+        #print(datasets)
+        #print("##############################")
 
         datasets.to_netcdf(output_file)
         spatial_bounds = []
@@ -1536,8 +1572,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             ]])
         """
         
-        return get_spatial_bounds(
-            dataset=dataset,
-            lat_var_names=lat_var_names,
-            lon_var_names=lon_var_names
+        return new_new_tree.tree_get_spatial_bounds(
+            dataset,
+            lat_var_names,
+            lon_var_names
         )

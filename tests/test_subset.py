@@ -976,6 +976,8 @@ def test_group_subset(data_dir, subset_output_dir):
         output_file=os.path.join(subset_output_dir, s6_output_file_name)
     )
 
+    print(bounds)
+
     # Check that bounds are within requested bbox
     assert bounds[0][0] >= bbox[0][0]
     assert bounds[0][1] <= bbox[0][1]
