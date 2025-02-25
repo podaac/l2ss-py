@@ -1014,12 +1014,13 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     datasets = []
     total_list = []  # don't include repeated variables
 
+    subset_dictionary = {}
+
     print(lat_bounds[0])
     print(lat_bounds[1])
     print(lon_bounds[0])
     print(lon_bounds[1])
 
-    subset_dictionary = {}
     for lat_var_name, lon_var_name, time_var_name in zip(lat_var_names, lon_var_names, time_var_names):
 
         lat_path = get_path(lat_var_name)
@@ -1038,19 +1039,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             temporal_cond
         )
 
-
         if lat_path == lon_path and lat_path == time_path and lon_path == time_path:
-            print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-            print(lon_data)
-            print(lat_data)
-            print(operation)
-            print(lat_path)
-            print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
             subset_dictionary[lat_path] = operation
-
-    print("##########################")
-    print(subset_dictionary)
-    print("##########################")
 
     return_dataset = xre.tree_where(dataset, subset_dictionary, cut)
     return return_dataset
@@ -1108,7 +1098,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         else:
             group_vars = list(dataset.keys())
-
 
         group_dataset = dataset
 
@@ -1573,7 +1562,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         """
         
         return new_new_tree.tree_get_spatial_bounds(
-            dataset,
+            datasets,
             lat_var_names,
             lon_var_names
         )

@@ -255,6 +255,9 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         """
         # Print the current path
         cond = get_condition(condition_dict, path)
+        if cond is None:
+            if len(condition_dict) == 1:
+                key, cond = next(iter(condition_dict.items()))
 
         # Get the dataset directly from the node
         dataset = node.ds
@@ -264,6 +267,7 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         # Process current node's dataset
         if len(dataset.variables) > 0:  # Only process if node has data
             # Create indexers from condition
+
             if cond.values.ndim == 1:
                 indexers = get_indexers_from_1d(cond)
             else:
@@ -272,9 +276,13 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             if not all(len(value) > 0 for value in indexers.values()):
                 return copy_empty_dataset(dataset), {}
 
+            print("**************************")
             print(indexers)
+            print("**************************") 
+
             # Check for partial dimension overlap
             partial_dim_in_vars = check_partial_dim_overlap_node(dataset, indexers)
+            partial_dim_in_in_vars = partial_dim_in_vars
 
             # Apply indexing to condition and dataset
             indexed_cond = cond.isel(**indexers)
@@ -283,23 +291,17 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             # Get variables with and without indexers
             subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
             
-            # dataset with variables that need to be subsetted
-            new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
-            # data with variables that shouldn't be subsetted
-            new_dataset_non_sub = indexed_ds[non_subset_vars]
 
-            """
+            print("********************************")
+            print(indexed_cond)
             print(subset_vars)
             print(non_subset_vars)
-            # Process variables
-            sub_ds = create_subset_dataset(dataset, subset_vars, indexers, cond)
-            non_sub_ds = create_subset_dataset(dataset, non_subset_vars, indexers, cond)
+            print("********************************")
+            # dataset with variables that need to be subsetted
+            new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
 
-            print("############################")
-            print(path)
-            print('applying subsetting')
-            print("############################")
-            """
+            # data with variables that shouldn't be subsetted
+            new_dataset_non_sub = indexed_ds[non_subset_vars]
 
             # Merge the datasets
             #merged_ds = xr.merge([non_sub_ds, sub_ds])            
@@ -311,7 +313,75 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                 if var in merged_ds:
                     merged_ds[var] = merged_ds[var].astype(dtype)
 
+            new_dataset = merged_ds
+
+            # Cast all variables to their original type
+            for variable_name, variable in new_dataset.data_vars.items():
+                original_type = indexed_ds[variable_name].dtype
+                new_type = variable.dtype
+                indexed_var = indexed_ds[variable_name]
+
+                if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
+                        indexers.keys()).intersection(dataset[variable_name].dims):
+
+                    missing_dim = (indexers.keys() - dataset[variable_name].dims).pop()  # Assume only 1
+                    var_indexers = {
+                        dim_name: dim_value for dim_name, dim_value in indexers.items()
+                        if dim_name in dataset[variable_name].dims
+                    }
+
+                    var_cond = cond.any(axis=cond.dims.index(missing_dim)).isel(**var_indexers)
+                    indexed_var = dataset[variable_name].isel(**var_indexers)
+                    new_dataset[variable_name] = indexed_var.where(var_cond)
+                    variable = new_dataset[variable_name]
+                elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
+                        indexers.keys()).intersection(new_dataset[variable_name].dims):
+                    new_dataset[variable_name] = indexed_var
+
+                    new_dataset[variable_name].attrs = indexed_var.attrs
+                    variable.attrs = indexed_var.attrs
+                # Check if variable has no _FillValue. If so, use original data
+                if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
+
+                    if original_type != new_type:
+                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
+                                                                    str(original_type), dask='allowed',
+                                                                    keep_attrs=True)
+
+                    # Replace nans with values from original dataset. If the
+                    # variable has more than one dimension, copy the entire
+                    # variable over, otherwise use a NaN mask to copy over the
+                    # relevant values.
+                    new_dataset[variable_name] = indexed_var
+
+                    new_dataset[variable_name].attrs = indexed_var.attrs
+                    variable.attrs = indexed_var.attrs
+                    new_dataset[variable_name].encoding['_FillValue'] = None
+                    variable.encoding['_FillValue'] = None
+
+                else:
+                    # Manually replace nans with FillValue
+                    # If variable represents time, cast _FillValue to datetime
+                    fill_value = new_dataset[variable_name].attrs.get('_FillValue')
+
+
+                    if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
+                        fill_value = np.datetime64('nat')
+                    if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
+                        fill_value = np.timedelta64('nat')
+                    new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
+
+                    if variable_name == "quality_flags":
+                        print(fill_value)
+                        print(variable_name)
+                        print(new_dataset[variable_name])
+                    if original_type != new_type:
+                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
+                                                                    str(original_type), dask='allowed',
+                                                                    keep_attrs=True)
+            processed_ds = new_dataset
             # Cast variables and handle fill values
+            """
             processed_ds = cast_variables_to_original_types(
                 merged_ds,
                 indexed_ds,
@@ -319,7 +389,7 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                 indexers,
                 partial_dim_in_vars,
                 cond
-            )
+            )"""
         else:
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
@@ -354,7 +424,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
     # Copy over root attributes
     result_tree.attrs.update(tree.attrs)
 
-    print(result_tree)
     return result_tree
 
 """
@@ -510,12 +579,9 @@ def create_subset_dataset(
                 if var_indexers:
                     var_cond = cond.isel(**var_indexers)
                     subset_dict[var_name] = indexed_var.where(var_cond)
-                    print("Subsetting")
                 else:
                     subset_dict[var_name] = indexed_var
-                print("NOT WHAT")
             else:
-                print("WHAT")
                 subset_dict[var_name] = dataset[var_name]
     
     return xr.Dataset(subset_dict)
@@ -708,7 +774,10 @@ def cast_variables_to_original_types(new_dataset, indexed_ds, dataset, indexers,
                 fill_value = np.datetime64('nat')
             if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
                 fill_value = np.timedelta64('nat')
-                
+            
+            print(variable_name)
+            print(fill_value)
+
             new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
             
             if original_type != new_type:
@@ -1095,10 +1164,6 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
     if not min_lats:  # If no valid bounds were found
         return None
 
-    print(min_lons)
-    print(max_lons)
-    print(min_lats)
-    print(max_lats)
     # Calculate overall bounds using numpy operations
     return np.array([
         [min(min_lons), max(max_lons)],

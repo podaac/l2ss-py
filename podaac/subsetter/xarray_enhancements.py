@@ -239,7 +239,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
     #subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
-
     subset_vars, non_subset_vars = new_dt.get_variables_with_indexers_tree(dataset, indexers)
 
     indexed_cond = cond.isel(**indexers)

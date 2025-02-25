@@ -65,12 +65,13 @@ def data_dir():
     return join(test_dir, 'data')
 
 
+#Simon
 @pytest.fixture(scope='class')
 def subset_output_dir(data_dir):
     """Makes a new temporary directory to hold the subset results while tests are running."""
     subset_output_dir = tempfile.mkdtemp(dir=data_dir)
     yield subset_output_dir
-    shutil.rmtree(subset_output_dir)
+    #shutil.rmtree(subset_output_dir)
 
 
 @pytest.fixture(scope='class')
@@ -127,12 +128,15 @@ def history_json_schema():
     }
 
 
+#SIMON
 def data_files():
     """Get all the netCDF files from the test data directory."""
     test_dir = dirname(realpath(__file__))
     test_data_dir = join(test_dir, 'data')
-    #return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")][2:3]
-    return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")]
+    return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")][1:2]
+
+    #return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")][10:11]
+    #return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")]
 
 
 TEST_DATA_FILES = data_files()
@@ -148,6 +152,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
 
     bbox = np.array(((-180, 90), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
+    print(test_file)
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
@@ -206,6 +211,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
     bbox = np.array(((-180, 90), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
     subset_output_file = join(subset_output_dir, output_file)
+    print(test_file)
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
@@ -227,6 +233,9 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
 
     lats = out_ds[lat_var_name].values
     lons = out_ds[lon_var_name].values
+
+    print(lats)
+    print(lons)
 
     warnings.filterwarnings('ignore')
 
@@ -255,7 +264,9 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         rows = np.any(spatial_mask, axis=1)
         cols = np.any(spatial_mask, axis=0)
         bound_mask = np.array([[r & c for c in cols] for r in rows])
+        print("WHAT")
 
+    print(bound_mask)
     # If all the lat/lon values are valid, the file is valid and
     # there is no need to check individual variables.
     if np.all(spatial_mask):
@@ -264,6 +275,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
     # Step 2: Get mask of values which are NaN or "_FillValue in
     # each variable.
     for _, var in out_ds.data_vars.items():
+
         # remove dimension of '1' if necessary
         vals = np.squeeze(var.values)
 
@@ -316,6 +328,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         # those values assuming there are only NaN values
         # in the data at those locations.
         np.testing.assert_equal(spatial_mask, combined_mask)
+
 
     out_ds.close()
 
