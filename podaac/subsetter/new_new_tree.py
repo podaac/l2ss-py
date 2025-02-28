@@ -105,112 +105,6 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
 
     return indexers
 
-def create_subset_dataset(
-    dataset: xr.Dataset,
-    variables: List[str],
-    indexers: Dict,
-    cond: Union[xr.Dataset, xr.DataArray]
-) -> xr.Dataset:
-    """
-    Create a dataset for a subset of variables with proper masking,
-    strictly maintaining each variable's original dimensions and order.
-    """
-    # Keep track of original variable order
-    original_var_order = list(dataset.variables)
-    original_dims = {var: dataset[var].dims for var in variables if var in dataset}
-    
-    # Create a full-size mask matching the original data size
-    full_mask = np.zeros(dataset.dims['num_lines'], dtype=bool)
-    full_mask[indexers['num_lines']] = True
-    
-    # Process variables maintaining order
-    subset_dict = {}
-    for var_name in original_var_order:
-        if var_name in variables and var_name in dataset:
-            var = dataset[var_name]
-            orig_dims = original_dims[var_name]
-            
-            # Create a condition matching the original variable's shape
-            if set(orig_dims).intersection(cond.dims):
-                subset_dict[var_name] = var.where(full_mask)
-            else:
-                subset_dict[var_name] = var.copy()
-            
-            # Verify dimensions haven't changed
-            assert subset_dict[var_name].dims == orig_dims, (
-                f"Dimensions changed for {var_name}. "
-                f"Expected {orig_dims}, got {subset_dict[var_name].dims}"
-            )
-    
-    # Create dataset with original structure and order
-    result = xr.Dataset()
-    
-    # Add variables in original order
-    for var_name in original_var_order:
-        if var_name in subset_dict:
-            result[var_name] = subset_dict[var_name]
-    
-    # Copy coordinates in original order
-    for coord_name in original_var_order:
-        if coord_name in dataset.coords and coord_name not in result.coords:
-            result.coords[coord_name] = dataset.coords[coord_name].copy()
-    
-    # Add provenance information
-    result.attrs.update(dataset.attrs)
-    
-    return result
-
-def _create_subset_dataset(
-    dataset: xr.Dataset,
-    variables: List[str],
-    indexers: Dict,
-    cond: Union[xr.Dataset, xr.DataArray]
-) -> xr.Dataset:
-    """
-    Create a dataset for a subset of variables with proper masking,
-    maintaining original dimension sets.
-    """
-    subset_dict = {}
-    
-    for var_name in variables:
-        if var_name in dataset:
-            var = dataset[var_name]
-            # Only use indexers that apply to this variable's dimensions
-            relevant_indexers = {
-                dim: idx for dim, idx in indexers.items()
-                if dim in var.dims
-            }
-            
-            if relevant_indexers:
-                indexed_var = var.isel(**relevant_indexers)
-                if set(relevant_indexers.keys()).intersection(var.dims):
-                    # Only apply condition if the variable shares dimensions with it
-                    relevant_cond = cond.isel(**{k: v for k, v in relevant_indexers.items()
-                                               if k in cond.dims})
-                    subset_dict[var_name] = indexed_var.where(relevant_cond)
-                else:
-                    subset_dict[var_name] = indexed_var
-            else:
-                # If no relevant indexers, keep the variable as is
-                subset_dict[var_name] = var.copy()
-            
-            # Ensure original dtype is preserved
-            subset_dict[var_name] = subset_dict[var_name].astype(var.dtype)
-    
-    # Create dataset maintaining original structure
-    result = xr.Dataset(subset_dict)
-    
-    # Copy only relevant coordinates
-    used_coords = set()
-    for var in result.data_vars.values():
-        used_coords.update(var.dims)
-    
-    for coord_name in used_coords:
-        if coord_name in dataset.coords and coord_name not in result.coords:
-            result.coords[coord_name] = dataset.coords[coord_name]
-    
-    return DataTree(name='root', dataset=result)
-
 def get_condition(condition_dict, path):
     while path:
         cond = condition_dict.get(path)
@@ -265,7 +159,7 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         original_dtypes = {var: dataset[var].dtype for var in dataset.variables}
 
         # Process current node's dataset
-        if len(dataset.variables) > 0:  # Only process if node has data
+        if len(dataset.data_vars) > 0:  # Only process if node has data
             # Create indexers from condition
 
             if cond.values.ndim == 1:
@@ -275,10 +169,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
 
             if not all(len(value) > 0 for value in indexers.values()):
                 return copy_empty_dataset(dataset), {}
-
-            print("**************************")
-            print(indexers)
-            print("**************************") 
 
             # Check for partial dimension overlap
             partial_dim_in_vars = check_partial_dim_overlap_node(dataset, indexers)
@@ -291,13 +181,13 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             # Get variables with and without indexers
             subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
             
-
-            print("********************************")
-            print(indexed_cond)
-            print(subset_vars)
-            print(non_subset_vars)
-            print("********************************")
+            #print("********************************")
+            #print(indexed_cond)
+            #print(subset_vars)
+            #print(non_subset_vars)
+            #print("********************************")
             # dataset with variables that need to be subsetted
+
             new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
 
             # data with variables that shouldn't be subsetted
@@ -309,11 +199,15 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             merged_ds.attrs.update(dataset.attrs)
 
             # Restore original data types
-            for var, dtype in original_dtypes.items():
-                if var in merged_ds:
-                    merged_ds[var] = merged_ds[var].astype(dtype)
+            #for var, dtype in original_dtypes.items():
+            #    if var in merged_ds:
+            #        merged_ds[var] = merged_ds[var].astype(dtype)
 
             new_dataset = merged_ds
+            print(list(new_dataset.variables))
+            print(list(dataset.variables))
+            #new_dataset.drop_vars('mirror_step')
+            print(list(new_dataset.variables))
 
             # Cast all variables to their original type
             for variable_name, variable in new_dataset.data_vars.items():
@@ -370,11 +264,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                     if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
                         fill_value = np.timedelta64('nat')
                     new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
-
-                    if variable_name == "quality_flags":
-                        print(fill_value)
-                        print(variable_name)
-                        print(new_dataset[variable_name])
                     if original_type != new_type:
                         new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
                                                                     str(original_type), dask='allowed',
@@ -393,6 +282,7 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         else:
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
+
 
         # Process child nodes
         processed_children = {}
@@ -426,125 +316,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
 
     return result_tree
 
-"""
-def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool) -> DataTree:
-
-    Return a DataTree which meets the given condition, processing all nodes in the tree.
-    
-    Parameters
-    ----------
-    tree : xarray.DataTree
-        The input DataTree to filter
-    cond : DataArray or Dataset with boolean dtype
-        Locations at which to preserve this object's values
-    cut : boolean
-        True if the scanline should be cut, False if not
-        
-    Returns
-    -------
-    xarray.DataTree
-        The filtered DataTree with all nodes processed
-    def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:
-        
-        Process a single node and its children in the tree.
-        
-        Parameters
-        ----------
-        node : DataTree
-            The node to process
-        path : str
-            Current path in the tree
-            
-        Returns
-        -------
-        Tuple[xr.Dataset, Dict[str, DataTree]]
-            Processed dataset and dictionary of processed child nodes
-        
-        dataset = node[path]
-        
-        original_dtypes = {var: dataset[var].dtype for var in dataset.variables}
-
-        # Process current node's dataset
-        if len(dataset.variables) > 0:  # Only process if node has data
-            # Create indexers from condition
-
-            if cond.values.ndim == 1:
-                indexers = get_indexers_from_1d(cond)
-            else:
-                indexers = get_indexers_from_nd(cond, cut)
-
-            if not all(len(value) > 0 for value in indexers.values()):
-                return copy_empty_dataset(dataset), {}
-
-            # Check for partial dimension overlap
-            partial_dim_in_vars = check_partial_dim_overlap_node(dataset, indexers)
-
-            # Apply indexing to condition and dataset
-            indexed_cond = cond.isel(**indexers)
-            try:
-                indexed_ds = dataset.isel(**indexers)
-            except Exception as ex:
-                indexed_ds = dataset
-
-            # Get variables with and without indexers
-            subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
-            
-            # Process variables
-            sub_ds = create_subset_dataset(dataset, subset_vars, indexers, cond)
-            non_sub_ds = create_subset_dataset(dataset, non_subset_vars, indexers, cond)
-            
-            # Merge the datasets
-            merged_ds = xr.merge([non_sub_ds, sub_ds])
-            
-            processed_ds = merged_ds
-            processed_ds.attrs.update(dataset.attrs)
-
-            for var, dtype in original_dtypes.items():
-                if var in merged_ds:
-                    merged_ds[var] = merged_ds[var].astype(dtype)
-
-            # Cast variables and handle fill values
-            
-            processed_ds = cast_variables_to_original_types(
-                merged_ds,
-                indexed_ds,
-                dataset,
-                indexers,
-                partial_dim_in_vars,
-                cond
-            )
-        else:
-            processed_ds = dataset
-            processed_ds.attrs.update(dataset.attrs)
-
-        # Process child nodes
-        processed_children = {}
-        for child_name, child_node in node.children.items():
-            child_path = f"{path}/{child_name}" if path != '/' else f"/{child_name}"
-            processed_child_ds, processed_child_children = process_node(child_node, child_path)
-            
-            # Create new DataTree for the processed child
-            child_tree = DataTree(name='', dataset=processed_child_ds)
-            for grandchild_name, grandchild_tree in processed_child_children.items():
-                child_tree[grandchild_name] = grandchild_tree
-                
-            processed_children[child_name] = child_tree
-
-        return processed_ds, processed_children
-
-    # Start processing from root
-    root_ds, children = process_node(tree, '/')
-    
-    # Create new root tree
-    result_tree = DataTree(name='', dataset=root_ds)
-    
-    # Add processed children to the result tree
-    for child_name, child_tree in children.items():
-        result_tree[child_name] = child_tree
-
-    return result_tree
-"""
-
 def check_partial_dim_overlap_node(dataset: xr.Dataset, indexers: Dict) -> bool:
     """
     Check if any variables in the dataset have partial dimension overlap with indexers.
@@ -557,34 +328,6 @@ def check_partial_dim_overlap_node(dataset: xr.Dataset, indexers: Dict) -> bool:
             return True
     return False
 
-def create_subset_dataset(
-    dataset: xr.Dataset,
-    variables: List[str],
-    indexers: Dict,
-    cond: Union[xr.Dataset, xr.DataArray]
-) -> xr.Dataset:
-    """
-    Create a dataset for a subset of variables with proper masking.
-    """
-    subset_dict = {}
-    
-    for var_name in variables:
-        if var_name in dataset:
-            if set(indexers.keys()).intersection(dataset[var_name].dims):
-                var_indexers = {
-                    dim: idx for dim, idx in indexers.items()
-                    if dim in dataset[var_name].dims
-                }
-                indexed_var = dataset[var_name].isel(**var_indexers)
-                if var_indexers:
-                    var_cond = cond.isel(**var_indexers)
-                    subset_dict[var_name] = indexed_var.where(var_cond)
-                else:
-                    subset_dict[var_name] = indexed_var
-            else:
-                subset_dict[var_name] = dataset[var_name]
-    
-    return xr.Dataset(subset_dict)
 
 def get_variables_with_indexers(dataset, indexers):
     """
@@ -774,9 +517,6 @@ def cast_variables_to_original_types(new_dataset, indexed_ds, dataset, indexers,
                 fill_value = np.datetime64('nat')
             if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
                 fill_value = np.timedelta64('nat')
-            
-            print(variable_name)
-            print(fill_value)
 
             new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
             
@@ -1169,3 +909,154 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
         [min(min_lons), max(max_lons)],
         [min(min_lats), max(max_lats)]
     ])
+
+
+def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataTree:
+    """
+    Drop variables from a DataTree using paths in the format '/group/var' or '/var' for root level
+    
+    Parameters
+    ----------
+    tree : DataTree
+        The input DataTree
+    var_paths : str or List[str]
+        Paths to variables to drop in format '/group/var' or '/var' for root level
+        Examples: 
+            - '/var1'  # root level variable
+            - '/group1/var1'  # variable in group1
+            - '/group1/subgroup/var1'  # variable in nested group
+    
+    Returns
+    -------
+    DataTree
+        Modified DataTree with variables dropped
+    
+    Examples
+    --------
+    >>> tree = DataTree()
+    >>> tree['group1'] = DataTree(data=xr.Dataset({'var1': [1], 'var2': [2]}))
+    >>> tree['group2'] = DataTree(data=xr.Dataset({'var1': [3], 'var3': [4]}))
+    >>> drop_vars_by_path(tree, ['/group1/var1', '/group2/var3'])
+    """
+    if isinstance(var_paths, str):
+        var_paths = [var_paths]
+    
+    for path in var_paths:
+        # Split the path into group path and variable name
+        parts = path.strip('/').split('/')
+        
+        if len(parts) == 1:
+            # Root level variable
+            var_name = parts[0]
+
+            ds = tree.to_dataset()
+            ds = ds.drop_vars(var_name, errors='ignore')
+            new_tree = DataTree(dataset=ds)
+            # Copy over any existing children
+            for child_name in tree.children:
+                new_tree[child_name] = tree[child_name]
+            tree = new_tree
+        else:
+            # Group variable
+            group_path = '/'.join(parts[:-1])
+            var_name = parts[-1]
+            try:
+                node = tree[group_path]
+                ds = node.to_dataset()
+                ds = ds.drop_vars([var_name], errors='ignore')
+                tree[group_path] = DataTree(dataset=ds)
+            except KeyError:
+                print(f"Warning: Group '{group_path}' not found")
+    
+    return tree
+
+
+
+def get_vars_with_paths(tree: DataTree) -> List[str]:
+    """
+    Get all variables and coordinates with their full paths from a DataTree
+    
+    Parameters
+    ----------
+    tree : DataTree
+        The input DataTree
+    
+    Returns
+    -------
+    List[str]
+        List of variable paths in format '/group/var' or '/var' for root level,
+        including coordinate variables at root level
+    
+    Examples
+    --------
+    >>> ds = xr.Dataset({'var1': [1], 'var2': [2], 'time': ('time', [0])})
+    >>> tree = DataTree(data=ds)
+    >>> tree['group1'] = DataTree(data=ds.copy())
+    >>> paths = get_vars_with_paths(tree)
+    >>> print(paths)
+    ['/time', '/var1', '/var2', '/group1/var1', '/group1/var2']
+    """
+    paths = []
+    
+    def collect_vars(node: DataTree, current_path: str = '', is_root: bool = False) -> None:
+        # At root level, add all coordinates
+        #if is_root:
+        #    for coord_name in node.coords:
+        #        paths.append(f'/{coord_name}')
+        
+        # Add data variables from current node
+        for var_name in node.ds.data_vars:
+            paths.append(f'{current_path}/{var_name}')
+        
+        # Recursively process child nodes
+        for child_name in node.children:
+            new_path = f'{current_path}/{child_name}' if current_path else f'/{child_name}'
+            collect_vars(node[child_name], new_path, is_root=False)
+    
+    collect_vars(tree, is_root=True)
+    return sorted(paths)  # Sort for consistent ordering
+
+
+def drop_vars_by_path_two(tree: DataTree, var_paths: Union[str, List[str]]) -> DataTree:
+    """
+    Drop variables from a DataTree using paths in the format '/group/var' or '/var' for root level
+    
+    Parameters
+    ----------
+    tree : DataTree
+        The input DataTree
+    var_paths : str or List[str]
+        Paths to variables to drop in format '/group/var' or '/var' for root level
+        Examples: 
+            - '/var1'  # root level variable
+            - '/group1/var1'  # variable in group1
+            - '/group1/subgroup/var1'  # variable in nested group
+    
+    Returns
+    -------
+    DataTree
+        Modified DataTree with variables dropped
+    """
+    if isinstance(var_paths, str):
+        var_paths = [var_paths]
+    
+    for path in var_paths:
+        # Split the path into group path and variable name
+        parts = path.strip('/').split('/')
+        
+        if len(parts) == 1:
+            # Root level variable
+            var_name = parts[0]
+            # Modify the dataset in-place using xarray's drop_vars
+            tree.ds = tree.ds.drop_vars([var_name], errors='ignore')
+        else:
+            # Group variable
+            group_path = '/'.join(parts[:-1])
+            var_name = parts[-1]
+            try:
+                node = tree[group_path]
+                node.ds = node.ds.drop_vars([var_name], errors='ignore')
+            except KeyError:
+                print(f"Warning: Group '{group_path}' not found")
+    
+    return tree

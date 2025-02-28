@@ -51,6 +51,8 @@ from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_datas
 
 from podaac.subsetter import new_new_tree as new_new_tree
 
+from xarray import DataTree
+
 
 SERVICE_NAME = 'l2ss-py'
 
@@ -325,8 +327,6 @@ def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str
             # Check if the var actually exists in the dataset
             match_coord_vars.append(match_vars[0])
     return match_coord_vars
-
-
 
 
 def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[str], str], Union[List[str], str]]:
@@ -1016,10 +1016,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     subset_dictionary = {}
 
-    print(lat_bounds[0])
-    print(lat_bounds[1])
-    print(lon_bounds[0])
-    print(lon_bounds[1])
+    #print(lat_bounds[0])
+    #print(lat_bounds[1])
+    #print(lon_bounds[0])
+    #print(lon_bounds[1])
 
     for lat_var_name, lon_var_name, time_var_name in zip(lat_var_names, lon_var_names, time_var_names):
 
@@ -1212,6 +1212,40 @@ def subset_with_shapefile(dataset: xr.Dataset,
     return xre.where(dataset, boolean_mask, cut)
 
 
+def normalize_paths(paths):
+    """
+    Convert paths with __ notation to normal group paths, removing leading /
+    and converting __ to /
+    
+    Parameters
+    ----------
+    paths : list of str
+        List of paths with __ notation
+        
+    Returns
+    -------
+    list of str
+        Normalized paths
+        
+    Examples
+    --------
+    >>> paths = ['/__geolocation__latitude', '/__geolocation__longitude']
+    >>> normalize_paths(paths)
+    ['/geolocation/latitude', '/geolocation/longitude']
+    """
+    normalized = []
+    for path in paths:
+        # Replace double underscore with slash
+        path = path.replace('__', '/')
+        # Remove any double slashes
+        while '//' in path:
+            path = path.replace('//', '/')
+        # Ensure path starts with /
+        if not path.startswith('/'):
+            path = '/' + path
+        normalized.append(path)
+    return normalized
+
 def get_coordinate_variable_names(dataset: xr.Dataset,
                                   lat_var_names: list = None,
                                   lon_var_names: list = None,
@@ -1238,6 +1272,13 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     TODO: add return type docstring and type hint.
     """
 
+    if isinstance(dataset, xr.Dataset):
+        tree = DataTree(dataset=dataset)
+    else:
+        tree = dataset
+
+    dataset = tree
+
     if not lat_var_names or not lon_var_names:
         lon_var_names, lat_var_names = new_new_tree.compute_coordinate_variable_names_from_tree(dataset)
     if not time_var_names:
@@ -1254,10 +1295,15 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
             time_var = f"{parent_path}{time_name}"
             time_var_names.append(time_var)
 
-        time_var_names.append(compute_utc_name(dataset))
+        if not time_var_names:
+            time_var_names.append(compute_utc_name(dataset))
+
         seen = set()
         time_var_names = [x for x in time_var_names if x is not None and not (x in seen or seen.add(x))]
 
+    lat_var_names = normalize_paths(lat_var_names)
+    lon_var_names = normalize_paths(lon_var_names)
+    time_var_names = normalize_paths(time_var_names)
     return lat_var_names, lon_var_names, time_var_names
 
 
@@ -1456,9 +1502,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         # Access the root dataset (if needed)
        # dataset = tree.ds
-
         #original_dataset = open_dataset
-
         #print(dataset.items())
 
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
@@ -1481,7 +1525,41 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
+
+            normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
+            keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
+
+            #print("##################################")
+            #print("ORIGINAL VARS")
+            #print(variables)
+            print("##################################")
+            print('keep_variables')
+            print(keep_variables)
+            print("##################################")
+
+            all_data_variables = new_new_tree.get_vars_with_paths(dataset)
+            #print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+            #print('all variable')
+            #print(all_data_variables)
+            #print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+
+            drop_variables = [
+                var for var in all_data_variables 
+                if var not in keep_variables and var.upper() not in keep_variables
+            ]
+
+            #drop_variables.remove('/mirror_step')
+            print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+            print('drop variables')
+            print(drop_variables)
+            print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+
+            #dataset = new_new_tree.drop_vars_by_path_two(dataset, drop_variables)
+            dataset = new_new_tree.drop_vars_by_path(dataset, drop_variables)
+
+            """
             variables_upper = [variable.upper() for variable in variables]
+
             vars_to_drop = [
                 var_name for var_name, var in dataset.data_vars.items()
                 if var_name.upper() not in variables_upper
@@ -1491,6 +1569,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             ]
 
             dataset = dataset.drop_vars(vars_to_drop)
+            """
+
         if shapefile:
             datasets = [
                 subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
@@ -1507,6 +1587,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 min_time=min_time,
                 max_time=max_time
             )
+            #datasets = new_new_tree.drop_vars_by_path_two(datasets, ['/mirror_step'])
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
