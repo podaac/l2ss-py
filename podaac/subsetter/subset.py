@@ -1501,9 +1501,15 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
         # Access the root dataset (if needed)
-       # dataset = tree.ds
+        # dataset = tree.ds
         #original_dataset = open_dataset
         #print(dataset.items())
+
+        #encoding = new_new_tree.get_datatree_encodings(dataset)
+        #encoding = {'/':{'sea_surface_temperature': {'zlib': True, 'complevel': 5, '_FillValue': -32767}, 'sst_dtime': {'zlib': True, 'complevel': 5, '_FillValue': -32768}}}
+        #print(dataset.groups)
+        #print(encoding)
+        #print(set(encoding))
 
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
@@ -1529,47 +1535,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
             keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
 
-            #print("##################################")
-            #print("ORIGINAL VARS")
-            #print(variables)
-            print("##################################")
-            print('keep_variables')
-            print(keep_variables)
-            print("##################################")
-
             all_data_variables = new_new_tree.get_vars_with_paths(dataset)
-            #print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-            #print('all variable')
-            #print(all_data_variables)
-            #print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
 
             drop_variables = [
                 var for var in all_data_variables 
                 if var not in keep_variables and var.upper() not in keep_variables
             ]
 
-            #drop_variables.remove('/mirror_step')
-            print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-            print('drop variables')
-            print(drop_variables)
-            print("$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-
-            #dataset = new_new_tree.drop_vars_by_path_two(dataset, drop_variables)
-            dataset = new_new_tree.drop_vars_by_path(dataset, drop_variables)
-
-            """
-            variables_upper = [variable.upper() for variable in variables]
-
-            vars_to_drop = [
-                var_name for var_name, var in dataset.data_vars.items()
-                if var_name.upper() not in variables_upper
-                and var_name not in lat_var_names
-                and var_name not in lon_var_names
-                and var_name not in time_var_names
-            ]
-
-            dataset = dataset.drop_vars(vars_to_drop)
-            """
+            dataset = new_new_tree.drop_vars_by_path_two(dataset, drop_variables)
 
         if shapefile:
             datasets = [
@@ -1596,8 +1569,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         #print("##############################")
 
         datasets.to_netcdf(output_file)
-        spatial_bounds = []
-
 
         """
         for dataset in datasets:

@@ -195,19 +195,15 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
 
             # Merge the datasets
             #merged_ds = xr.merge([non_sub_ds, sub_ds])            
-            merged_ds = xr.merge([new_dataset_non_sub, new_dataset_sub])
-            merged_ds.attrs.update(dataset.attrs)
+            new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
+            new_dataset.attrs.update(dataset.attrs)
 
             # Restore original data types
             #for var, dtype in original_dtypes.items():
             #    if var in merged_ds:
             #        merged_ds[var] = merged_ds[var].astype(dtype)
 
-            new_dataset = merged_ds
-            print(list(new_dataset.variables))
-            print(list(dataset.variables))
-            #new_dataset.drop_vars('mirror_step')
-            print(list(new_dataset.variables))
+            #new_dataset = merged_ds
 
             # Cast all variables to their original type
             for variable_name, variable in new_dataset.data_vars.items():
@@ -236,7 +232,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                     variable.attrs = indexed_var.attrs
                 # Check if variable has no _FillValue. If so, use original data
                 if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
-
                     if original_type != new_type:
                         new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
                                                                     str(original_type), dask='allowed',
@@ -257,7 +252,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                     # Manually replace nans with FillValue
                     # If variable represents time, cast _FillValue to datetime
                     fill_value = new_dataset[variable_name].attrs.get('_FillValue')
-
 
                     if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
                         fill_value = np.datetime64('nat')
@@ -389,53 +383,35 @@ def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
     return data.astype(dtype_str)
 
 
+
 def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     """
-    Create an empty copy of a dataset while preserving its structure, coordinates, 
-    attributes and dtypes.
-    
+    Copy a dataset into a new, empty dataset. This dataset should:
+        * Contain the same structure as the input dataset (only include
+          requested variables, if variable subset)
+        * Contain the same global metadata as the input dataset
+        * Contain a history field which describes this subset operation.
+
     Parameters
     ----------
-    dataset : xr.Dataset
-        The dataset to create an empty copy from
-        
+    dataset: xarray.Dataset
+        The dataset to copy into a empty dataset.
+
     Returns
     -------
-    xr.Dataset
-        A new dataset with the same structure but empty data arrays
+    xarray.Dataset
+        The new dataset which has no data.
     """
-    empty_vars = {}
-    
-    # Copy each data variable with empty data but preserve attributes and encoding
-    for name, var in dataset.data_vars.items():
-        # Create empty array with same shape and dtype
-        empty_data = np.full(var.shape, fill_value=np.nan, dtype=var.dtype)
-        
-        # Create new DataArray with empty data but preserve attributes and encoding
-        empty_vars[name] = xr.DataArray(
-            data=empty_data,
-            dims=var.dims,
-            coords=var.coords,
-            attrs=var.attrs.copy(),
-        )
-        # Preserve encoding separately as it's not part of attrs
-        empty_vars[name].encoding.update(var.encoding)
-        
-    # Create new dataset with empty variables
-    empty_ds = xr.Dataset(empty_vars)
-    
-    # Copy coordinates that aren't already included
-    for coord_name, coord in dataset.coords.items():
-        if coord_name not in empty_ds.coords:
-            empty_ds[coord_name] = coord.copy()
-    
-    # Copy dataset attributes
-    empty_ds.attrs.update(dataset.attrs)
-    
-    # Copy dataset encoding
-    empty_ds.encoding.update(dataset.encoding)
-    
-    return empty_ds
+    # Create a dict object where each key is a variable in the dataset and the value is an
+    # array initialized to the fill value for that variable or NaN if there is no fill value
+    # attribute for the variable
+
+    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan), dtype=v.dtype) for k, v in dataset.items()}
+
+    # Create a copy of the dataset filled with the empty data. Then select the first index along each
+    # dimension and return the result
+    return dataset.copy(data=empty_data)
+    return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
 
 
 def cast_variables_to_original_types(new_dataset, indexed_ds, dataset, indexers, partial_dim_in_in_vars, cond=None):
@@ -1060,3 +1036,51 @@ def drop_vars_by_path_two(tree: DataTree, var_paths: Union[str, List[str]]) -> D
                 print(f"Warning: Group '{group_path}' not found")
     
     return tree
+
+
+def get_datatree_encodings(datatree):
+    """
+    Get encodings from an xarray DataTree structure.
+    
+    Parameters:
+    -----------
+    datatree : xarray.DataTree
+        The input DataTree structure
+        
+    Returns:
+    --------
+    dict
+        Dictionary mapping variable paths to their encodings
+    """
+    encodings = {}
+    
+    def traverse_datatree(node, path=''):
+        for var_name in node.data_vars:
+            var = node[var_name]
+            full_name = f"{path}/{var_name}" if path else var_name
+            
+            var_encoding = {
+                "zlib": True,
+                "complevel": 5
+            }
+            
+            # Get existing fill value from encoding
+            if '_FillValue' in var.encoding:
+                fill_value = var.encoding['_FillValue']
+                if isinstance(fill_value, bytes):
+                    try:
+                        fill_value = fill_value.decode('UTF-8')
+                    except UnicodeDecodeError:
+                        fill_value = fill_value.decode('latin1')
+                var_encoding['_FillValue'] = fill_value
+            
+            encodings[full_name] = var_encoding
+        
+        # Process groups using children property of DataTree
+        if hasattr(node, 'children'):
+            for child_name, child_node in node.children.items():
+                child_path = f"{path}/{child_name}" if path else child_name
+                traverse_datatree(child_node, child_path)
+    
+    traverse_datatree(datatree)
+    return encodings

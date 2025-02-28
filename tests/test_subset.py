@@ -152,7 +152,6 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
 
     bbox = np.array(((-180, 90), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
-    print(test_file)
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
@@ -211,7 +210,6 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
     bbox = np.array(((-180, 90), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
     subset_output_file = join(subset_output_dir, output_file)
-    print(test_file)
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
@@ -233,9 +231,6 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
 
     lats = out_ds[lat_var_name].values
     lons = out_ds[lon_var_name].values
-
-    print(lats)
-    print(lons)
 
     warnings.filterwarnings('ignore')
 
@@ -264,9 +259,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         rows = np.any(spatial_mask, axis=1)
         cols = np.any(spatial_mask, axis=0)
         bound_mask = np.array([[r & c for c in cols] for r in rows])
-        print("WHAT")
 
-    print(bound_mask)
     # If all the lat/lon values are valid, the file is valid and
     # there is no need to check individual variables.
     if np.all(spatial_mask):
@@ -332,7 +325,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
 
     out_ds.close()
 
-
+#simon
 @pytest.mark.parametrize("test_file", TEST_DATA_FILES)
 def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
     """Test that an empty file is returned when the bounding box
@@ -369,10 +362,14 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
         
         # Perform the main check
         condition = np.all(data == fill_value) or np.all(np.isnan(data))
-        
+
         # Handle the specific integer dtype case
         if not condition and not (np.isnan(fill_value) and np.issubdtype(variable.dtype, np.integer)):
-            assert condition, f"Data does not match fill value for variable: {variable}"
+            try:
+                assert condition, f"Data does not match fill value for variable: {variable}"
+            except Exception as ex:
+                print(variable)
+                raise ex
 
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
 
@@ -1012,7 +1009,6 @@ def test_group_subset(data_dir, subset_output_dir):
         output_file=os.path.join(subset_output_dir, s6_output_file_name)
     )
 
-    print(bounds)
 
     # Check that bounds are within requested bbox
     assert bounds[0][0] >= bbox[0][0]
@@ -1590,7 +1586,6 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
         time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], total_time_vars)
-        print(time_var_name)
         lat_dims = dataset[lat_var_name].squeeze().dims
         time_dims = dataset[time_var_name].squeeze().dims
         assert lat_dims == time_dims
