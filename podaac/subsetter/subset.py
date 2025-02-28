@@ -1439,6 +1439,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
     """
+
     file_extension = os.path.splitext(file_to_subset)[1]
     nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
 
@@ -1492,6 +1493,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if hdf_type == 'GPM':
         args['decode_times'] = False
+
+    nc_dataset.close()
 
     #with xr.open_dataset(
     #        xr.backends.NetCDF4DataStore(nc_dataset),
@@ -1567,6 +1570,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         #print("##############################")
         #print(datasets)
         #print("##############################")
+
+        set_version_history(datasets, cut, bbox, shapefile)
+        set_json_history(datasets, cut, file_to_subset, bbox, shapefile, origin_source)
 
         datasets.to_netcdf(output_file)
 
