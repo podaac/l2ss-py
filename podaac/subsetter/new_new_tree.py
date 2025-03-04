@@ -175,8 +175,16 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             partial_dim_in_in_vars = partial_dim_in_vars
 
             # Apply indexing to condition and dataset
+            #print(condition_dict)
+            #print(condition_dict.get(path))
+            #print(path)
+            #print(indexers)
+            #print(dataset)
+
             indexed_cond = cond.isel(**indexers)
-            indexed_ds = dataset.isel(**indexers)
+            # added missing dims to ignore
+            # test to make it pass test_omi_novars_subset
+            indexed_ds = dataset.isel(**indexers, missing_dims='ignore')
 
             # Get variables with and without indexers
             subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
@@ -589,6 +597,8 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
 
         for child_name, child_node in node.children.items():
             new_path = f"{path}/{child_name}" if path else child_name
+            #print(new_path)
+
             traverse_tree(child_node, new_path)
 
     # Start recursive tree traversal
@@ -1057,13 +1067,15 @@ def get_datatree_encodings(datatree):
     def traverse_datatree(node, path=''):
         for var_name in node.data_vars:
             var = node[var_name]
-            full_name = f"{path}/{var_name}" if path else var_name
+            full_path = f"{path}/{var_name}" if path else var_name
             
             var_encoding = {
                 "zlib": True,
-                "complevel": 5
+                "complevel": 5,
+                "_FillValue": var.encoding.get('_FillValue')
+
             }
-            
+            """
             # Get existing fill value from encoding
             if '_FillValue' in var.encoding:
                 fill_value = var.encoding['_FillValue']
@@ -1073,8 +1085,13 @@ def get_datatree_encodings(datatree):
                     except UnicodeDecodeError:
                         fill_value = fill_value.decode('latin1')
                 var_encoding['_FillValue'] = fill_value
-            
-            encodings[full_name] = var_encoding
+            """
+            encoding_path = '/' + path.lstrip('/') if path else '/'
+
+            if encoding_path not in encodings:
+                encodings[encoding_path] = {}
+
+            encodings[encoding_path][var_name] = var_encoding
         
         # Process groups using children property of DataTree
         if hasattr(node, 'children'):

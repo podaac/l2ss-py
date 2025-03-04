@@ -1381,6 +1381,16 @@ def test_access_sst_dtime_values(datafile):
     return True
 
 
+def common_nested_keys(old_dict, new_dict):
+    common = {}
+    for group, old_vars in old_dict.items():
+        if group in new_dict and isinstance(old_vars, dict) and isinstance(new_dict[group], dict):
+            # Keep keys that exist in both old_vars and new_dict[group], but retain values from old_dict
+            common_vars = {k: v for k, v in old_vars.items() if k in new_dict[group]}
+            if common_vars:
+                common[group] = common_vars
+    return common
+
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            variables: Union[List[str], str, None] = (),
            # pylint: disable=too-many-branches, disable=too-many-statements
@@ -1439,7 +1449,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
     """
-
+    """
     file_extension = os.path.splitext(file_to_subset)[1]
     nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
 
@@ -1495,6 +1505,17 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         args['decode_times'] = False
 
     nc_dataset.close()
+    """
+
+    hdf_type = False
+    args = {
+        'decode_coords': False,
+        'mask_and_scale': False,
+        'decode_times': False
+    }
+
+    if min_time or max_time:
+        args['decode_times'] = True
 
     #with xr.open_dataset(
     #        xr.backends.NetCDF4DataStore(nc_dataset),
@@ -1508,7 +1529,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         #original_dataset = open_dataset
         #print(dataset.items())
 
-        #encoding = new_new_tree.get_datatree_encodings(dataset)
+        old_encoding = new_new_tree.get_datatree_encodings(dataset)
         #encoding = {'/':{'sea_surface_temperature': {'zlib': True, 'complevel': 5, '_FillValue': -32767}, 'sst_dtime': {'zlib': True, 'complevel': 5, '_FillValue': -32768}}}
         #print(dataset.groups)
         #print(encoding)
@@ -1520,6 +1541,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lon_var_names=lon_var_names,
             time_var_names=time_var_names
         )
+
+        #
+        #print(time_var_names)
 
         if not time_var_names and (min_time or max_time):
             raise ValueError('Could not determine time variable')
@@ -1574,7 +1598,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         set_version_history(datasets, cut, bbox, shapefile)
         set_json_history(datasets, cut, file_to_subset, bbox, shapefile, origin_source)
 
-        datasets.to_netcdf(output_file)
+        new_encoding = new_new_tree.get_datatree_encodings(datasets)
+        encoding = common_nested_keys(old_encoding, new_encoding)
+        
+        datasets.to_netcdf(output_file, encoding=encoding)
+        #datasets.to_netcdf(output_file)
+
+        #with nc.Dataset(output_file, 'a') as dataset_attr:
+        #    dataset_attr.setncatts(datasets.attrs)
 
         """
         for dataset in datasets:
@@ -1624,3 +1655,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lat_var_names,
             lon_var_names
         )
+
+
+
+

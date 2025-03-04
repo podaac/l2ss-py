@@ -469,8 +469,13 @@ def compare_java(test_file, cut, data_dir, subset_output_dir, request):
         np.testing.assert_equal(var.shape, py_ds[var_name].shape)
 
         # Compare meta
-        np.testing.assert_equal(var.attrs, py_ds[var_name].attrs)
-
+        try:
+            np.testing.assert_equal(var.attrs, py_ds[var_name].attrs)
+        except:
+            print(var.attrs)
+            print(py_ds[var_name].attrs)
+            np.testing.assert_equal(var.attrs, py_ds[var_name].attrs)
+            
         # Compare data
         np.testing.assert_equal(var.values, py_ds[var_name].values)
 
@@ -479,6 +484,7 @@ def compare_java(test_file, cut, data_dir, subset_output_dir, request):
     del j_ds.attrs['history']
     del py_ds.attrs['history']
     del py_ds.attrs['history_json']
+
     np.testing.assert_equal(j_ds.attrs, py_ds.attrs)
 
 
@@ -527,13 +533,13 @@ def test_history_metadata_append(data_dir, subset_output_dir, request):
     Tests that the history metadata header is appended to when it
     already exists.
     """
-    test_file = next(filter(
-        lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
-        , TEST_DATA_FILES))
-    output_file = "{}_{}".format(request.node.name, test_file)
+    test_file = next(f for f in TEST_DATA_FILES if '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f)
+
+    output_file = f"{request.node.name}_{test_file}"
+
     subset.subset(
         file_to_subset=join(data_dir, test_file),
-        bbox=np.array(((-180, 180), (-90.0, 90))),
+        bbox=np.array([[-180, 180], [-90, 90]]),
         output_file=join(subset_output_dir, output_file)
     )
 
@@ -2150,14 +2156,15 @@ def test_passed_coords(data_dir):
                               decode_times=False,
                               decode_coords=False)
 
-    dummy_lats = ['dummy_lat']
-    dummy_lons = ['dummy_lon']
-    dummy_times = ['dummy_time']
+    dummy_lats = ['/dummy_lat']
+    dummy_lons = ['/dummy_lon']
+    dummy_times = ['/dummy_time']
 
-    actual_lats = ['lat']
-    actual_lons = ['lon']
-    actual_times = ['time']
+    actual_lats = ['/lat']
+    actual_lons = ['/lon']
+    actual_times = ['/time']
 
+    # coordinates now come with a leading / for groups
     # When none are passed in, variables are computed manually
     lats, lons, times = subset.get_coordinate_variable_names(
         dataset,
