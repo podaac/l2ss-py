@@ -907,9 +907,16 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     datasets = []
     total_list = []  # don't include repeated variables
-    for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
-            lat_var_names, lon_var_names, time_var_names, diff_count
-    ):
+    print(lon_var_names)
+    print(time_var_names)
+    print(lat_var_names)
+    print(diff_count)
+    #for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
+    #        lat_var_names, lon_var_names, time_var_names, diff_count
+    #):
+    for lat_var_name, lon_var_name, time_var_name, diffs in zip_longest(lat_var_names, lon_var_names, time_var_names, diff_count, fillvalue=None):
+    #print(lat, lon, time, diff)
+        print("LOOPING")
         if GROUP_DELIM in lat_var_name:
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
 
@@ -959,8 +966,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                 group_vars.extend(var_included)
 
         else:
+            print("NO")
             group_vars = list(dataset.keys())
 
+        print("YES")
         group_dataset = dataset[group_vars]
 
         # Calculate temporal conditions
@@ -984,6 +993,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         total_list.extend(group_vars)
         if diffs == -1:
             return datasets
+
     dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
     return dim_cleaned_datasets
 
@@ -1333,11 +1343,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 min_time=min_time,
                 max_time=max_time
             )
+            print(datasets)
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
         spatial_bounds = []
-
         for dataset in datasets:
             set_version_history(dataset, cut, bbox, shapefile)
             set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)

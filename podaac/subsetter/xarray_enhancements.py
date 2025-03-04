@@ -183,7 +183,8 @@ def get_variables_with_indexers(dataset, indexers):
     return subset_vars, no_subset_vars
 
 
-def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool, longitude=None, latitude=None, pixel_subset=False) -> xr.Dataset:
+def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool, longitude=None, latitude=None, pixel_subset=True
+    ) -> xr.Dataset:
     """
     Return a dataset which meets the given condition.
 
@@ -211,6 +212,8 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
     However in that mask, True represents valid data and False
     represents invalid data.
     """
+    print("HERE2")
+
     if cond.values.ndim == 1:
         indexers = get_indexers_from_1d(cond)
     else:
@@ -238,12 +241,14 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         else subset_vars
     )
 
+    print("HERE")
     print(subset_vars_to_process)
     print(non_subset_vars)
     print(longitude)
     print(latitude)
     print(list(indexed_ds.variables))
-    new_dataset_sub = indexed_ds[subset_vars_to_process].where(indexed_cond)
+    #new_dataset_sub = indexed_ds[subset_vars_to_process].where(indexed_cond)
+    new_dataset_sub = indexed_ds[subset_vars_to_process]
 
     # Variables to retain without subsetting
     new_dataset_non_sub = indexed_ds[non_subset_vars]
@@ -281,38 +286,40 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
 
             new_dataset[variable_name].attrs = indexed_var.attrs
             variable.attrs = indexed_var.attrs
+
         # Check if variable has no _FillValue. If so, use original data
-        if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
+        if not pixel_subset:
+            if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
 
-            if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
-                                                            str(original_type), dask='allowed',
-                                                            keep_attrs=True)
+                if original_type != new_type:
+                    new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
+                                                                str(original_type), dask='allowed',
+                                                                keep_attrs=True)
 
-            # Replace nans with values from original dataset. If the
-            # variable has more than one dimension, copy the entire
-            # variable over, otherwise use a NaN mask to copy over the
-            # relevant values.
-            new_dataset[variable_name] = indexed_var
+                # Replace nans with values from original dataset. If the
+                # variable has more than one dimension, copy the entire
+                # variable over, otherwise use a NaN mask to copy over the
+                # relevant values.
+                new_dataset[variable_name] = indexed_var
 
-            new_dataset[variable_name].attrs = indexed_var.attrs
-            variable.attrs = indexed_var.attrs
-            new_dataset[variable_name].encoding['_FillValue'] = None
-            variable.encoding['_FillValue'] = None
+                new_dataset[variable_name].attrs = indexed_var.attrs
+                variable.attrs = indexed_var.attrs
+                new_dataset[variable_name].encoding['_FillValue'] = None
+                variable.encoding['_FillValue'] = None
 
-        else:
-            # Manually replace nans with FillValue
-            # If variable represents time, cast _FillValue to datetime
-            fill_value = new_dataset[variable_name].attrs.get('_FillValue')
-            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
-                fill_value = np.datetime64('nat')
-            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
-                fill_value = np.timedelta64('nat')
-            new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
-            if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
-                                                            str(original_type), dask='allowed',
-                                                            keep_attrs=True)
+            else:
+                # Manually replace nans with FillValue
+                # If variable represents time, cast _FillValue to datetime
+                fill_value = new_dataset[variable_name].attrs.get('_FillValue')
+                if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
+                    fill_value = np.datetime64('nat')
+                if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
+                    fill_value = np.timedelta64('nat')
+                new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
+                if original_type != new_type:
+                    new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
+                                                                str(original_type), dask='allowed',
+                                                                keep_attrs=True)
 
     dc.sync_dims_inplace(dataset, new_dataset)
     return new_dataset
