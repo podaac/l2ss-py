@@ -24,6 +24,7 @@ import shutil
 from tempfile import mkdtemp
 import traceback
 from typing import List, Union
+import sys
 
 import pystac
 from pystac import Asset
@@ -41,9 +42,16 @@ DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
 
 
 class L2SSException(HarmonyException):
-    """Base class for exceptions in the Harmony GDAL Adapter."""
-
+    """L2SS Exception class for custom error messages to see in harmony api calls."""
     def __init__(self, original_exception):
+        # Ensure we can extract traceback information
+        if original_exception.__traceback__ is None:
+            # Capture the current traceback if not already present
+            try:
+                raise original_exception
+            except type(original_exception):
+                original_exception.__traceback__ = sys.exc_info()[2]
+
         # Extract the last traceback entry (most recent call) for the error location
         tb = traceback.extract_tb(original_exception.__traceback__)[-1]
 
@@ -57,7 +65,11 @@ class L2SSException(HarmonyException):
         readable_message = (f"Error in file '{filename}', line {lineno}, in function '{funcname}': "
                             f"{error_msg}")
 
-        super().__init__(readable_message, 'nasa/harmony-gdal-adapter')
+        # Call the parent class constructor with the formatted message and category
+        super().__init__(readable_message, 'podaac/l2-subsetter')
+
+        # Store the original exception for potential further investigation
+        self.original_exception = original_exception
 
 
 def podaac_to_harmony_bbox(bbox: np.ndarray) -> Union[np.ndarray, float]:
