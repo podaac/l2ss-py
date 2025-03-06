@@ -209,7 +209,21 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             subset_params['output_file'] = f'{output_dir}/{os.path.basename(input_filename)}'
             subset_params['file_to_subset'] = input_filename
-            subset_params['origin_source'] = asset.href
+
+            operations = {
+                "variable_subset": subset_params.get('variables'),
+                "is_subsetted": True
+            }
+            staged_filename_true = generate_output_filename(asset.href, '.nc4', **operations)
+
+            operations = {
+                "variable_subset": subset_params.get('variables'),
+                "is_subsetted": False
+            }
+            staged_filename_false = generate_output_filename(asset.href, '.nc4', **operations)
+
+            subset_params['stage_file_name_subsetted_true'] = staged_filename_true
+            subset_params['stage_file_name_subsetted_false'] = staged_filename_false
 
             self.logger.info('Calling l2ss-py subset with params %s', subset_params)
             result_bbox = subset.subset(**subset_params)

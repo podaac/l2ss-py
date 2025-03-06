@@ -1181,7 +1181,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
            lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (),
-           pixel_subset: bool = False
+           pixel_subset: bool = False, stage_file_name_subsetted_true: str = None, stage_file_name_subsetted_false: str = None
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -1236,6 +1236,10 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     pixel_subset : boolean
         Cut the lon lat based on the rows and columns within the bounding box,
         but could result with lon lats that are outside the bounding box
+    stage_file_name_subsetted_true: str
+        stage file name if subsetting is true name depends on result of subset
+    stage_file_name_subsetted_false: str
+        stage file name if subsetting is false name depends on result of subset
     """
     file_extension = os.path.splitext(file_to_subset)[1]
     nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
@@ -1403,8 +1407,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             )
 
         # Set new metadata with original attribute type
-        if spatial_bounds_array is not None:
-            with nc.Dataset(output_file, 'a') as dataset_attr:
+        with nc.Dataset(output_file, 'a') as dataset_attr:
+            if spatial_bounds_array is not None:
                 original_attrs = dataset_attr.ncattrs()
 
                 def set_attr_with_type(attr_name, value):
@@ -1416,5 +1420,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 set_attr_with_type('southernmost_latitude', spatial_bounds_array[1][0])
                 set_attr_with_type('easternmost_longitude', spatial_bounds_array[0][1])
                 set_attr_with_type('westernmost_longitude', spatial_bounds_array[0][0])
+                if stage_file_name_subsetted_true:
+                    set_attr_with_type('product_name', stage_file_name_subsetted_true)
+                else:
+                    set_attr_with_type('product_name', output_file)
+            else:
+                if stage_file_name_subsetted_false:
+                    set_attr_with_type('product_name', stage_file_name_subsetted_false)
+                else:
+                    set_attr_with_type('product_name', output_file)
 
         return spatial_bounds_array
