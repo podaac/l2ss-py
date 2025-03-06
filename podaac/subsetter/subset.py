@@ -1408,13 +1408,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         # Set new metadata with original attribute type
         with nc.Dataset(output_file, 'a') as dataset_attr:
-            if spatial_bounds_array is not None:
-                original_attrs = dataset_attr.ncattrs()
+            original_attrs = dataset_attr.ncattrs()
 
-                def set_attr_with_type(attr_name, value):
-                    if attr_name in original_attrs:
-                        original_type = type(dataset_attr.getncattr(attr_name))
-                        dataset_attr.setncattr(attr_name, original_type(value))
+            def set_attr_with_type(attr_name, value):
+                if attr_name in original_attrs:
+                    original_type = type(dataset_attr.getncattr(attr_name))
+                    dataset_attr.setncattr(attr_name, original_type(value))
+
+            if spatial_bounds_array is not None:
 
                 set_attr_with_type('northernmost_latitude', spatial_bounds_array[1][1])
                 set_attr_with_type('southernmost_latitude', spatial_bounds_array[1][0])
