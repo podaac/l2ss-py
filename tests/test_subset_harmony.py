@@ -203,3 +203,84 @@ def test_service_invoke(
             
         except Exception as e:
             pytest.fail(f"Test failed: {str(e)}")
+
+@pytest.mark.parametrize("with_coord_vars", [True])
+def test_service_invoke_pixel_subset(
+    mock_environ,
+    temp_dir: str,
+    test_env_vars: Dict[str, str],
+    harmony_message_base: Dict[str, Any],
+    with_coord_vars: bool
+):
+    """Test service invoke with and without coordinate variables."""
+    test_dir = os.path.dirname(os.path.realpath(__file__))
+    harmony_bbox = harmony_message_base["subset"]["bbox"]
+    harmony_message_base['pixelSubset'] = True
+
+    # Prepare source variables
+    base_variable = {
+        "id": "V0001-EXAMPLE",
+        "name": "bathymetry",
+        "type": "SCIENCE"
+    }
+    
+    coord_variables = [] if not with_coord_vars else [
+        {
+            "id": "V0001-EXAMPLE",
+            "name": name,
+            "fullPath": f"example/group/path/ExampleVar{i+2}",
+            "type": "COORDINATE",
+            "subtype": subtype
+        }
+        for i, (name, subtype) in enumerate([
+            ("lat", "LATITUDE"),
+            ("lon", "LONGITUDE"),
+            ("time", "TIME")
+        ])
+    ]
+    
+    # Create input message
+    input_json = harmony_message_base.copy()
+    input_json["sources"] = [{
+        "collection": "test-collection",
+        "variables": [base_variable],
+        "coordinateVariables": coord_variables
+    }]
+
+    # Create test setup
+    item = create_test_stac_item(test_dir, harmony_bbox)
+    catalog = create_test_catalog(item)
+    message = Message(input_json)
+    service = L2SubsetterService(message, catalog=catalog)
+    
+    # Create test arguments
+    test_args = [
+        "podaac.subsetter.subset_harmony",
+        "--harmony-action", "invoke",
+        "--harmony-input", json.dumps(input_json),
+        "--harmony-metadata-dir", temp_dir,
+        "--harmony-service-id", "l2ss-py"
+    ]
+
+    with patch.dict(os.environ, test_env_vars), \
+         patch.object(sys, 'argv', test_args):
+        try:
+            # Process the item
+            source = message.sources[0]
+            result_item = service.process_item(item, source)
+            
+            # Verify results
+            assert isinstance(result_item, pystac.Item)
+            assert 'data' in result_item.assets
+            
+            # Verify bbox
+            if result_item.bbox:
+                np.testing.assert_almost_equal(harmony_bbox, result_item.bbox, decimal=1)
+            
+            # Verify output file
+            output_asset = result_item.assets['data']
+            output_path = output_asset.href.replace('file://', '')
+            assert output_path.endswith('.nc4')
+            
+        except Exception as e:
+            pytest.fail(f"Test failed: {str(e)}")

@@ -181,6 +181,9 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 subset_params['min_time'] = message.temporal.start
                 subset_params['max_time'] = message.temporal.end
 
+            if message.pixelSubset:
+                subset_params['pixel_subset'] = message.pixelSubset
+
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
 
             try:

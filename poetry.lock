@@ -882,13 +882,13 @@ numpy = ">=1.19.3"
 
 [[package]]
 name = "harmony-service-lib"
-version = "2.5.0"
+version = "2.6.0"
 description = "A library for Python-based Harmony services to parse incoming message, fetch data, stage data, and call back to Harmony."
 optional = true
 python-versions = ">=3.9"
 files = [
-    {file = "harmony_service_lib-2.5.0-py3-none-any.whl", hash = "sha256:0a9888c352867da1c881d1099411444cb99178511bc8f66ed0331d79bf14ed6b"},
-    {file = "harmony_service_lib-2.5.0.tar.gz", hash = "sha256:290b50a665db500e79ea371ef8ff43d1b8bf399dd82decb5b83d500e0f8f63e3"},
+    {file = "harmony_service_lib-2.6.0-py3-none-any.whl", hash = "sha256:4dd31e78190f1e563523dff9724c9bf2df8498cf1a637b34f10bf22983786932"},
+    {file = "harmony_service_lib-2.6.0.tar.gz", hash = "sha256:2b61848fe4366c9e00178e6f1a60072a38a77e03224c2a23f607150675814839"},
 ]
 
 [package.dependencies]
@@ -2829,4 +2829,4 @@ harmony = ["harmony-service-lib", "pystac"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.10"
-content-hash = "90a4ff9679c71634eb9a63acf2d4b7fb007872e9f000cc4cac45b4b8267df337"
+content-hash = "df95964c6c643be2cbffa0144f58358dffb7e9ffd11dd1f06b3f3d5d1ffff3c7"
