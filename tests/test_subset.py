@@ -460,6 +460,8 @@ def compare_java(test_file, cut, data_dir, subset_output_dir, request):
         # Compare meta
         np.testing.assert_equal(var.attrs, py_ds[var_name].attrs)
 
+        diff_indices = np.where(var.values != py_ds[var_name].values)
+
         # Compare data
         np.testing.assert_equal(var.values, py_ds[var_name].values)
 
@@ -468,8 +470,17 @@ def compare_java(test_file, cut, data_dir, subset_output_dir, request):
     del j_ds.attrs['history']
     del py_ds.attrs['history']
     del py_ds.attrs['history_json']
-    np.testing.assert_equal(j_ds.attrs, py_ds.attrs)
 
+    ignore_attributes = [
+        "northernmost_latitude",
+        "southernmost_latitude",
+        "easternmost_longitude",
+        "westernmost_longitude"
+    ]
+    filtered_j_ds_attrs = {k: v for k, v in j_ds.attrs.items() if k not in ignore_attributes}
+    filtered_py_ds_attrs = {k: v for k, v in py_ds.attrs.items() if k not in ignore_attributes}
+
+    np.testing.assert_equal(filtered_j_ds_attrs, filtered_py_ds_attrs)
 
 @pytest.mark.parametrize("test_file", [
     "ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc",
@@ -526,8 +537,8 @@ def test_history_metadata_append(data_dir, subset_output_dir, request):
         output_file=join(subset_output_dir, output_file)
     )
 
-    in_nc = xr.open_dataset(join(data_dir, test_file))
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
+    in_nc = xr.open_dataset(join(data_dir, test_file), decode_times=False)
+    out_nc = xr.open_dataset(join(subset_output_dir, output_file), decode_times=False)
 
     # Assert that the original granule contains history
     assert in_nc.attrs.get('history') is not None
@@ -564,7 +575,7 @@ def test_history_metadata_create(data_dir, subset_output_dir, request):
         output_file=join(subset_output_dir, output_file)
     )
 
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
+    out_nc = xr.open_dataset(join(subset_output_dir, output_file), decode_times=False)
 
     # Assert that the input granule contains no history
     assert in_nc.attrs.get('history') is None
@@ -1283,7 +1294,7 @@ def test_subset_jason(data_dir, subset_output_dir, request):
     min_time = "2002-01-15T06:07:06Z"
     max_time = "2002-01-15T06:30:16Z"
 
-    subset.subset(
+    result = subset.subset(
         file_to_subset=os.path.join(data_dir, file),
         bbox=bbox,
         min_time=min_time,

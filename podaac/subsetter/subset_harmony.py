@@ -147,7 +147,6 @@ class L2SubsetterService(BaseHarmonyAdapter):
         temp_dir = mkdtemp()
         output_dir = self.data_dir
         self.prepare_output_dir(output_dir)
-
         try:
             # Get the data file
             asset = next(v for k, v in item.assets.items() if 'data' in (v.roles or []))
@@ -181,6 +180,9 @@ class L2SubsetterService(BaseHarmonyAdapter):
             if message.temporal:
                 subset_params['min_time'] = message.temporal.start
                 subset_params['max_time'] = message.temporal.end
+
+            if message.pixelSubset:
+                subset_params['pixel_subset'] = message.pixelSubset
 
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
 

@@ -337,7 +337,7 @@ def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[s
         name and the second element is the lon coordinate name
     """
 
-    dataset = xr.decode_cf(dataset)
+    dataset = xr.decode_cf(dataset, decode_times=False)
 
     # look for lon and lat using standard name in coordinates and axes
     custom_criteria = {
@@ -859,7 +859,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      bbox: np.ndarray = None,
                      cut: bool = True,
                      min_time: str = None,
-                     max_time: str = None) -> np.ndarray:
+                     max_time: str = None,
+                     pixel_subset: bool = False) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -883,6 +884,9 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         ISO timestamp of min temporal bound
     max_time : str
         ISO timestamp of max temporal bound
+    pixel_subset : boolean
+        Cut the lon lat based on the rows and columns within the bounding box,
+        but could result with lon lats that are outside the bounding box
     TODO: add docstring and type hint for `variables` parameter.
 
     Returns
@@ -907,9 +911,13 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     datasets = []
     total_list = []  # don't include repeated variables
-    for lat_var_name, lon_var_name, time_var_name, diffs in zip(  # pylint: disable=too-many-nested-blocks
-            lat_var_names, lon_var_names, time_var_names, diff_count
-    ):
+
+    for lat_var_name, lon_var_name, time_var_name, diffs in zip_longest(lat_var_names, lon_var_names, time_var_names, diff_count, fillvalue=None):
+
+        # If there is an extra time variable with no lon lat zip to it
+        if lon_var_name is None and lat_var_name is None:
+            continue
+
         if GROUP_DELIM in lat_var_name:
             lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
 
@@ -965,7 +973,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         # Calculate temporal conditions
         temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
-
         group_dataset = xre.where(
             group_dataset,
             oper(
@@ -975,13 +982,15 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             (group_dataset[lat_var_name] >= lat_bounds[0]) &
             (group_dataset[lat_var_name] <= lat_bounds[1]) &
             temporal_cond,
-            cut
+            cut,
+            pixel_subset=pixel_subset
         )
 
         datasets.append(group_dataset)
         total_list.extend(group_vars)
         if diffs == -1:
             return datasets
+
     dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
     return dim_cleaned_datasets
 
@@ -1171,7 +1180,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
-           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = ()
+           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (),
+           pixel_subset: bool = False
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -1223,6 +1233,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         variables for this granule. This list will only contain more
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
+    pixel_subset : boolean
+        Cut the lon lat based on the rows and columns within the bounding box,
+        but could result with lon lats that are outside the bounding box
     """
     file_extension = os.path.splitext(file_to_subset)[1]
     nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
@@ -1329,16 +1342,18 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,
-                max_time=max_time
+                max_time=max_time,
+                pixel_subset=pixel_subset
             )
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
         spatial_bounds = []
-
         for dataset in datasets:
+            # Set version and JSON history efficiently
             set_version_history(dataset, cut, bbox, shapefile)
             set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)
+
             if has_groups:
                 spatial_bounds.append(get_spatial_bounds(
                     dataset=dataset,
@@ -1346,20 +1361,25 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     lon_var_names=lon_var_names
                 ))
             else:
-                for var in dataset.data_vars:
-                    if dataset[var].dtype == 'S1' and isinstance(dataset[var].attrs.get('_FillValue'), bytes):
-                        dataset[var].attrs['_FillValue'] = dataset[var].attrs['_FillValue'].decode('UTF-8')
+                for var, data_var in dataset.data_vars.items():
+                    # Optimize string handling and decoding
+                    fill_value = data_var.attrs.get('_FillValue')
+                    if data_var.dtype == 'S1' and isinstance(fill_value, bytes):
+                        data_var.attrs['_FillValue'] = fill_value.decode('UTF-8')
 
+                    # Efficiently prepare encoding options
                     var_encoding = {
                         "zlib": True,
                         "complevel": 5,
                         "_FillValue": original_dataset[var].encoding.get('_FillValue')
                     }
 
-                    data_var = dataset[var].copy()
-                    data_var.load().to_netcdf(output_file, 'a', encoding={var: var_encoding})
-                    del data_var
+                    # Load, write, and release memory efficiently
+                    data_var.load()
+                    data_var.to_netcdf(output_file, 'a', encoding={var: var_encoding})
+                    del data_var  # Explicitly free memory
 
+                # Set global attributes efficiently
                 with nc.Dataset(output_file, 'a') as dataset_attr:
                     dataset_attr.setncatts(dataset.attrs)
 
@@ -1367,18 +1387,34 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             recombine_grouped_datasets(datasets, output_file, start_date, time_var_names)
             # Check if the spatial bounds are all 'None'. This means the
             # subset result is empty.
+
             if any(bound is None for bound in spatial_bounds):
                 return None
-            return np.array([[
-                min(lon[0][0][0] for lon in zip(spatial_bounds)),
-                max(lon[0][0][1] for lon in zip(spatial_bounds))
-            ], [
-                min(lat[0][1][0] for lat in zip(spatial_bounds)),
-                max(lat[0][1][1] for lat in zip(spatial_bounds))
-            ]])
+            min_lon = min(bound[0][0] for bound in spatial_bounds)
+            max_lon = max(bound[0][1] for bound in spatial_bounds)
+            min_lat = min(bound[1][0] for bound in spatial_bounds)
+            max_lat = max(bound[1][1] for bound in spatial_bounds)
+            spatial_bounds_array = np.array([[min_lon, max_lon], [min_lat, max_lat]])
+        else:
+            spatial_bounds_array = get_spatial_bounds(
+                dataset=datasets[0],
+                lat_var_names=lat_var_names,
+                lon_var_names=lon_var_names
+            )
 
-        return get_spatial_bounds(
-            dataset=dataset,
-            lat_var_names=lat_var_names,
-            lon_var_names=lon_var_names
-        )
+        # Set new metadata with original attribute type
+        if spatial_bounds_array is not None:
+            with nc.Dataset(output_file, 'a') as dataset_attr:
+                original_attrs = dataset_attr.ncattrs()
+
+                def set_attr_with_type(attr_name, value):
+                    if attr_name in original_attrs:
+                        original_type = type(dataset_attr.getncattr(attr_name))
+                        dataset_attr.setncattr(attr_name, original_type(value))
+
+                set_attr_with_type('northernmost_latitude', spatial_bounds_array[1][1])
+                set_attr_with_type('southernmost_latitude', spatial_bounds_array[1][0])
+                set_attr_with_type('easternmost_longitude', spatial_bounds_array[0][1])
+                set_attr_with_type('westernmost_longitude', spatial_bounds_array[0][0])
+
+        return spatial_bounds_array
