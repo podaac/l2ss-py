@@ -183,8 +183,7 @@ def get_variables_with_indexers(dataset, indexers):
     return subset_vars, no_subset_vars
 
 
-def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool, longitude=None, latitude=None, pixel_subset=True
-    ) -> xr.Dataset:
+def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool, pixel_subset=False) -> xr.Dataset:
     """
     Return a dataset which meets the given condition.
 
@@ -200,7 +199,9 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
     cut : boolean
         True if the scanline should be cut, False if the scanline should
         not be cut.
-
+    pixel_subset : boolean
+        Cut the lon lat based on the rows and columns within the bounding box,
+        but could result with lon lats that are outside the bounding box
     Returns
     -------
     xarray.Dataset
@@ -212,7 +213,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
     However in that mask, True represents valid data and False
     represents invalid data.
     """
-    print("HERE2")
 
     if cond.values.ndim == 1:
         indexers = get_indexers_from_1d(cond)
@@ -232,34 +232,62 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
 
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
-    subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
-    # Variables to subset
-    subset_vars_to_process = (
-        [var for var in subset_vars if var not in {longitude, latitude}]
-        if pixel_subset
-        else subset_vars
-    )
-
-    print("HERE")
-    print(subset_vars_to_process)
-    print(non_subset_vars)
-    print(longitude)
-    print(latitude)
-    print(list(indexed_ds.variables))
-    #new_dataset_sub = indexed_ds[subset_vars_to_process].where(indexed_cond)
-    new_dataset_sub = indexed_ds[subset_vars_to_process]
-
-    # Variables to retain without subsetting
-    new_dataset_non_sub = indexed_ds[non_subset_vars]
-
-    # Add longitude and latitude if pixel_subset is True
-    datasets_to_merge = [new_dataset_non_sub, new_dataset_sub]
     if pixel_subset:
-        datasets_to_merge.append(indexed_ds[[longitude, latitude]])
+        # Directly assign indexed_ds to new_dataset when pixel_subset is True
+        new_dataset = indexed_ds
+    else:
+        # Get variables that should and shouldn't be subsetted
+        subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
-    # Merge datasets
-    new_dataset = xr.merge(datasets_to_merge)
+        # Subset the indexed dataset based on the condition
+        subsetted_data = indexed_ds[subset_vars].where(indexed_cond)
+
+        # Extract data for variables that shouldn't be subsetted
+        non_subsetted_data = indexed_ds[non_subset_vars]
+
+        # Merge the subsetted and non-subsetted datasets
+        new_dataset = xr.merge([non_subsetted_data, subsetted_data])
+
+        process_dataset_variables(
+            new_dataset=new_dataset,
+            indexed_ds=indexed_ds,
+            dataset=dataset,
+            indexers=indexers,
+            partial_dim_in_in_vars=partial_dim_in_in_vars,
+            cond=cond,
+            pixel_subset=pixel_subset
+        )
+
+    dc.sync_dims_inplace(dataset, new_dataset)
+    return new_dataset
+
+
+def process_dataset_variables(new_dataset, indexed_ds, dataset, indexers, partial_dim_in_in_vars, cond, pixel_subset=False):
+    """
+    Process dataset variables by handling type casting, fill values, and dimension indexing.
+
+    Parameters:
+    -----------
+    new_dataset : xarray.Dataset
+        The target dataset to be modified
+    indexed_ds : xarray.Dataset
+        The indexed source dataset
+    dataset : xarray.Dataset
+        The original dataset
+    indexers : dict
+        Dictionary of dimension indices
+    partial_dim_in_in_vars : bool
+        Flag indicating if partial dimensions are in variables
+    cond : xarray.DataArray
+        Condition array for filtering
+    pixel_subset : bool, optional
+        Flag for pixel subsetting, defaults to False
+
+    Returns:
+    --------
+    None (modifies new_dataset in place)
+    """
 
     # Cast all variables to their original type
     for variable_name, variable in new_dataset.data_vars.items():
@@ -283,14 +311,12 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
                 indexers.keys()).intersection(new_dataset[variable_name].dims):
             new_dataset[variable_name] = indexed_var
-
             new_dataset[variable_name].attrs = indexed_var.attrs
             variable.attrs = indexed_var.attrs
 
         # Check if variable has no _FillValue. If so, use original data
         if not pixel_subset:
             if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
-
                 if original_type != new_type:
                     new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
                                                                 str(original_type), dask='allowed',
@@ -301,7 +327,6 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                 # variable over, otherwise use a NaN mask to copy over the
                 # relevant values.
                 new_dataset[variable_name] = indexed_var
-
                 new_dataset[variable_name].attrs = indexed_var.attrs
                 variable.attrs = indexed_var.attrs
                 new_dataset[variable_name].encoding['_FillValue'] = None
@@ -320,9 +345,3 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                     new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
                                                                 str(original_type), dask='allowed',
                                                                 keep_attrs=True)
-
-    dc.sync_dims_inplace(dataset, new_dataset)
-    return new_dataset
-
-
-

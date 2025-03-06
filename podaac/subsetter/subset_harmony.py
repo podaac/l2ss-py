@@ -147,7 +147,6 @@ class L2SubsetterService(BaseHarmonyAdapter):
         temp_dir = mkdtemp()
         output_dir = self.data_dir
         self.prepare_output_dir(output_dir)
-
         try:
             # Get the data file
             asset = next(v for k, v in item.assets.items() if 'data' in (v.roles or []))
