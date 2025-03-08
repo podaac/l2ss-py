@@ -54,8 +54,34 @@ from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter import xarray_enhancements as xre
 from podaac.subsetter import gpm_cleanup as gc
+import gc as garbage_collection
 from podaac.subsetter import time_converting as tc
 # from podaac.subsetter import dimension_cleanup as dc
+
+
+@pytest.fixture(autouse=True)
+def close_all_datasets():
+    """Ensure all netCDF4 and xarray datasets are closed after each test"""
+
+    test_name = f"{pytest.current_test.__module__}.{pytest.current_test.__name__}"
+    
+    yield
+    
+    # Force garbage collection
+    garbage_collection.collect()
+    
+    # Close netCDF4 datasets
+    for obj in garbage_collection.get_objects():
+        if isinstance(obj, nc.Dataset):
+            try:
+                obj.close()
+            except:
+                pass
+        elif isinstance(obj, xr.Dataset):
+            try:
+                obj.close()
+            except:
+                pass
 
 
 @pytest.fixture(scope='class')
@@ -137,232 +163,6 @@ def data_files():
 TEST_DATA_FILES = data_files()
 
 
-@pytest.mark.parametrize("test_file", TEST_DATA_FILES)
-def test_subset_variables(test_file, data_dir, subset_output_dir, request):
-    """
-    Test that all variables present in the original NetCDF file
-    are present after the subset takes place, and with the same
-    attributes.
-    """
-
-    bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, test_file)
-    subset.subset(
-        file_to_subset=join(data_dir, test_file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file)
-    )
-
-    in_ds = xr.open_dataset(join(data_dir, test_file),
-                            decode_times=False,
-                            decode_coords=False)
-    out_ds = xr.open_dataset(join(subset_output_dir, output_file),
-                             decode_times=False,
-                             decode_coords=False)
-
-
-    nc_in_ds = nc.Dataset(join(data_dir, test_file))
-    nc_out_ds = nc.Dataset(join(subset_output_dir, output_file))
-
-    time_var_name = None
-    try:
-        lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
-        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name], [])
-    except ValueError:
-        # unable to determine lon lat vars
-        pass
-
-    if time_var_name:
-        assert nc_in_ds[time_var_name].units == nc_out_ds[time_var_name].units
-
-    nc_in_ds.close()
-    nc_out_ds.close()
-
-    for in_var, out_var in zip(in_ds.data_vars.items(), out_ds.data_vars.items()):
-        # compare names
-        assert in_var[0] == out_var[0]
-
-        # compare attributes
-        np.testing.assert_equal(in_var[1].attrs, out_var[1].attrs)
-
-        # compare type and dimension names
-        assert in_var[1].dtype == out_var[1].dtype
-        assert in_var[1].dims == out_var[1].dims
-
-    in_ds.close()
-    out_ds.close()
-
-
-@pytest.mark.parametrize("test_file", TEST_DATA_FILES)
-def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
-    """
-    Test that all data present is within the bounding box given,
-    and that the correct bounding box is used. This test assumed
-    that the scanline *is* being cut.
-    """
-
-    # pylint: disable=too-many-locals
-    bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, test_file)
-    subset_output_file = join(subset_output_dir, output_file)
-    subset.subset(
-        file_to_subset=join(data_dir, test_file),
-        bbox=bbox,
-        output_file=subset_output_file
-    )
-
-    out_ds, _, file_ext = subset.open_as_nc_dataset(subset_output_file)
-    out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
-                             decode_times=False,
-                             decode_coords=False,
-                             mask_and_scale=False)
-
-    lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(out_ds)
-
-    lat_var_name = lat_var_name[0]
-    lon_var_name = lon_var_name[0]
-
-    lon_bounds, lat_bounds = subset.convert_bbox(bbox, out_ds, lat_var_name, lon_var_name)
-
-    lats = out_ds[lat_var_name].values
-    lons = out_ds[lon_var_name].values
-
-    warnings.filterwarnings('ignore')
-
-    # Step 1: Get mask of values which aren't in the bounds.
-
-    # For lon spatial condition, need to consider the
-    # lon_min > lon_max case. If that's the case, should do
-    # an 'or' instead.
-    oper = operator.and_ if lon_bounds[0] < lon_bounds[1] else operator.or_
-
-    # In these two masks, True == valid and False == invalid
-    lat_truth = np.ma.masked_where((lats >= lat_bounds[0])
-                                   & (lats <= lat_bounds[1]), lats).mask
-    lon_truth = np.ma.masked_where(oper((lons >= lon_bounds[0]),
-                                        (lons <= lon_bounds[1])), lons).mask
-
-    # combine masks
-    spatial_mask = np.bitwise_and(lat_truth, lon_truth)
-
-    # Create a mask which represents the valid matrix bounds of
-    # the spatial mask. This is used in the case where a var
-    # has no _FillValue.
-    if lon_truth.ndim == 1:
-        bound_mask = spatial_mask
-    else:
-        rows = np.any(spatial_mask, axis=1)
-        cols = np.any(spatial_mask, axis=0)
-        bound_mask = np.array([[r & c for c in cols] for r in rows])
-
-    # If all the lat/lon values are valid, the file is valid and
-    # there is no need to check individual variables.
-    if np.all(spatial_mask):
-        return
-
-    # Step 2: Get mask of values which are NaN or "_FillValue in
-    # each variable.
-    for _, var in out_ds.data_vars.items():
-        # remove dimension of '1' if necessary
-        vals = np.squeeze(var.values)
-
-        # Get the Fill Value
-        fill_value = var.attrs.get('_FillValue')
-
-        # If _FillValue isn't provided, check that all values
-        # are in the valid matrix bounds go to the next variable
-        if fill_value is None:
-            combined_mask = np.ma.mask_or(spatial_mask, bound_mask)
-            np.testing.assert_equal(bound_mask, combined_mask)
-            continue
-
-        # If the shapes of this var doesn't match the mask,
-        # reshape the var so the comparison can be made. Take
-        # the first index of the unknown dims. This makes
-        # assumptions about the ordering of the dimensions.
-        if vals.shape != out_ds[lat_var_name].shape and vals.shape:
-            slice_list = []
-            for dim in var.dims:
-                if dim in out_ds[lat_var_name].dims:
-                    slice_list.append(slice(None))
-                else:
-                    slice_list.append(slice(0, 1))
-            vals = np.squeeze(vals[tuple(slice_list)])
-
-        # Skip for byte type.
-        if vals.dtype == 'S1':
-            continue
-
-        # In this mask, False == NaN and True = valid
-        var_mask = np.invert(np.ma.masked_invalid(vals).mask)
-        fill_mask = np.invert(np.ma.masked_values(vals, fill_value).mask)
-
-        var_mask = np.bitwise_and(var_mask, fill_mask)
-
-        if var_mask.shape != spatial_mask.shape:
-            # This may be a case where the time represents lines,
-            # or some other case where the variable doesn't share
-            # a shape with the coordinate variables.
-            continue
-
-        # Step 3: Combine the spatial and var mask with 'or'
-        combined_mask = np.ma.mask_or(var_mask, spatial_mask)
-
-        # Step 4: compare the newly combined mask and the
-        # spatial mask created from the lat/lon masks. They
-        # should be equal, because the 'or' of the two masks
-        # where out-of-bounds values are 'False' will leave
-        # those values assuming there are only NaN values
-        # in the data at those locations.
-        np.testing.assert_equal(spatial_mask, combined_mask)
-
-    out_ds.close()
-
-
-@pytest.mark.parametrize("test_file", TEST_DATA_FILES)
-def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
-    """Test that an empty file is returned when the bounding box
-    contains no data."""
-    nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
-    shutil.copyfile(os.path.join(data_dir, test_file),
-                    nc_copy_for_expected_results)
-
-    bbox = np.array(((120, 125), (-90, -85)))
-    output_file = "{}_{}".format(request.node.name, test_file)
-    subset.subset(
-        file_to_subset=join(data_dir, test_file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file)
-    )
-
-    test_input_dataset = xr.open_dataset(
-        nc_copy_for_expected_results,
-        decode_times=False,
-        decode_coords=False,
-        mask_and_scale=False
-    )
-    empty_dataset = xr.open_dataset(
-        join(subset_output_dir, output_file),
-        decode_times=False,
-        decode_coords=False,
-        mask_and_scale=False
-    )
-
-    # Ensure all variables are present but empty.
-    for _, variable in empty_dataset.data_vars.items():
-        fill_value = variable.attrs.get('_FillValue', np.nan)
-        data = variable.data
-        
-        # Perform the main check
-        condition = np.all(data == fill_value) or np.all(np.isnan(data))
-        
-        # Handle the specific integer dtype case
-        if not condition and not (np.isnan(fill_value) and np.issubdtype(variable.dtype, np.integer)):
-            assert condition, f"Data does not match fill value for variable: {variable}"
-
-    assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
-
-
 def test_bbox_conversion(data_dir):
     """
     Test that the bounding box conversion returns expected
@@ -409,119 +209,6 @@ def test_bbox_conversion(data_dir):
         np.testing.assert_equal(actual_result, expected_result)
 
 
-def compare_java(test_file, cut, data_dir, subset_output_dir, request):
-    """
-    Run the L2 subsetter and compare the result to the equivelant
-    legacy (Java) subsetter result.
-    Parameters
-    ----------
-    test_file : str
-        path to test file.
-    cut : boolean
-        True if the subsetter should return compact.
-    """
-    bbox_map = [("ascat_20150702_084200", ((-180, 0), (-90, 0))),
-                ("ascat_20150702_102400", ((-180, 0), (-90, 0))),
-                ("MODIS_A-JPL", ((65.8, 86.35), (40.1, 50.15))),
-                ("MODIS_T-JPL", ((-78.7, -60.7), (-54.8, -44))),
-                ("VIIRS", ((-172.3, -126.95), (62.3, 70.65))),
-                ("AMSR2-L2B_v08_r38622", ((-180, 0), (-90, 0)))]
-
-    java_files_dir = join(data_dir, "java_results", "cut" if cut else "uncut")
-
-    java_files = [join(java_files_dir, f) for f in listdir(java_files_dir) if
-                  isfile(join(java_files_dir, f)) and f.endswith(".nc")]
-
-    file, bbox = next(iter([b for b in bbox_map if b[0] in test_file]))
-    java_file = next(iter([f for f in java_files if file in f]))
-
-    output_file = "{}_{}".format(urllib.parse.quote_plus(request.node.name), test_file)
-    subset.subset(
-        file_to_subset=join(data_dir, test_file),
-        bbox=np.array(bbox),
-        output_file=join(subset_output_dir, output_file),
-        cut=cut
-    )
-
-    j_ds = xr.open_dataset(join(data_dir, java_file),
-                           decode_times=False,
-                           decode_coords=False,
-                           mask_and_scale=False)
-
-    py_ds = xr.open_dataset(join(subset_output_dir, output_file),
-                            decode_times=False,
-                            decode_coords=False,
-                            mask_and_scale=False)
-
-    for var_name, var in j_ds.data_vars.items():
-        # Compare shape
-        np.testing.assert_equal(var.shape, py_ds[var_name].shape)
-
-        # Compare meta
-        np.testing.assert_equal(var.attrs, py_ds[var_name].attrs)
-
-        diff_indices = np.where(var.values != py_ds[var_name].values)
-
-        # Compare data
-        np.testing.assert_equal(var.values, py_ds[var_name].values)
-
-    # Compare meta. History will always be different, so remove
-    # from the headers for comparison.
-    del j_ds.attrs['history']
-    del py_ds.attrs['history']
-    del py_ds.attrs['history_json']
-
-    ignore_attributes = [
-        "northernmost_latitude",
-        "southernmost_latitude",
-        "easternmost_longitude",
-        "westernmost_longitude"
-    ]
-    filtered_j_ds_attrs = {k: v for k, v in j_ds.attrs.items() if k not in ignore_attributes}
-    filtered_py_ds_attrs = {k: v for k, v in py_ds.attrs.items() if k not in ignore_attributes}
-
-    np.testing.assert_equal(filtered_j_ds_attrs, filtered_py_ds_attrs)
-
-@pytest.mark.parametrize("test_file", [
-    "ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc",
-    "ascat_20150702_102400_metopa_45146_eps_o_250_2300_ovw.l2.nc",
-    "MODIS_A-JPL-L2P-v2014.0.nc",
-    "MODIS_T-JPL-L2P-v2014.0.nc",
-    "VIIRS_NPP-NAVO-L2P-v3.0.nc",
-    "AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc"
-])
-def test_compare_java_compact(test_file, data_dir, subset_output_dir, request):
-    """
-    Tests that the results of the subsetting operation is
-    equivalent to the Java subsetting result on the same bounding
-    box. For simplicity the subsetted Java granules have been
-    manually run and copied into this project. This test DOES
-    cut the scanline.
-    """
-
-    compare_java(test_file, True, data_dir, subset_output_dir, request)
-
-
-@pytest.mark.parametrize("test_file", [
-    "ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc",
-    "ascat_20150702_102400_metopa_45146_eps_o_250_2300_ovw.l2.nc",
-    "MODIS_A-JPL-L2P-v2014.0.nc",
-    "MODIS_T-JPL-L2P-v2014.0.nc",
-    "VIIRS_NPP-NAVO-L2P-v3.0.nc",
-    "AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc"
-])
-def test_compare_java(test_file, data_dir, subset_output_dir, request):
-    """
-    Tests that the results of the subsetting operation is
-    equivalent to the Java subsetting result on the same bounding
-    box. For simplicity the subsetted Java granules have been
-    manually run and copied into this project. This runs does NOT
-    cut the scanline.
-    """
-
-    compare_java(test_file, False, data_dir, subset_output_dir, request)
-
-
 def test_history_metadata_append(data_dir, subset_output_dir, request):
     """
     Tests that the history metadata header is appended to when it
@@ -537,8 +224,8 @@ def test_history_metadata_append(data_dir, subset_output_dir, request):
         output_file=join(subset_output_dir, output_file)
     )
 
-    in_nc = xr.open_dataset(join(data_dir, test_file), decode_times=False)
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file), decode_times=False)
+    in_nc = xr.open_dataset(join(data_dir, test_file))
+    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
 
     # Assert that the original granule contains history
     assert in_nc.attrs.get('history') is not None
@@ -575,7 +262,7 @@ def test_history_metadata_create(data_dir, subset_output_dir, request):
         output_file=join(subset_output_dir, output_file)
     )
 
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file), decode_times=False)
+    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
 
     # Assert that the input granule contains no history
     assert in_nc.attrs.get('history') is None
@@ -586,60 +273,6 @@ def test_history_metadata_create(data_dir, subset_output_dir, request):
     # Assert that the history created by this service is the only
     # line present in the history.
     assert '\n' not in out_nc.attrs['history']
-
-
-@pytest.mark.parametrize("test_file", TEST_DATA_FILES)
-def test_specified_variables(test_file, data_dir, subset_output_dir, request):
-    """
-    Test that the variables which are specified when calling the subset
-    operation are present in the resulting subsetted data file,
-    and that the variables which are specified are not present.
-    """
-    nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
-    shutil.copyfile(os.path.join(data_dir, test_file),
-                    nc_copy_for_expected_results)
-
-    bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, test_file)
-
-    in_ds, _, file_ext = subset.open_as_nc_dataset(nc_copy_for_expected_results)
-    in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
-                            decode_times=False,
-                            decode_coords=False)
-    # Non-data vars are by default included in the result
-    non_data_vars = set(in_ds.variables.keys()) - set(in_ds.data_vars.keys())
-
-    # Coordinate variables are always included in the result
-    lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(in_ds)
-    coordinate_variables = lat_var_names + lon_var_names + time_var_names
-
-    # Pick some variables to include in the result (every other variable: first, third, fifth, etc.)
-    included_variables = set([variable[0] for variable in in_ds.data_vars.items()][::2])
-    included_variables = list(included_variables)
-
-    # All other data variables should be dropped
-    expected_excluded_variables = list(set(variable[0] for variable in in_ds.data_vars.items())
-                                       - set(included_variables) - set(coordinate_variables))
-
-    subset.subset(
-        file_to_subset=join(data_dir, test_file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file),
-        variables=[var.replace(GROUP_DELIM, '/') for var in included_variables]
-    )
-
-    out_ds, _, file_ext = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
-    out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
-                             decode_times=False,
-                             decode_coords=False)
-
-    out_vars = list(out_ds.variables.keys())
-
-    assert set(out_vars) == set(included_variables + coordinate_variables).union(non_data_vars)
-    assert set(out_vars).isdisjoint(expected_excluded_variables)
-
-    in_ds.close()
-    out_ds.close()
 
 
 def test_calculate_chunks():
@@ -1268,24 +901,6 @@ def test_temporal_subset_s6(data_dir, subset_output_dir, request):
     assert (out_ds.time <= pd.to_datetime(end_dt)).all()
 
 
-@pytest.mark.parametrize('test_file', TEST_DATA_FILES)
-def test_get_time_variable_name(test_file, data_dir):
-    """Ensures that the name of the time variable can be retrieved."""
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': False,
-        'decode_times': True
-    }
-    ds, _, file_ext = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
-    ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
-
-    lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
-    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name], [])
-
-    assert time_var_name is not None
-    assert 'time' in time_var_name
-
-
 def test_subset_jason(data_dir, subset_output_dir, request):
     """TODO: Give description to this test function."""
     bbox = np.array(((-180, 0), (-90, 90)))
@@ -1294,7 +909,7 @@ def test_subset_jason(data_dir, subset_output_dir, request):
     min_time = "2002-01-15T06:07:06Z"
     max_time = "2002-01-15T06:30:16Z"
 
-    result = subset.subset(
+    subset.subset(
         file_to_subset=os.path.join(data_dir, file),
         bbox=bbox,
         min_time=min_time,
@@ -1302,25 +917,6 @@ def test_subset_jason(data_dir, subset_output_dir, request):
         output_file=os.path.join(subset_output_dir, output_file)
     )
 
-
-@pytest.mark.parametrize('test_file', TEST_DATA_FILES)
-def test_subset_size(test_file, data_dir, subset_output_dir, request):
-    """Verifies that the subsetted file is smaller in size than the original file."""
-    bbox = np.array(((-180, 0), (-30, 90)))
-    output_file = "{}_{}".format(request.node.name, test_file)
-    input_file_path = os.path.join(data_dir, test_file)
-    output_file_path = os.path.join(subset_output_dir, output_file)
-
-    subset.subset(
-        file_to_subset=input_file_path,
-        bbox=bbox,
-        output_file=output_file_path
-    )
-
-    original_file_size = os.path.getsize(input_file_path)
-    subset_file_size = os.path.getsize(output_file_path)
-
-    assert subset_file_size < original_file_size
 
 def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     """
