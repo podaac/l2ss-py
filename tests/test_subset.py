@@ -62,8 +62,6 @@ from podaac.subsetter import time_converting as tc
 @pytest.fixture(autouse=True)
 def close_all_datasets():
     """Ensure all netCDF4 and xarray datasets are closed after each test"""
-
-    test_name = f"{pytest.current_test.__module__}.{pytest.current_test.__name__}"
     
     yield
     
