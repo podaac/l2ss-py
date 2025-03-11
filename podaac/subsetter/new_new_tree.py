@@ -14,6 +14,8 @@ import re
 from typing import List, Optional
 from typing import Optional, Set
 
+from podaac.subsetter import dimension_cleanup as dc
+
 GROUP_DELIM = "/"  # Adjust based on actual dataset structure
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
@@ -106,12 +108,34 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     return indexers
 
 def get_condition(condition_dict, path):
-    while path:
-        cond = condition_dict.get(path)
-        if cond is not None:
-            return cond
-        path = "/".join(path.rstrip("/").split("/")[:-1])  # Remove last segment
-    return condition_dict.get("/", None)  # Final fallback to root
+    return get_sibling_or_parent_condition(condition_dict, path)
+
+def get_sibling_or_parent_condition(condition_dict, path):
+    # Normalize the path by removing trailing slashes
+    path = path.rstrip('/')
+    path_parts = path.split("/")
+    
+    # First try to find sibling match
+    for potential_path in condition_dict:
+        potential_path = potential_path.rstrip('/')
+        potential_parts = potential_path.split("/")
+        
+        # Check if paths have the same depth
+        if len(path_parts) == len(potential_parts):
+            # Check if they share the same structure up to parent
+            common_parent = all(p1 == p2 for p1, p2 in zip(path_parts[:-2], potential_parts[:-2]))
+            if common_parent and potential_path != path:
+                return condition_dict[potential_path]
+    
+    # If no sibling found, walk up the tree to find parent conditions
+    current_path = path
+    while current_path:
+        if current_path in condition_dict:
+            return condition_dict[current_path]
+        current_path = "/".join(current_path.split("/")[:-1])
+    
+    return condition_dict.get("/", None)
+
 
 def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool, condition_dict) -> DataTree:
     """
@@ -148,18 +172,24 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             Processed dataset and dictionary of processed child nodes
         """
         # Print the current path
+
+
+
         cond = get_condition(condition_dict, path)
+
+        # if only one condition in dictionary then get the one condition
         if cond is None:
             if len(condition_dict) == 1:
                 key, cond = next(iter(condition_dict.items()))
 
         # Get the dataset directly from the node
         dataset = node.ds
-        
+
+        dataset = dc.remove_duplicate_dims_xarray(dataset)
+
         original_dtypes = {var: dataset[var].dtype for var in dataset.variables}
 
-        # Process current node's dataset
-        if len(dataset.data_vars) > 0:  # Only process if node has data
+        if len(dataset.data_vars) > 0 and cond is not None:  # Only process if node has data
             # Create indexers from condition
 
             if cond.values.ndim == 1:
@@ -271,6 +301,7 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                                                                     str(original_type), dask='allowed',
                                                                     keep_attrs=True)
             processed_ds = new_dataset
+
             # Cast variables and handle fill values
             """
             processed_ds = cast_variables_to_original_types(
@@ -284,7 +315,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         else:
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
-
 
         # Process child nodes
         processed_children = {}
@@ -300,6 +330,9 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                 child_tree[grandchild_name] = grandchild_tree
                 
             processed_children[child_name] = child_tree
+
+
+        #processed_ds = dc.recreate_pixcore_dimensions(processed_ds)
 
         return processed_ds, processed_children
 

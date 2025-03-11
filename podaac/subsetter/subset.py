@@ -50,6 +50,7 @@ from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_datas
     h5file_transform
 
 from podaac.subsetter import new_new_tree as new_new_tree
+from podaac.subsetter import tree_time_converting as tree_time_converting
 
 from xarray import DataTree
 
@@ -911,6 +912,7 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
         is essentially a noop.
     """
 
+
     def build_cond(str_timestamp, compare):
         timestamp = translate_timestamp(str_timestamp)
 
@@ -954,7 +956,7 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
 def get_path(s):
     """Extracts the path by removing the last part after the final '/'."""
     path = s.rsplit('/', 1)[0] if '/' in s else s
-    return f"/{path}"
+    return path if path.startswith('/') else f'/{path}'
 
 
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
@@ -1391,6 +1393,42 @@ def common_nested_keys(old_dict, new_dict):
                 common[group] = common_vars
     return common
 
+def get_hdf_type(tree: xr.DataTree) -> Optional[str]:
+    """
+    Determine the HDF type (OMI or MLS) from a DataTree object.
+
+    Parameters
+    ----------
+    tree : DataTree
+        DataTree object containing the HDF data
+
+    Returns
+    -------
+    Optional[str]
+        'OMI', 'MLS', or None if type cannot be determined
+    """
+    try:
+        # Try to get instrument information from FILE_ATTRIBUTES
+        additional_attrs = tree['/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES']
+        if additional_attrs is not None and 'InstrumentName' in additional_attrs.attrs:
+            instrument = additional_attrs.attrs['InstrumentName']
+            if isinstance(instrument, bytes):
+                instrument = instrument.decode("utf-8")
+        else:
+            return None
+            
+        # Determine HDF type based on instrument name
+        if 'OMI' in instrument:
+            return 'OMI'
+        elif 'MLS' in instrument:
+            return 'MLS'
+            
+    except (KeyError, AttributeError):
+        pass
+        
+    return None
+
+
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            variables: Union[List[str], str, None] = (),
            # pylint: disable=too-many-branches, disable=too-many-statements
@@ -1507,6 +1545,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     nc_dataset.close()
     """
 
+    file_extension = os.path.splitext(file_to_subset)[1]
+
     hdf_type = False
     args = {
         'decode_coords': False,
@@ -1524,12 +1564,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     #with xr.open_datatree(xr.backends.NetCDF4DataStore(nc_dataset)) as tree:
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
+
+        hdf_type = get_hdf_type(dataset)
         # Access the root dataset (if needed)
         # dataset = tree.ds
         #original_dataset = open_dataset
         #print(dataset.items())
 
-        old_encoding = new_new_tree.get_datatree_encodings(dataset)
+        #old_encoding = new_new_tree.get_datatree_encodings(dataset)
         #encoding = {'/':{'sea_surface_temperature': {'zlib': True, 'complevel': 5, '_FillValue': -32767}, 'sst_dtime': {'zlib': True, 'complevel': 5, '_FillValue': -32768}}}
         #print(dataset.groups)
         #print(encoding)
@@ -1548,9 +1590,18 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if not time_var_names and (min_time or max_time):
             raise ValueError('Could not determine time variable')
 
+        normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
+
+        # to be implemented
+        #if '.HDF5' == file_extension:
+        #    # GPM files will have a ScanTime group
+        #    if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
+        #        gc.change_var_dims(nc_dataset, normalized_variables)
+        #        hdf_type = 'GPM'
+
         start_date = None
         if hdf_type and (min_time or max_time):
-            dataset, start_date = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
+            dataset, start_date = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
         chunks = calculate_chunks(dataset)
         if chunks:
@@ -1559,7 +1610,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
 
-            normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
             keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
 
             all_data_variables = new_new_tree.get_vars_with_paths(dataset)
@@ -1598,9 +1648,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         set_version_history(datasets, cut, bbox, shapefile)
         set_json_history(datasets, cut, file_to_subset, bbox, shapefile, origin_source)
 
-        new_encoding = new_new_tree.get_datatree_encodings(datasets)
-        encoding = common_nested_keys(old_encoding, new_encoding)
+        #new_encoding = new_new_tree.get_datatree_encodings(datasets)
+        #encoding = common_nested_keys(old_encoding, new_encoding)
         
+        encoding = prepare_basic_encoding(datasets)
+
         datasets.to_netcdf(output_file, encoding=encoding)
         #datasets.to_netcdf(output_file)
 
@@ -1657,5 +1709,58 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         )
 
 
+def prepare_basic_encoding(datasets: DataTree) -> dict:
+    """
+    Prepare basic encoding dictionary for DataTree organized by groups.
+    Only applies zlib and complevel for float32, float64, int32, uint16 datatypes.
+    All paths start with '/' for root and nested groups.
+    
+    Args:
+        datasets: xarray DataTree
+    Returns:
+        dict: Dictionary structure {'/group': {var: encoding, ...}, ...}
+    """
+    group_encodings = {}
+    
+    # Types that should have compression
+    COMPRESS_TYPES = {
+        'float32', 'float64',  # Floating point
+        'int8', 'int16', 'int32', 'int64',  # Signed integers
+        'uint8', 'uint16', 'uint32', 'uint64'  # Unsigned integers
+    }
 
-
+    def process_node(node: DataTree, group_path: str):
+        # Initialize encoding dict for this group
+        var_encodings = {}
+        
+        # Process only data variables in this group
+        for var_name in node.ds.data_vars:
+            var = node.ds[var_name]
+            
+            # Start with just _FillValue
+            encoding = {
+                "_FillValue": var.encoding.get('_FillValue')
+            }
+            
+            # Add compression only for specific dtypes
+            if var.dtype.name in COMPRESS_TYPES:
+                encoding['zlib'] = True
+                encoding['complevel'] = 5
+            
+            # Only add to var_encodings if we have any encoding settings
+            if encoding:
+                var_encodings[var_name] = encoding
+        
+        # Add this group's encodings to the main dict
+        if var_encodings:  # only add if there are variables with encoding
+            group_encodings[group_path] = var_encodings
+        
+        # Process child groups
+        for child_name, child in node.children.items():
+            child_path = f"{group_path}/{child_name}" if group_path != '/' else f"/{child_name}"
+            process_node(child, child_path)
+    
+    # Start processing from root with '/'
+    process_node(datasets, '/')
+    
+    return group_encodings
