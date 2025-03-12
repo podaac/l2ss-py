@@ -113,9 +113,16 @@ def get_condition(condition_dict, path):
 def get_sibling_or_parent_condition(condition_dict, path):
     # Normalize the path by removing trailing slashes
     path = path.rstrip('/')
-    path_parts = path.split("/")
     
-    # First try to find sibling match
+    # First try to find parent match by walking up the tree
+    current_path = path
+    while current_path:
+        if current_path in condition_dict:
+            return condition_dict[current_path]
+        current_path = "/".join(current_path.split("/")[:-1])
+    
+    # If no parent found, look for sibling match
+    path_parts = path.split("/")
     for potential_path in condition_dict:
         potential_path = potential_path.rstrip('/')
         potential_parts = potential_path.split("/")
@@ -127,13 +134,7 @@ def get_sibling_or_parent_condition(condition_dict, path):
             if common_parent and potential_path != path:
                 return condition_dict[potential_path]
     
-    # If no sibling found, walk up the tree to find parent conditions
-    current_path = path
-    while current_path:
-        if current_path in condition_dict:
-            return condition_dict[current_path]
-        current_path = "/".join(current_path.split("/")[:-1])
-    
+    # If no parent or sibling found, return root condition if it exists
     return condition_dict.get("/", None)
 
 
@@ -155,6 +156,9 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
+    print("#########################")
+    print(condition_dict.keys())
+    print("#########################")
     def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:
         """
         Process a single node and its children in the tree.
@@ -171,11 +175,12 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         Tuple[xr.Dataset, Dict[str, DataTree]]
             Processed dataset and dictionary of processed child nodes
         """
-        # Print the current path
-
-
-
         cond = get_condition(condition_dict, path)
+
+        print("#########################")
+        print(path)
+        print(cond)
+        print("#########################")
 
         # if only one condition in dictionary then get the one condition
         if cond is None:
@@ -184,7 +189,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
 
         # Get the dataset directly from the node
         dataset = node.ds
-
         dataset = dc.remove_duplicate_dims_xarray(dataset)
 
         original_dtypes = {var: dataset[var].dtype for var in dataset.variables}
@@ -204,13 +208,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             partial_dim_in_vars = check_partial_dim_overlap_node(dataset, indexers)
             partial_dim_in_in_vars = partial_dim_in_vars
 
-            # Apply indexing to condition and dataset
-            #print(condition_dict)
-            #print(condition_dict.get(path))
-            #print(path)
-            #print(indexers)
-            #print(dataset)
-
             indexed_cond = cond.isel(**indexers)
             # added missing dims to ignore
             # test to make it pass test_omi_novars_subset
@@ -218,14 +215,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
 
             # Get variables with and without indexers
             subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
-            
-            #print("********************************")
-            #print(indexed_cond)
-            #print(subset_vars)
-            #print(non_subset_vars)
-            #print("********************************")
-            # dataset with variables that need to be subsetted
-
             new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
 
             # data with variables that shouldn't be subsetted
@@ -235,13 +224,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             #merged_ds = xr.merge([non_sub_ds, sub_ds])            
             new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
             new_dataset.attrs.update(dataset.attrs)
-
-            # Restore original data types
-            #for var, dtype in original_dtypes.items():
-            #    if var in merged_ds:
-            #        merged_ds[var] = merged_ds[var].astype(dtype)
-
-            #new_dataset = merged_ds
 
             # Cast all variables to their original type
             for variable_name, variable in new_dataset.data_vars.items():
@@ -301,20 +283,11 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                                                                     str(original_type), dask='allowed',
                                                                     keep_attrs=True)
             processed_ds = new_dataset
-
-            # Cast variables and handle fill values
-            """
-            processed_ds = cast_variables_to_original_types(
-                merged_ds,
-                indexed_ds,
-                dataset,
-                indexers,
-                partial_dim_in_vars,
-                cond
-            )"""
         else:
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
+
+        dc.sync_dims_inplace(dataset, processed_ds)
 
         # Process child nodes
         processed_children = {}
@@ -327,12 +300,13 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             
             # Add all processed grandchildren to the child tree
             for grandchild_name, grandchild_tree in child_children.items():
-                child_tree[grandchild_name] = grandchild_tree
+                child_tree._children[grandchild_name] = grandchild_tree
+                grandchild_tree._parent = child_tree
+                #child_tree[grandchild_name] = grandchild_tree
                 
             processed_children[child_name] = child_tree
 
-
-        #processed_ds = dc.recreate_pixcore_dimensions(processed_ds)
+        #processed_ds = dc.recreate_pixcore_dimensions([processed_ds])[0]
 
         return processed_ds, processed_children
 
@@ -344,7 +318,21 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
     
     # Add processed children to the result tree
     for child_name, child_tree in children.items():
-        result_tree[child_name] = child_tree
+        #parent_node = result_tree.ds
+        #child_node = child_tree.ds
+
+        #normalized_nodes = dc.recreate_pixcore_dimensions([parent_node, child_node])
+
+        #child_tree.ds = normalized_nodes[1]
+        #result_tree.ds = normalized_nodes[0]
+
+        #print(result_tree.ds.dims)
+        #print(child_tree.ds.dims)
+
+        result_tree._children[child_name] = child_tree
+        child_tree._parent = result_tree
+
+        #result_tree[child_name] = child_tree
 
     # Copy over root attributes
     result_tree.attrs.update(tree.attrs)
@@ -423,8 +411,6 @@ def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
     """
     return data.astype(dtype_str)
 
-
-
 def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     """
     Copy a dataset into a new, empty dataset. This dataset should:
@@ -451,103 +437,10 @@ def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
 
     # Create a copy of the dataset filled with the empty data. Then select the first index along each
     # dimension and return the result
-    return dataset.copy(data=empty_data)
+
+    #maybe check with the dimensions on being differ
+    #return dataset.copy(data=empty_data)
     return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
-
-
-def cast_variables_to_original_types(new_dataset, indexed_ds, dataset, indexers, partial_dim_in_in_vars, cond=None):
-    """
-    Cast variables in a dataset to their original types while handling fill values and dimension indexing.
-    
-    Parameters
-    ----------
-    new_dataset : xarray.Dataset
-        The target dataset where variables will be modified
-    indexed_ds : xarray.Dataset
-        The dataset containing the original data types
-    dataset : xarray.Dataset
-        The source dataset
-    indexers : dict
-        Dictionary of dimension names and their corresponding index values
-    partial_dim_in_in_vars : bool
-        Flag indicating if there are partial dimensions in input variables
-    cond : xarray.DataArray, optional
-        Conditional mask for filtering data
-        
-    Returns
-    -------
-    xarray.Dataset
-        Modified dataset with variables cast to their original types
-    """
-    def cast_type(data, dtype_str):
-        """Helper function to cast data to specified type"""
-        return data.astype(dtype_str)
-    
-    for variable_name, variable in new_dataset.data_vars.items():
-        original_type = indexed_ds[variable_name].dtype
-        new_type = variable.dtype
-        indexed_var = indexed_ds[variable_name]
-
-        # Handle partial dimension indexing
-        if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
-                indexers.keys()).intersection(dataset[variable_name].dims):
-
-            missing_dim = (indexers.keys() - dataset[variable_name].dims).pop()  # Assume only 1
-            var_indexers = {
-                dim_name: dim_value for dim_name, dim_value in indexers.items()
-                if dim_name in dataset[variable_name].dims
-            }
-
-            var_cond = cond.any(axis=cond.dims.index(missing_dim)).isel(**var_indexers)
-            indexed_var = dataset[variable_name].isel(**var_indexers)
-            new_dataset[variable_name] = indexed_var.where(var_cond)
-            variable = new_dataset[variable_name]
-            
-        elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
-                indexers.keys()).intersection(new_dataset[variable_name].dims):
-            new_dataset[variable_name] = indexed_var
-            new_dataset[variable_name].attrs = indexed_var.attrs
-            variable.attrs = indexed_var.attrs
-
-        # Handle variables without _FillValue or scalar variables
-        if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
-            if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(
-                    cast_type, 
-                    variable,
-                    str(original_type), 
-                    dask='allowed',
-                    keep_attrs=True
-                )
-            new_dataset[variable_name] = indexed_var
-            new_dataset[variable_name].attrs = indexed_var.attrs
-            variable.attrs = indexed_var.attrs
-            new_dataset[variable_name].encoding['_FillValue'] = None
-            variable.encoding['_FillValue'] = None
-
-        else:
-            # Handle variables with _FillValue
-            fill_value = new_dataset[variable_name].attrs.get('_FillValue')
-            
-            # Special handling for datetime and timedelta types
-            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
-                fill_value = np.datetime64('nat')
-            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
-                fill_value = np.timedelta64('nat')
-
-            new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
-            
-            if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(
-                    cast_type, 
-                    new_dataset[variable_name],
-                    str(original_type), 
-                    dask='allowed',
-                    keep_attrs=True
-                )
-    
-    return new_dataset
-
 
 def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
     """
@@ -630,8 +523,6 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
 
         for child_name, child_node in node.children.items():
             new_path = f"{path}/{child_name}" if path else child_name
-            #print(new_path)
-
             traverse_tree(child_node, new_path)
 
     # Start recursive tree traversal

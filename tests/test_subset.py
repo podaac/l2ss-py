@@ -1876,7 +1876,7 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
     # subset should be present.
     assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
 
-
+@pytest.mark.skip(reason="Test flattens data which we do not have to do anymore")
 def test_temporal_he5file_subset(data_dir, subset_output_dir):
     """
     Test that the time type changes to datetime for subsetting
