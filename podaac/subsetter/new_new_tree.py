@@ -177,11 +177,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         """
         cond = get_condition(condition_dict, path)
 
-        print("#########################")
-        print(path)
-        print(cond)
-        print("#########################")
-
         # if only one condition in dictionary then get the one condition
         if cond is None:
             if len(condition_dict) == 1:
@@ -999,17 +994,6 @@ def get_datatree_encodings(datatree):
                 "_FillValue": var.encoding.get('_FillValue')
 
             }
-            """
-            # Get existing fill value from encoding
-            if '_FillValue' in var.encoding:
-                fill_value = var.encoding['_FillValue']
-                if isinstance(fill_value, bytes):
-                    try:
-                        fill_value = fill_value.decode('UTF-8')
-                    except UnicodeDecodeError:
-                        fill_value = fill_value.decode('latin1')
-                var_encoding['_FillValue'] = fill_value
-            """
             encoding_path = '/' + path.lstrip('/') if path else '/'
 
             if encoding_path not in encodings:

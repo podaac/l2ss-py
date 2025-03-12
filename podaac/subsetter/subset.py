@@ -25,7 +25,7 @@ import operator
 import os
 import re
 from itertools import zip_longest
-from typing import List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 import dateutil
 from dateutil import parser
 
@@ -861,7 +861,6 @@ def get_base_group_names(lats: List[str]) -> Tuple[List[str], List[Union[int, st
     return unique_groups, diff_count
 
 
-
 def get_variable_data(dtree, var_path):
     """
     Retrieve data from a DataTree object given a variable path.
@@ -959,6 +958,90 @@ def get_path(s):
     return path if path.startswith('/') else f'/{path}'
 
 
+
+def subset_with_shapefile_multi(dataset: xr.Dataset,
+                              lat_var_names: List[str],
+                              lon_var_names: List[str],
+                              shapefile: str,
+                              cut: bool,
+                              chunks) -> Dict[str, np.ndarray]:
+    """
+    Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Dataset to subset
+    lat_var_names : List[str]
+        List of latitude variable names in the given dataset
+    lon_var_names : List[str]
+        List of longitude variable names in the given dataset
+    shapefile : str
+        Absolute path to the shapefile used to subset the given dataset
+    cut : bool
+        True if scanline should be cut
+    chunks : Union[Dict, None]
+        Chunking specification for dask arrays
+
+    Returns
+    -------
+    Dict[str, np.ndarray]
+        Dictionary mapping variable names to their respective boolean masks
+        Keys are formatted as "{lat_var_name}_{lon_var_name}"
+    """
+    if len(lat_var_names) != len(lon_var_names):
+        raise ValueError("Number of latitude variables must match number of longitude variables")
+
+    shapefile_df = gpd.read_file(shapefile)
+    masks = {}
+
+    for lat_var_name, lon_var_name in zip(lat_var_names, lon_var_names):
+        # Get scaling factors and offsets for this pair
+        lat_scale = dataset[lat_var_name].attrs.get('scale_factor', 1.0)
+        lon_scale = dataset[lon_var_name].attrs.get('scale_factor', 1.0)
+        lat_offset = dataset[lat_var_name].attrs.get('add_offset', 0.0)
+        lon_offset = dataset[lon_var_name].attrs.get('add_offset', 0.0)
+
+        # Create a copy of shapefile_df for this pair
+        current_shapefile_df = shapefile_df.copy()
+
+        # If data is '360', convert shapefile to '360' as well
+        if is_360(dataset[lon_var_name], lon_scale, lon_offset):
+            current_shapefile_df.geometry = current_shapefile_df['geometry'].apply(translate_longitude)
+
+        # Mask and scale shapefile
+        def scale(lon, lat, extra=None):  # pylint: disable=unused-argument
+            lon = tuple(map(functools.partial(apply_scale_offset, lon_scale, lon_offset), lon))
+            lat = tuple(map(functools.partial(apply_scale_offset, lat_scale, lat_offset), lat))
+            return lon, lat
+
+        geometries = [transform(scale, geometry) for geometry in current_shapefile_df.geometry]
+        current_shapefile_df.geometry = geometries
+
+        def in_shape(data_lon, data_lat):
+            point = Point(data_lon, data_lat)
+            point_in_shapefile = current_shapefile_df.contains(point)
+            return point_in_shapefile.array[0]
+
+        dask = "forbidden"
+        if chunks:
+            dask = "allowed"
+
+        in_shape_vec = np.vectorize(in_shape)
+        boolean_mask = xr.apply_ufunc(
+            in_shape_vec, 
+            dataset[lon_var_name], 
+            dataset[lat_var_name], 
+            dask=dask
+        )
+        
+        # Store mask with a key that combines both variable names
+        lat_path = get_path(lat_var_name)
+        masks[lat_path] = boolean_mask
+
+    return_dataset = xre.tree_where(dataset, masks, cut)
+    return return_dataset
+
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
@@ -1018,10 +1101,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     subset_dictionary = {}
 
-    #print(lat_bounds[0])
-    #print(lat_bounds[1])
-    #print(lon_bounds[0])
-    #print(lon_bounds[1])
 
     for lat_var_name, lon_var_name, time_var_name in zip(lat_var_names, lon_var_names, time_var_names):
 
@@ -1622,9 +1701,10 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             dataset = new_new_tree.drop_vars_by_path_two(dataset, drop_variables)
 
         if shapefile:
-            datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
-            ]
+            #datasets = [
+            #    subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
+            #]
+            datasets = subset_with_shapefile_multi(dataset, lat_var_names, lon_var_names, shapefile, cut, chunks)
         elif bbox is not None:
             datasets = subset_with_bbox(
                 dataset=dataset,
