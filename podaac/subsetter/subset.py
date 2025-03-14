@@ -25,7 +25,8 @@ import operator
 import os
 import re
 from itertools import zip_longest
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
+
 import dateutil
 from dateutil import parser
 
@@ -39,20 +40,25 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import xarray.coding.times
-from shapely.geometry import Point, Polygon, MultiPolygon
+from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 
-from podaac.subsetter import gpm_cleanup as gc
-from podaac.subsetter import time_converting as tc
-from podaac.subsetter import dimension_cleanup as dc
-from podaac.subsetter import xarray_enhancements as xre
-from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
-    h5file_transform
-
-from podaac.subsetter import new_new_tree as new_new_tree
-from podaac.subsetter import tree_time_converting as tree_time_converting
-
 from xarray import DataTree
+
+from podaac.subsetter import (
+    dimension_cleanup as dc,
+    gpm_cleanup as gc,
+    new_new_tree as new_new_tree,
+    time_converting as tc,
+    tree_time_converting as tree_time_converting,
+    xarray_enhancements as xre,
+)
+from podaac.subsetter.group_handling import (
+    GROUP_DELIM,
+    h5file_transform,
+    recombine_grouped_datasets,
+    transform_grouped_dataset,
+)
 
 
 SERVICE_NAME = 'l2ss-py'
@@ -1570,7 +1576,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     file_extension = os.path.splitext(file_to_subset)[1]
     nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
 
-    override_decode_cf_datetime()
 
     if has_groups:
         # Make sure all variables start with '/'
@@ -1625,6 +1630,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     """
 
     file_extension = os.path.splitext(file_to_subset)[1]
+    override_decode_cf_datetime()
 
     hdf_type = False
     args = {
@@ -1636,13 +1642,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     if min_time or max_time:
         args['decode_times'] = True
 
-    #with xr.open_dataset(
-    #        xr.backends.NetCDF4DataStore(nc_dataset),
-    #        **args
-    #) as open_dataset:
-    #with xr.open_datatree(xr.backends.NetCDF4DataStore(nc_dataset)) as tree:
     with xr.open_datatree(file_to_subset, **args) as dataset:
-
 
         hdf_type = get_hdf_type(dataset)
         # Access the root dataset (if needed)
@@ -1731,8 +1731,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         #new_encoding = new_new_tree.get_datatree_encodings(datasets)
         #encoding = common_nested_keys(old_encoding, new_encoding)
         
-        encoding = prepare_basic_encoding(datasets)
+        datasets = clean_inherited_coords(datasets)
 
+        encoding = prepare_basic_encoding(datasets)
         datasets.to_netcdf(output_file, encoding=encoding)
         #datasets.to_netcdf(output_file)
 
@@ -1788,6 +1789,50 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             lon_var_names
         )
 
+
+def clean_inherited_coords(dt: DataTree) -> DataTree:
+    """
+    Clean coordinates that are inherited from parent nodes throughout the tree.
+    Each node will only keep coordinates that are unique to it and not present in any ancestor.
+    
+    Parameters
+    ----------
+    dt : DataTree
+        The input DataTree to clean
+        
+    Returns
+    -------
+    DataTree
+        The cleaned DataTree where each node only has its unique coordinates
+    """
+    def get_ancestor_coords(node: DataTree) -> Set[str]:
+        """Get all coordinate names from ancestor nodes."""
+        ancestor_coords = set()
+        current = node.parent
+        while current is not None:
+            if current.ds is not None:
+                ancestor_coords.update(current.ds.coords)
+            current = current.parent
+        return ancestor_coords
+    
+    # Process each node in the tree except root
+    for node in dt.subtree:
+        if node is not dt:  # Skip root
+            if node.ds is not None:
+                # Get coordinates from all ancestors
+                ancestor_coords = get_ancestor_coords(node)
+                
+                # Find coordinates to drop (ones that exist in ancestors)
+                coords_to_drop = ancestor_coords.intersection(node.ds.coords)
+                
+                # Drop inherited coordinates if any exist
+                # Try to drop the dimensions are different could throw an exception when dropping
+                if coords_to_drop:
+                    try:
+                        node.ds = node.ds.drop_vars(coords_to_drop, errors='ignore')
+                    except Exception:
+                        pass
+    return dt
 
 def prepare_basic_encoding(datasets: DataTree) -> dict:
     """

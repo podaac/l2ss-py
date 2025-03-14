@@ -1,18 +1,11 @@
-import xarray as xr
-import numpy as np
-from typing import Union, Dict, Tuple, List
-from xarray import DataTree
-from typing import Union, Dict, Tuple, List, Any
-import cf_xarray as cfxr
-
 import logging
-import xarray as xr
 import re
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
+import cf_xarray as cfxr
+import numpy as np
 import xarray as xr
-import re
-from typing import List, Optional
-from typing import Optional, Set
+from xarray import DataTree
 
 from podaac.subsetter import dimension_cleanup as dc
 
@@ -156,9 +149,7 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
-    print("#########################")
-    print(condition_dict.keys())
-    print("#########################")
+
     def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:
         """
         Process a single node and its children in the tree.
@@ -185,8 +176,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         # Get the dataset directly from the node
         dataset = node.ds
         dataset = dc.remove_duplicate_dims_xarray(dataset)
-
-        original_dtypes = {var: dataset[var].dtype for var in dataset.variables}
 
         if len(dataset.data_vars) > 0 and cond is not None:  # Only process if node has data
             # Create indexers from condition
@@ -302,6 +291,7 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             processed_children[child_name] = child_tree
 
         #processed_ds = dc.recreate_pixcore_dimensions([processed_ds])[0]
+        #print(list(processed_ds.variables))
 
         return processed_ds, processed_children
 
@@ -434,6 +424,8 @@ def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     # dimension and return the result
 
     #maybe check with the dimensions on being differ
+    #tests/test_subset.py::test_subset_empty_bbox[TEMPO_HCHO_L2_V01_20240110T170237Z_S005G08.nc] 
+    #tests/test_subset.py::test_no_null_time_values_in_time_and_space_subset_for_tempo
     #return dataset.copy(data=empty_data)
     return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
 
@@ -814,68 +806,6 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
         [min(min_lons), max(max_lons)],
         [min(min_lats), max(max_lats)]
     ])
-
-
-def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataTree:
-    """
-    Drop variables from a DataTree using paths in the format '/group/var' or '/var' for root level
-    
-    Parameters
-    ----------
-    tree : DataTree
-        The input DataTree
-    var_paths : str or List[str]
-        Paths to variables to drop in format '/group/var' or '/var' for root level
-        Examples: 
-            - '/var1'  # root level variable
-            - '/group1/var1'  # variable in group1
-            - '/group1/subgroup/var1'  # variable in nested group
-    
-    Returns
-    -------
-    DataTree
-        Modified DataTree with variables dropped
-    
-    Examples
-    --------
-    >>> tree = DataTree()
-    >>> tree['group1'] = DataTree(data=xr.Dataset({'var1': [1], 'var2': [2]}))
-    >>> tree['group2'] = DataTree(data=xr.Dataset({'var1': [3], 'var3': [4]}))
-    >>> drop_vars_by_path(tree, ['/group1/var1', '/group2/var3'])
-    """
-    if isinstance(var_paths, str):
-        var_paths = [var_paths]
-    
-    for path in var_paths:
-        # Split the path into group path and variable name
-        parts = path.strip('/').split('/')
-        
-        if len(parts) == 1:
-            # Root level variable
-            var_name = parts[0]
-
-            ds = tree.to_dataset()
-            ds = ds.drop_vars(var_name, errors='ignore')
-            new_tree = DataTree(dataset=ds)
-            # Copy over any existing children
-            for child_name in tree.children:
-                new_tree[child_name] = tree[child_name]
-            tree = new_tree
-        else:
-            # Group variable
-            group_path = '/'.join(parts[:-1])
-            var_name = parts[-1]
-            try:
-                node = tree[group_path]
-                ds = node.to_dataset()
-                ds = ds.drop_vars([var_name], errors='ignore')
-                tree[group_path] = DataTree(dataset=ds)
-            except KeyError:
-                print(f"Warning: Group '{group_path}' not found")
-    
-    return tree
-
-
 
 def get_vars_with_paths(tree: DataTree) -> List[str]:
     """

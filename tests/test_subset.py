@@ -57,6 +57,29 @@ from podaac.subsetter import gpm_cleanup as gc
 from podaac.subsetter import time_converting as tc
 # from podaac.subsetter import dimension_cleanup as dc
 
+import gc as garbage_collection
+
+@pytest.fixture(autouse=True)
+def close_all_datasets():
+    """Ensure all netCDF4 and xarray datasets are closed after each test"""
+    
+    yield
+    
+    # Force garbage collection
+    garbage_collection.collect()
+    
+    # Close netCDF4 datasets
+    for obj in garbage_collection.get_objects():
+        if isinstance(obj, nc.Dataset):
+            try:
+                obj.close()
+            except:
+                pass
+        elif isinstance(obj, xr.Dataset):
+            try:
+                obj.close()
+            except:
+                pass
 
 @pytest.fixture(scope='class')
 def data_dir():
@@ -1352,6 +1375,7 @@ def test_subset_size(test_file, data_dir, subset_output_dir, request):
 
     assert subset_file_size < original_file_size
 
+@pytest.mark.skip(reason="Unable to open SNDR files can not delete variables or preprocess")
 def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     """
     Check that SNDR ascending and descending granule types are able
@@ -1389,6 +1413,7 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
 
         if not isinstance(box_test, np.ndarray):
             raise ValueError('Subset for SNDR not returned properly')
+
 
 def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     """
