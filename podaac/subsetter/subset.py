@@ -1420,6 +1420,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 set_attr_with_type('southernmost_latitude', spatial_bounds_array[1][0])
                 set_attr_with_type('easternmost_longitude', spatial_bounds_array[0][1])
                 set_attr_with_type('westernmost_longitude', spatial_bounds_array[0][0])
+
+                set_attr_with_type('geospatial_lat_max', spatial_bounds_array[1][1])
+                set_attr_with_type('geospatial_lat_min', spatial_bounds_array[1][0])
+                set_attr_with_type('geospatial_lon_max', spatial_bounds_array[0][1])
+                set_attr_with_type('geospatial_lon_min', spatial_bounds_array[0][0])
+
                 if stage_file_name_subsetted_true:
                     set_attr_with_type('product_name', stage_file_name_subsetted_true)
                 else:
