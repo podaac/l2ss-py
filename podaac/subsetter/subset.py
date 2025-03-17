@@ -25,7 +25,7 @@ import operator
 import os
 import re
 from itertools import zip_longest
-from typing import List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 import dateutil
 from dateutil import parser
 
@@ -1405,35 +1405,124 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 lon_var_names=lon_var_names
             )
 
-        # Set new metadata with original attribute type
-        with nc.Dataset(output_file, 'a') as dataset_attr:
-            original_attrs = dataset_attr.ncattrs()
-
-            def set_attr_with_type(attr_name, value):
-                if attr_name in original_attrs:
-                    original_type = type(dataset_attr.getncattr(attr_name))
-                    dataset_attr.setncattr(attr_name, original_type(value))
-
-            if spatial_bounds_array is not None:
-
-                set_attr_with_type('northernmost_latitude', spatial_bounds_array[1][1])
-                set_attr_with_type('southernmost_latitude', spatial_bounds_array[1][0])
-                set_attr_with_type('easternmost_longitude', spatial_bounds_array[0][1])
-                set_attr_with_type('westernmost_longitude', spatial_bounds_array[0][0])
-
-                set_attr_with_type('geospatial_lat_max', spatial_bounds_array[1][1])
-                set_attr_with_type('geospatial_lat_min', spatial_bounds_array[1][0])
-                set_attr_with_type('geospatial_lon_max', spatial_bounds_array[0][1])
-                set_attr_with_type('geospatial_lon_min', spatial_bounds_array[0][0])
-
-                if stage_file_name_subsetted_true:
-                    set_attr_with_type('product_name', stage_file_name_subsetted_true)
-                else:
-                    set_attr_with_type('product_name', output_file)
-            else:
-                if stage_file_name_subsetted_false:
-                    set_attr_with_type('product_name', stage_file_name_subsetted_false)
-                else:
-                    set_attr_with_type('product_name', output_file)
+        update_netcdf_attrs(output_file,
+                            spatial_bounds_array,
+                            stage_file_name_subsetted_true,
+                            stage_file_name_subsetted_false)
 
         return spatial_bounds_array
+
+
+def update_netcdf_attrs(output_file: str,
+                        spatial_bounds_array: Optional[list] = None,
+                        stage_file_name_subsetted_true: Optional[str] = None,
+                        stage_file_name_subsetted_false: Optional[str] = None) -> None:
+    """
+    Update NetCDF file attributes with spatial bounds and product name information.
+
+    Args:
+        output_file (str): Path to the NetCDF file to be updated
+        spatial_bounds_array (list, optional): Nested list containing spatial bounds in format:
+            [[lon_min, lon_max], [lat_min, lat_max]]
+        stage_file_name_subsetted_true (str, optional): Product name when subset is True
+        stage_file_name_subsetted_false (str, optional): Product name when subset is False
+
+    Notes:
+        - Updates various geospatial attributes in the NetCDF file
+        - Removes deprecated center coordinate attributes
+        - Sets the product name based on provided parameters
+        - Preserves original attribute types when setting new values
+
+    Example:
+        >>> spatial_bounds = [[120.5, 130.5], [-10.5, 10.5]]
+        >>> update_netcdf_attrs("output.nc", spatial_bounds, "subset_true.nc")
+    """
+    with nc.Dataset(output_file, 'a') as dataset_attr:
+        original_attrs = dataset_attr.ncattrs()
+
+        def set_attr_with_type(attr_name: str, value: Any) -> None:
+            """Set attribute while preserving its original type if it exists."""
+            if attr_name in original_attrs:
+                original_type = type(dataset_attr.getncattr(attr_name))
+                dataset_attr.setncattr(attr_name, original_type(value))
+
+        if spatial_bounds_array is not None:
+            # Define geographical bounds mapping
+            bounds_mapping = {
+                'northernmost_latitude': (1, 1),
+                'southernmost_latitude': (1, 0),
+                'easternmost_longitude': (0, 1),
+                'westernmost_longitude': (0, 0),
+                'geospatial_lat_max': (1, 1),
+                'geospatial_lat_min': (1, 0),
+                'geospatial_lon_max': (0, 1),
+                'geospatial_lon_min': (0, 0)
+            }
+
+            # Set all geographic bounds attributes
+            for attr_name, (i, j) in bounds_mapping.items():
+                set_attr_with_type(attr_name, spatial_bounds_array[i][j])
+
+            # Remove deprecated center coordinates
+            deprecated_keys = {
+                "start_center_longitude",
+                "start_center_latitude",
+                "end_center_longitude",
+                "end_center_latitude"
+            }
+
+            # Safely remove deprecated attributes if they exist
+            for key in deprecated_keys & set(dataset_attr.ncattrs()):
+                dataset_attr.delncattr(key)
+
+            # Set CRS and bounds
+            dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
+            dataset_attr.setncattr("geospatial_bounds", create_geospatial_bounds(spatial_bounds_array))
+
+        # Set product name based on conditions
+        has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
+        product_name = (stage_file_name_subsetted_true if has_spatial_bounds and stage_file_name_subsetted_true
+                        else stage_file_name_subsetted_false if stage_file_name_subsetted_false
+                        else output_file)
+
+        set_attr_with_type('product_name', product_name)
+
+
+def create_geospatial_bounds(spatial_bounds_array):
+    """
+    Generate a Well-Known Text (WKT) POLYGON string representing the geospatial bounds.
+
+    The polygon is defined using the min/max longitude and latitude values and follows
+    the format: "POLYGON ((lon_min lat_min, lon_max lat_min, lon_max lat_max,
+                           lon_min lat_max, lon_min lat_min))"
+
+    This ensures the polygon forms a closed loop.
+
+    Parameters:
+    -----------
+    spatial_bounds_array : list of lists
+        A 2D list where:
+        - spatial_bounds_array[0] contains [lon_min, lon_max]
+        - spatial_bounds_array[1] contains [lat_min, lat_max]
+
+    Returns:
+    --------
+    str
+        A WKT POLYGON string representing the bounding box.
+
+    Example:
+    --------
+    >>> spatial_bounds = [[81.489693, 85.129562], [-78.832314, 49.646988]]
+    >>> create_geospatial_bounds(spatial_bounds)
+    'POLYGON ((81.489693 -78.832314, 85.129562 -78.832314, 85.129562 49.646988, 81.489693 49.646988, 81.489693 -78.832314))'
+    """
+    lon_min, lon_max = spatial_bounds_array[0]
+    lat_min, lat_max = spatial_bounds_array[1]
+
+    # Construct the WKT polygon string (ensuring the loop closes)
+    wkt_polygon = (
+        f"POLYGON (({lon_min} {lat_min}, {lon_max} {lat_min}, "
+        f"{lon_max} {lat_max}, {lon_min} {lat_max}, {lon_min} {lat_min}))"
+    )
+
+    return wkt_polygon

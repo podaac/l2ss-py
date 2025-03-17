@@ -96,7 +96,9 @@ def compare_java(test_file, cut, data_dir, subset_output_dir, request):
         "northernmost_latitude",
         "southernmost_latitude",
         "easternmost_longitude",
-        "westernmost_longitude"
+        "westernmost_longitude",
+        "geospatial_bounds_crs",
+        "geospatial_bounds"
     ]
     filtered_j_ds_attrs = {k: v for k, v in j_ds.attrs.items() if k not in ignore_attributes}
     filtered_py_ds_attrs = {k: v for k, v in py_ds.attrs.items() if k not in ignore_attributes}

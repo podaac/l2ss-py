@@ -80,6 +80,7 @@ def parse_args(args: list) -> tuple:
     parser.add_argument(
         '--pixel_subset',
         default=False,
+        action='store_true',
         help='To pixel cut based the lon lat on the bounding box'
     )
 
