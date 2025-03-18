@@ -473,7 +473,7 @@ def get_time_epoch_var(tree: DataTree, time_var_name: str) -> str:
     path_parts = time_var_name.split('/')
     group_path = '/'.join(path_parts[:-1])
     var_name = path_parts[-1]
-    
+
     # Get the dataset at the correct group level
     dataset = tree[group_path].ds if group_path else tree.ds
     time_var = dataset[var_name]
