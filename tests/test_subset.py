@@ -1838,9 +1838,12 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
         'decode_times': False
     }
 
-    with xr.open_datatree(file, **args) as tree:
-        
-        epoch_time_var = subset.get_time_epoch_var(dataset, '/PRODUCT/delta_time')
+    with xr.open_datatree(file, **args) as dataset:
+
+        lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+            dataset=dataset
+        )
+        epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
         assert epoch_time_var.split('/')[-1] == 'time'
 
 

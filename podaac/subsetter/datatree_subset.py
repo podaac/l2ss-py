@@ -568,7 +568,7 @@ def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str
 def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     """attempt to get the time variable for a datatree"""
 
-    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, total_time_vars: Set[str]) -> Optional[str]:
+    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, total_time_vars: Set[str]) -> Optional[str]:  # pylint: disable=too-many-branches
         """
         Find the time variable name in a dataset using various criteria.
 
@@ -614,6 +614,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             re.IGNORECASE
         )
 
+        possible_time = None
         # Check variables with time-related metadata
         for var_name, var in dataset.variables.items():
             if var_name in total_time_vars:
@@ -625,10 +626,16 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
                 var.attrs.get('axis') == 'T',
                 ('units' in var.attrs and time_units_pattern.match(var.attrs['units']))
             ]):
-                return var_name
+                if np.issubdtype(var.dtype, np.dtype(np.datetime64)):
+                    return var_name
+                possible_time = var_name
+
+        if possible_time:
+            return possible_time
 
         # Check variables with 'time' in name and matching dimensions
         for var_name in dataset.variables:
+
             if var_name in total_time_vars:
                 continue
 
