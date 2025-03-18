@@ -15,7 +15,6 @@ import collections
 
 import netCDF4 as nc
 import xarray as xr
-from typing import Dict, Any
 
 
 def remove_duplicate_dims(nc_dataset: nc.Dataset) -> nc.Dataset:
@@ -145,21 +144,6 @@ def recreate_pixcore_dimensions(datasets: list):
     return datasets
 
 
-def get_duplicate_dims(dataset: xr.Dataset) -> Dict[str, list]:
-    """
-    Find all duplicate dimensions in the dataset and their variables.
-    Returns a dictionary of dimension names and the variables that use them.
-    """
-    dim_usage = {}
-    for var_name, var in dataset.variables.items():
-        for dim in var.dims:
-            if dim not in dim_usage:
-                dim_usage[dim] = []
-            dim_usage[dim].append(var_name)
-    
-    return {dim: vars for dim, vars in dim_usage.items() 
-            if any(list(dataset[var].dims).count(dim) > 1 for var in vars)}
-
 def remove_duplicate_dims_xarray(dataset: xr.Dataset) -> xr.Dataset:
     """
     Handle datasets with duplicate dimensions in xarray while preserving
@@ -167,25 +151,22 @@ def remove_duplicate_dims_xarray(dataset: xr.Dataset) -> xr.Dataset:
     """
     # Work with a copy
     ds = dataset.copy(deep=True)
-    
+
     # Store original encodings and chunking
     original_encodings = {var: ds[var].encoding.copy() for var in ds.variables}
-    
-    # Find all duplicate dimensions
-    dup_dims = get_duplicate_dims(ds)
-    
+
     # Process each variable that has duplicate dimensions
-    for var_name, var in ds.variables.items():
+    for var_name, var in ds.variables.items():  # pylint: disable=too-many-nested-blocks
         dim_list = list(var.dims)
-        
+
         # Skip if no duplicates in this variable
         if not any(dim_list.count(dim) > 1 for dim in dim_list):
             continue
-            
+
         # Create new dimension names for duplicates
         new_dims = list(dim_list)
         dims_renamed = set()
-        
+
         for i, dim in enumerate(dim_list):
             if dim_list.count(dim) > 1 and dim not in dims_renamed:
                 # Find all occurrences after the first one
@@ -193,31 +174,31 @@ def remove_duplicate_dims_xarray(dataset: xr.Dataset) -> xr.Dataset:
                     if dim_list[j] == dim:
                         new_dim_name = f"{dim}_{j}"
                         new_dims[j] = new_dim_name
-                        
+
                         # Create new dimension if it doesn't exist
                         if new_dim_name not in ds.dims:
                             ds = ds.assign_coords({
                                 new_dim_name: ds[dim].copy() if dim in ds.coords else range(ds.dims[dim])
                             })
                 dims_renamed.add(dim)
-        
+
         # Create new variable with renamed dimensions
         data = var.values
         attrs = var.attrs.copy()
         encoding = original_encodings[var_name].copy()
-        
+
         # Remove problematic encoding keys
         for key in ['dimensions', 'source', 'original_shape']:
             encoding.pop(key, None)
-        
+
         # Create new variable
         ds[var_name] = xr.Variable(
             dims=new_dims,
             data=data,
             attrs=attrs
         )
-        
+
         # Restore encoding
         ds[var_name].encoding.update(encoding)
-    
+
     return ds

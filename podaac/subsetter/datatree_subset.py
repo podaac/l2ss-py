@@ -1,3 +1,6 @@
+"""script to help with subsetting xarray datatree objects"""
+
+# pylint: disable=protected-access, inconsistent-return-statements
 import logging
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -10,6 +13,7 @@ from xarray import DataTree
 from podaac.subsetter import dimension_cleanup as dc
 
 GROUP_DELIM = "/"  # Adjust based on actual dataset structure
+
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
     """
@@ -100,41 +104,55 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
 
     return indexers
 
-def get_condition(condition_dict, path):
-    return get_sibling_or_parent_condition(condition_dict, path)
 
 def get_sibling_or_parent_condition(condition_dict, path):
+    """
+    Retrieve a condition from a dictionary based on a given path, prioritizing
+    parent paths first, then sibling paths, and finally the root condition.
+
+    The function first attempts to find the closest parent match by walking up
+    the directory-like hierarchy. If no parent is found, it looks for a sibling
+    at the same depth that shares a common structure. If neither is found, it
+    returns the condition for the root ("/") if available.
+
+    Args:
+        condition_dict (dict): A dictionary mapping paths (keys) to conditions (values).
+        path (str): The path for which to find a matching condition.
+
+    Returns:
+        Any: The condition found in the dictionary, or None if no match exists.
+    """
     # Normalize the path by removing trailing slashes
     path = path.rstrip('/')
-    
+
     # First try to find parent match by walking up the tree
     current_path = path
     while current_path:
         if current_path in condition_dict:
             return condition_dict[current_path]
         current_path = "/".join(current_path.split("/")[:-1])
-    
+
     # If no parent found, look for sibling match
     path_parts = path.split("/")
     for potential_path in condition_dict:
         potential_path = potential_path.rstrip('/')
         potential_parts = potential_path.split("/")
-        
+
         # Check if paths have the same depth
         if len(path_parts) == len(potential_parts):
             # Check if they share the same structure up to parent
             common_parent = all(p1 == p2 for p1, p2 in zip(path_parts[:-2], potential_parts[:-2]))
             if common_parent and potential_path != path:
                 return condition_dict[potential_path]
-    
+
     # If no parent or sibling found, return root condition if it exists
     return condition_dict.get("/", None)
 
 
-def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool, condition_dict) -> DataTree:
+def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
     """
     Return a DataTree which meets the given condition, processing all nodes in the tree.
-    
+
     Parameters
     ----------
     tree : xarray.DataTree
@@ -143,35 +161,35 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         Locations at which to preserve this object's values
     cut : boolean
         True if the scanline should be cut, False if not
-        
+
     Returns
     -------
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
 
-    def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:
+    def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
-        
+
         Parameters
         ----------
         node : DataTree
             The node to process
         path : str
             The current path of the node
-            
+
         Returns
         -------
         Tuple[xr.Dataset, Dict[str, DataTree]]
             Processed dataset and dictionary of processed child nodes
         """
-        cond = get_condition(condition_dict, path)
+        cond = get_sibling_or_parent_condition(condition_dict, path)
 
         # if only one condition in dictionary then get the one condition
         if cond is None:
             if len(condition_dict) == 1:
-                key, cond = next(iter(condition_dict.items()))
+                _, cond = next(iter(condition_dict.items()))
 
         # Get the dataset directly from the node
         dataset = node.ds
@@ -205,7 +223,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
             new_dataset_non_sub = indexed_ds[non_subset_vars]
 
             # Merge the datasets
-            #merged_ds = xr.merge([non_sub_ds, sub_ds])            
             new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
             new_dataset.attrs.update(dataset.attrs)
 
@@ -246,7 +263,6 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
                     # variable over, otherwise use a NaN mask to copy over the
                     # relevant values.
                     new_dataset[variable_name] = indexed_var
-
                     new_dataset[variable_name].attrs = indexed_var.attrs
                     variable.attrs = indexed_var.attrs
                     new_dataset[variable_name].encoding['_FillValue'] = None
@@ -278,60 +294,44 @@ def where_tree(tree: DataTree, cond: Union[xr.Dataset, xr.DataArray], cut: bool,
         for child_name, child_node in node.children.items():
             # Process the child node
             child_ds, child_children = process_node(child_node, f"{path}/{child_name}")
-            
+
             # Create new DataTree for the processed child
             child_tree = DataTree(name=child_name, dataset=child_ds)
-            
+
             # Add all processed grandchildren to the child tree
             for grandchild_name, grandchild_tree in child_children.items():
                 child_tree._children[grandchild_name] = grandchild_tree
                 grandchild_tree._parent = child_tree
-                #child_tree[grandchild_name] = grandchild_tree
-                
-            processed_children[child_name] = child_tree
 
-        #processed_ds = dc.recreate_pixcore_dimensions([processed_ds])[0]
-        #print(list(processed_ds.variables))
+            processed_children[child_name] = child_tree
 
         return processed_ds, processed_children
 
     # Start processing from root
     root_ds, children = process_node(tree, '')
-    
+
     # Create new root tree preserving the original name and attributes
     result_tree = DataTree(name=tree.name, dataset=root_ds)
-    
+
     # Add processed children to the result tree
     for child_name, child_tree in children.items():
-        #parent_node = result_tree.ds
-        #child_node = child_tree.ds
-
-        #normalized_nodes = dc.recreate_pixcore_dimensions([parent_node, child_node])
-
-        #child_tree.ds = normalized_nodes[1]
-        #result_tree.ds = normalized_nodes[0]
-
-        #print(result_tree.ds.dims)
-        #print(child_tree.ds.dims)
-
         result_tree._children[child_name] = child_tree
         child_tree._parent = result_tree
-
-        #result_tree[child_name] = child_tree
 
     # Copy over root attributes
     result_tree.attrs.update(tree.attrs)
 
     return result_tree
 
+
 def check_partial_dim_overlap_node(dataset: xr.Dataset, indexers: Dict) -> bool:
     """
     Check if any variables in the dataset have partial dimension overlap with indexers.
     """
-    for var_name, var in dataset.variables.items():
+    for _, var in dataset.variables.items():
         overlap_dims = set(indexers.keys()).intersection(var.dims)
         missing_dims = set(indexers.keys()) - set(var.dims)
-        
+
         if len(overlap_dims) > 0 and len(missing_dims) > 0:
             return True
     return False
@@ -356,45 +356,48 @@ def get_variables_with_indexers(dataset, indexers):
 
     return subset_vars, no_subset_vars
 
+
 def get_fill_value(var: xr.DataArray) -> Union[np.datetime64, np.timedelta64, Any]:
     """
     Get appropriate fill value based on variable type.
-    
+
     Parameters
     ----------
     var : xr.DataArray
         The variable to get fill value for
-        
+
     Returns
     -------
     Union[np.datetime64, np.timedelta64, Any]
         The appropriate fill value for the variable type
     """
     fill_value = var.attrs.get('_FillValue')
-    
+
     if np.issubdtype(var.dtype, np.dtype(np.datetime64)):
         return np.datetime64('nat')
-    elif np.issubdtype(var.dtype, np.dtype(np.timedelta64)):
+    if np.issubdtype(var.dtype, np.dtype(np.timedelta64)):
         return np.timedelta64('nat')
     return fill_value
+
 
 def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
     """
     Cast data to the specified dtype.
-    
+
     Parameters
     ----------
     data : xr.DataArray
         The data to cast
     dtype_str : str
         The target dtype as a string
-        
+
     Returns
     -------
     xr.DataArray
         The data cast to the new dtype
     """
     return data.astype(dtype_str)
+
 
 def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     """
@@ -423,11 +426,12 @@ def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
     # Create a copy of the dataset filled with the empty data. Then select the first index along each
     # dimension and return the result
 
-    #maybe check with the dimensions on being differ
-    #tests/test_subset.py::test_subset_empty_bbox[TEMPO_HCHO_L2_V01_20240110T170237Z_S005G08.nc] 
-    #tests/test_subset.py::test_no_null_time_values_in_time_and_space_subset_for_tempo
-    #return dataset.copy(data=empty_data)
+    # maybe check with the dimensions on being differ
+    # tests/test_subset.py::test_subset_empty_bbox[TEMPO_HCHO_L2_V01_20240110T170237Z_S005G08.nc]
+    # tests/test_subset.py::test_no_null_time_values_in_time_and_space_subset_for_tempo
+    # return dataset.copy(data=empty_data)
     return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
+
 
 def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
     """
@@ -450,7 +454,7 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
 
     def find_coords_in_dataset(dataset: xr.Dataset, path: str):
         """Find latitude and longitude variable names in a single dataset and track full paths."""
-        
+
         possible_lat_coord_names = {'lat', 'latitude', 'y'}
         possible_lon_coord_names = {'lon', 'longitude', 'x'}
 
@@ -520,6 +524,7 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
 
     return lon_coord_names, lat_coord_names
 
+
 def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str]:
     """
     As a backup for finding a coordinate var, look at the 'coordinates'
@@ -561,10 +566,9 @@ def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str
 
 
 def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
+    """attempt to get the time variable for a datatree"""
 
-    time_coord_name = []
-
-    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, path: str, total_time_vars: Set[str]) -> Optional[str]:
+    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, total_time_vars: Set[str]) -> Optional[str]:
         """
         Find the time variable name in a dataset using various criteria.
 
@@ -589,9 +593,10 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             Name of found time variable or None if not found
         """
         lat_dims = lat_var.squeeze().dims
-        
+
         # Cache squeezed dimensions to avoid repeated computations
         dim_cache = {}
+
         def get_squeezed_dims(var_name: str) -> tuple:
             if var_name not in dim_cache:
                 dim_cache[var_name] = dataset[var_name].squeeze().dims
@@ -613,7 +618,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
         for var_name, var in dataset.variables.items():
             if var_name in total_time_vars:
                 continue
-                
+
             # Check metadata indicators
             if any([
                 var.attrs.get('standard_name') == 'time',
@@ -626,17 +631,17 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
         for var_name in dataset.variables:
             if var_name in total_time_vars:
                 continue
-                
+
             dims = get_squeezed_dims(var_name)
             if not dims:  # Skip dimensionless variables
                 continue
-                
+
             var_basename = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1].lower()
-            
+
             # Check for exact time variable names first
             if var_basename in {'time', 'timemidscan'} and dims[0] in lat_dims:
                 return var_name
-                
+
             # Then check for 'time' in name
             if 'time' in var_basename and dims[0] in lat_dims:
                 return var_name
@@ -646,7 +651,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     def traverse_tree(node, path):
         """Recursively search through the tree for latitude and longitude coordinates."""
         if node.ds is not None:
-            return_time = find_time_in_dataset(node.ds, lat_var, path, total_time_vars)
+            return_time = find_time_in_dataset(node.ds, lat_var, total_time_vars)
             if return_time:
                 time_var = f"{path}/{return_time}"
                 return time_var
@@ -658,10 +663,11 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     # Start recursive tree traversal
     return traverse_tree(tree, "")
 
+
 def get_variable_from_path(datatree: Any, path: str) -> Optional[Union[xr.DataArray, xr.Dataset]]:
     """
     Get a variable from a datatree object using a path-like string.
-    
+
     Parameters
     ----------
     datatree : Any
@@ -669,50 +675,52 @@ def get_variable_from_path(datatree: Any, path: str) -> Optional[Union[xr.DataAr
     path : str
         Path to the variable using '/' as delimiter
         Example: "group1/subgroup/variable_name"
-    
+
     Returns
     -------
     Optional[Union[xr.DataArray, xr.Dataset]]
         The variable found at the specified path, or None if not found
-    
+
     """
     # Handle empty path
     if not path:
         return None
-        
+
     # Clean path by removing leading/trailing slashes and whitespace
     clean_path = path.strip().strip('/')
-    
+
     # Split path into components
     path_components = clean_path.split('/')
-    
+
     # Start at root
     current = datatree
-    
+
     try:
         # Traverse through path components
         for component in path_components:
             # Skip empty components
             if not component:
                 continue
-                
+
             # Check if component exists
             if not hasattr(current, component):
                 return None
-                
+
             # Move to next level
             current = getattr(current, component)
-            
+
         return current
-        
+
     except (AttributeError, TypeError):
         # Return None if any error occurs during traversal
         return None
+
 
 def get_path(s):
     """Extracts the path by removing the last part after the final '/'."""
     path = s.rsplit('/', 1)[0] if '/' in s else s
     return f"/{path}"
+
 
 def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_var_names: List[str]) -> Union[np.ndarray, None]:
     """
@@ -807,21 +815,22 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
         [min(min_lats), max(max_lats)]
     ])
 
+
 def get_vars_with_paths(tree: DataTree) -> List[str]:
     """
     Get all variables and coordinates with their full paths from a DataTree
-    
+
     Parameters
     ----------
     tree : DataTree
         The input DataTree
-    
+
     Returns
     -------
     List[str]
         List of variable paths in format '/group/var' or '/var' for root level,
         including coordinate variables at root level
-    
+
     Examples
     --------
     >>> ds = xr.Dataset({'var1': [1], 'var2': [2], 'time': ('time', [0])})
@@ -832,41 +841,36 @@ def get_vars_with_paths(tree: DataTree) -> List[str]:
     ['/time', '/var1', '/var2', '/group1/var1', '/group1/var2']
     """
     paths = []
-    
-    def collect_vars(node: DataTree, current_path: str = '', is_root: bool = False) -> None:
-        # At root level, add all coordinates
-        #if is_root:
-        #    for coord_name in node.coords:
-        #        paths.append(f'/{coord_name}')
-        
+
+    def collect_vars(node: DataTree, current_path: str = '') -> None:
         # Add data variables from current node
         for var_name in node.ds.data_vars:
             paths.append(f'{current_path}/{var_name}')
-        
+
         # Recursively process child nodes
         for child_name in node.children:
             new_path = f'{current_path}/{child_name}' if current_path else f'/{child_name}'
-            collect_vars(node[child_name], new_path, is_root=False)
-    
-    collect_vars(tree, is_root=True)
+            collect_vars(node[child_name], new_path)
+
+    collect_vars(tree)
     return sorted(paths)  # Sort for consistent ordering
 
 
-def drop_vars_by_path_two(tree: DataTree, var_paths: Union[str, List[str]]) -> DataTree:
+def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataTree:
     """
     Drop variables from a DataTree using paths in the format '/group/var' or '/var' for root level
-    
+
     Parameters
     ----------
     tree : DataTree
         The input DataTree
     var_paths : str or List[str]
         Paths to variables to drop in format '/group/var' or '/var' for root level
-        Examples: 
+        Examples:
             - '/var1'  # root level variable
             - '/group1/var1'  # variable in group1
             - '/group1/subgroup/var1'  # variable in nested group
-    
+
     Returns
     -------
     DataTree
@@ -874,11 +878,11 @@ def drop_vars_by_path_two(tree: DataTree, var_paths: Union[str, List[str]]) -> D
     """
     if isinstance(var_paths, str):
         var_paths = [var_paths]
-    
+
     for path in var_paths:
         # Split the path into group path and variable name
         parts = path.strip('/').split('/')
-        
+
         if len(parts) == 1:
             # Root level variable
             var_name = parts[0]
@@ -893,49 +897,107 @@ def drop_vars_by_path_two(tree: DataTree, var_paths: Union[str, List[str]]) -> D
                 node.ds = node.ds.drop_vars([var_name], errors='ignore')
             except KeyError:
                 print(f"Warning: Group '{group_path}' not found")
-    
+
     return tree
 
 
-def get_datatree_encodings(datatree):
+def prepare_basic_encoding(datasets: DataTree) -> dict:
     """
-    Get encodings from an xarray DataTree structure.
-    
-    Parameters:
-    -----------
-    datatree : xarray.DataTree
-        The input DataTree structure
-        
+    Prepare basic encoding dictionary for DataTree organized by groups.
+    Only applies zlib and complevel for float32, float64, int32, uint16 datatypes.
+    All paths start with '/' for root and nested groups.
+
+    Args:
+        datasets: xarray DataTree
     Returns:
-    --------
-    dict
-        Dictionary mapping variable paths to their encodings
+        dict: Dictionary structure {'/group': {var: encoding, ...}, ...}
     """
-    encodings = {}
-    
-    def traverse_datatree(node, path=''):
-        for var_name in node.data_vars:
-            var = node[var_name]
-            full_path = f"{path}/{var_name}" if path else var_name
-            
-            var_encoding = {
-                "zlib": True,
-                "complevel": 5,
+    group_encodings = {}
+
+    # Types that should have compression
+    compress_types = {
+        'float32', 'float64',  # Floating point
+        'int8', 'int16', 'int32', 'int64',  # Signed integers
+        'uint8', 'uint16', 'uint32', 'uint64'  # Unsigned integers
+    }
+
+    def process_node(node: DataTree, group_path: str):
+        # Initialize encoding dict for this group
+        var_encodings = {}
+
+        # Process only data variables in this group
+        for var_name in node.ds.data_vars:
+            var = node.ds[var_name]
+
+            # Start with just _FillValue
+            encoding = {
                 "_FillValue": var.encoding.get('_FillValue')
-
             }
-            encoding_path = '/' + path.lstrip('/') if path else '/'
 
-            if encoding_path not in encodings:
-                encodings[encoding_path] = {}
+            # Add compression only for specific dtypes
+            if var.dtype.name in compress_types:
+                encoding['zlib'] = True
+                encoding['complevel'] = 5
 
-            encodings[encoding_path][var_name] = var_encoding
-        
-        # Process groups using children property of DataTree
-        if hasattr(node, 'children'):
-            for child_name, child_node in node.children.items():
-                child_path = f"{path}/{child_name}" if path else child_name
-                traverse_datatree(child_node, child_path)
-    
-    traverse_datatree(datatree)
-    return encodings
+            # Only add to var_encodings if we have any encoding settings
+            if encoding:
+                var_encodings[var_name] = encoding
+
+        # Add this group's encodings to the main dict
+        if var_encodings:  # only add if there are variables with encoding
+            group_encodings[group_path] = var_encodings
+
+        # Process child groups
+        for child_name, child in node.children.items():
+            child_path = f"{group_path}/{child_name}" if group_path != '/' else f"/{child_name}"
+            process_node(child, child_path)
+
+    # Start processing from root with '/'
+    process_node(datasets, '/')
+
+    return group_encodings
+
+
+def clean_inherited_coords(dt: DataTree) -> DataTree:
+    """
+    Clean coordinates that are inherited from parent nodes throughout the tree.
+    Each node will only keep coordinates that are unique to it and not present in any ancestor.
+
+    Parameters
+    ----------
+    dt : DataTree
+        The input DataTree to clean
+
+    Returns
+    -------
+    DataTree
+        The cleaned DataTree where each node only has its unique coordinates
+    """
+    def get_ancestor_coords(node: DataTree) -> Set[str]:
+        """Get all coordinate names from ancestor nodes."""
+        ancestor_coords = set()
+        current = node.parent
+        while current is not None:
+            if current.ds is not None:
+                ancestor_coords.update(current.ds.coords)
+            current = current.parent
+        return ancestor_coords
+
+    # Process each node in the tree except root
+    for node in dt.subtree:
+        if node is not dt:  # Skip root
+            if node.ds is not None:
+                # Get coordinates from all ancestors
+                ancestor_coords = get_ancestor_coords(node)
+
+                # Find coordinates to drop (ones that exist in ancestors)
+                coords_to_drop = ancestor_coords.intersection(node.ds.coords)
+
+                # Drop inherited coordinates if any exist
+                # Try to drop the dimensions are different could throw an exception when dropping
+                if coords_to_drop:
+                    try:
+                        node.ds = node.ds.drop_vars(coords_to_drop, errors='ignore')
+                    except Exception:  # pylint: disable=broad-exception-caught
+                        pass
+    return dt
