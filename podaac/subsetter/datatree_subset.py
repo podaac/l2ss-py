@@ -661,6 +661,9 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             traverse_tree(child_node, new_path)
 
     # Start recursive tree traversal
+    if isinstance(tree, xr.Dataset):
+        tree = DataTree(dataset=tree)
+
     return traverse_tree(tree, "")
 
 

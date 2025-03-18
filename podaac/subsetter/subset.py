@@ -450,7 +450,7 @@ def translate_longitude(geometry):
         return geometry
 
 
-def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
+def get_time_epoch_var(tree: DataTree, time_var_name: str) -> str:
     """
     Get the name of the epoch time var. This is only needed in the case
     where there is a single time var (of size 1) that contains the time
@@ -458,8 +458,8 @@ def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
 
     Parameters
     ----------
-    dataset : xr.Dataset
-        Dataset that contains time var
+    tree : DataTree
+        DataTree that contains time var
     time_var_name : str
         The name of the actual time var (with matching dims to the
         coord vars)
@@ -469,18 +469,26 @@ def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
     str
         The name of the epoch time variable
     """
-    time_var = dataset[time_var_name]
+    # Split the time_var_name path to get the group and variable name
+    path_parts = time_var_name.split('/')
+    group_path = '/'.join(path_parts[:-1])
+    var_name = path_parts[-1]
+    
+    # Get the dataset at the correct group level
+    dataset = tree[group_path].ds if group_path else tree.ds
+    time_var = dataset[var_name]
 
     if 'comment' in time_var.attrs:
         epoch_var_name = time_var.attrs['comment'].split('plus')[0].strip()
-    elif 'time' in dataset.variables.keys() and time_var_name != 'time':
-        epoch_var_name = 'time'
-    elif any('time' in s for s in list(dataset.variables.keys())) and time_var_name != 'time':
+    elif 'time' in dataset.variables.keys() and var_name != 'time':
+        epoch_var_name = f"{group_path}/time" if group_path else "time"
+    elif any('time' in s for s in list(dataset.variables.keys())) and var_name != 'time':
         for i in list(dataset.variables.keys()):
-            group_list = i.split(GROUP_DELIM)
-            if group_list[-1] == 'time':
-                epoch_var_name = i
+            if i.endswith('time'):
+                epoch_var_name = f"{group_path}/{i}" if group_path else i
                 break
+        else:
+            raise ValueError('Unable to determine time variables')
         return epoch_var_name
     else:
         raise ValueError('Unable to determine time variables')

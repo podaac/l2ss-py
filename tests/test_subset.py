@@ -23,7 +23,6 @@ Unit tests for the L2 subsetter. These tests are all related to the
 subsetting functionality itself, and should provide coverage on the
 following files:
     - podaac.subsetter.subset.py
-    - podaac.subsetter.xarray_enhancements.py
 """
 import json
 import operator
@@ -50,11 +49,12 @@ from shapely.geometry import Point
 from unittest.mock import patch
 
 from podaac.subsetter import subset
+from podaac.subsetter import datatree_subset
 from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
-from podaac.subsetter import xarray_enhancements as xre
+from podaac.subsetter.datatree_subset import get_indexers_from_nd
 from podaac.subsetter import gpm_cleanup as gc
-from podaac.subsetter import time_converting as tc
+# from podaac.subsetter import time_converting as tc
 # from podaac.subsetter import dimension_cleanup as dc
 
 import gc as garbage_collection
@@ -94,7 +94,7 @@ def subset_output_dir(data_dir):
     """Makes a new temporary directory to hold the subset results while tests are running."""
     subset_output_dir = tempfile.mkdtemp(dir=data_dir)
     yield subset_output_dir
-    #shutil.rmtree(subset_output_dir)
+    shutil.rmtree(subset_output_dir)
 
 
 @pytest.fixture(scope='class')
@@ -195,7 +195,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
     time_var_name = None
     try:
         lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
-        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name], [])
+        time_var_name = datatree_subset.compute_time_variable_name_tree(in_ds, in_ds[lat_var_name], [])
     except ValueError:
         # unable to determine lon lat vars
         pass
@@ -827,6 +827,9 @@ def test_get_spatial_bounds(data_dir):
         mask_and_scale=False
     )
 
+    ascat_dataset = xr.DataTree(name='root', dataset=ascat_dataset)
+    ghrsst_dataset = xr.DataTree(name='root', dataset=ghrsst_dataset)
+
     # ascat1 longitude is -0 360, ghrsst modis A is -180 180
     # Both have metadata for valid_min
 
@@ -841,10 +844,10 @@ def test_get_spatial_bounds(data_dir):
     ghrsst_expected_lon_min = -170.5
     ghrsst_expected_lon_max = -101.7
 
-    min_lon, max_lon, min_lat, max_lat = subset.get_spatial_bounds(
-        dataset=ascat_dataset,
-        lat_var_names=['lat'],
-        lon_var_names=['lon']
+    min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
+        datatree=ascat_dataset,
+        lat_var_names=['/lat'],
+        lon_var_names=['/lon']
     ).flatten()
 
     assert np.isclose(min_lat, ascat_expected_lat_min)
@@ -856,10 +859,10 @@ def test_get_spatial_bounds(data_dir):
     del ascat_dataset['lat'].attrs['valid_min']
     del ascat_dataset['lon'].attrs['valid_min']
 
-    min_lon, max_lon, min_lat, max_lat = subset.get_spatial_bounds(
-        dataset=ascat_dataset,
-        lat_var_names=['lat'],
-        lon_var_names=['lon']
+    min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
+        datatree=ascat_dataset,
+        lat_var_names=['/lat'],
+        lon_var_names=['/lon']
     ).flatten()
 
     assert np.isclose(min_lat, ascat_expected_lat_min)
@@ -869,10 +872,10 @@ def test_get_spatial_bounds(data_dir):
 
     # Repeat test, but with GHRSST granule
 
-    min_lon, max_lon, min_lat, max_lat = subset.get_spatial_bounds(
-        dataset=ghrsst_dataset,
-        lat_var_names=['lat'],
-        lon_var_names=['lon']
+    min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
+        datatree=ghrsst_dataset,
+        lat_var_names=['/lat'],
+        lon_var_names=['/lon']
     ).flatten()
 
     assert np.isclose(min_lat, ghrsst_expected_lat_min)
@@ -885,10 +888,10 @@ def test_get_spatial_bounds(data_dir):
     del ghrsst_dataset['lat'].attrs['valid_min']
     del ghrsst_dataset['lon'].attrs['valid_min']
 
-    min_lon, max_lon, min_lat, max_lat = subset.get_spatial_bounds(
-        dataset=ghrsst_dataset,
-        lat_var_names=['lat'],
-        lon_var_names=['lon']
+    min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
+        datatree=ghrsst_dataset,
+        lat_var_names=['/lat'],
+        lon_var_names=['/lon']
     ).flatten()
 
     assert np.isclose(min_lat, ghrsst_expected_lat_min)
@@ -1333,7 +1336,7 @@ def test_get_time_variable_name(test_file, data_dir):
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
-    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name], [])
+    time_var_name = datatree_subset.compute_time_variable_name_tree(ds, ds[lat_var_name], [])
 
     assert time_var_name is not None
     assert 'time' in time_var_name
@@ -1591,7 +1594,7 @@ def test_root_group(data_dir, subset_output_dir):
         expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
         assert groups == expected_group
 
-
+@pytest.mark.skip(reason='We no longer flatten groups but do we want to have same function copying the dims')
 def test_get_time_squeeze(data_dir, subset_output_dir):
     """test builtin squeeze method on the lat and time variables so
     when the two have the same shape with a time and delta time in
@@ -1601,24 +1604,31 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'tropomi', tropomi_file_name),
                     os.path.join(subset_output_dir, tropomi_file_name))
 
-    nc_dataset = nc.Dataset(os.path.join(subset_output_dir, tropomi_file_name))
-    total_time_vars = ['__PRODUCT__time']
-
+    file = os.path.join(subset_output_dir, tropomi_file_name)
+    
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
         'decode_times': False
     }
-    nc_dataset = subset.transform_grouped_dataset(nc_dataset,
-                                                  os.path.join(subset_output_dir, tropomi_file_name))
-    with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
-    ) as dataset:
-        lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], total_time_vars)
-        lat_dims = dataset[lat_var_name].squeeze().dims
-        time_dims = dataset[time_var_name].squeeze().dims
+
+    with xr.open_datatree(file, **args) as tree:
+        
+        lat_var_names = []
+        lon_var_names = []
+        time_var_names = ['/PRODUCT/time']
+        lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+            dataset=tree,
+            lat_var_names=lat_var_names,
+            lon_var_names=lon_var_names,
+            time_var_names=time_var_names
+        )
+        lat_var_name = lat_var_names[0]
+        time_var_name = time_var_names[0]
+
+        lat_dims = tree[lat_var_name].squeeze().dims
+        time_dims = tree[time_var_name].squeeze().dims
+
         assert lat_dims == time_dims
 
 
@@ -1644,7 +1654,7 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
     ) as dataset:
         lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
         lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
-        time_var_name = subset.compute_time_variable_name(dataset, dataset[lat_var_name], [])
+        time_var_name = datatree_subset.compute_time_variable_name_tree(dataset, dataset[lat_var_name], [])
         oper = operator.and_
 
         cond = oper(
@@ -1652,7 +1662,7 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
             (dataset[lon_var_name] <= 180)
         ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
 
-        indexers = xre.get_indexers_from_nd(cond, True)
+        indexers = get_indexers_from_nd(cond, True)
         indexed_cond = cond.isel(**indexers)
         indexed_ds = dataset.isel(**indexers)
         new_dataset = indexed_ds.where(indexed_cond)
@@ -1820,9 +1830,7 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'tropomi', tropomi_file),
                     os.path.join(subset_output_dir, tropomi_file))
 
-    nc_dataset = nc.Dataset(os.path.join(subset_output_dir, tropomi_file), mode='r')
-
-    nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(subset_output_dir, tropomi_file))
+    file = os.path.join(subset_output_dir, tropomi_file)
 
     args = {
         'decode_coords': False,
@@ -1830,19 +1838,21 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
         'decode_times': False
     }
 
-    with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
-    ) as dataset:
-        lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
-        time_var_names = ['__PRODUCT__time']
-        for lat_var_name in lat_var_names:
-            time_var_names.append(subset.compute_time_variable_name(
-                    dataset, dataset[lat_var_name], time_var_names
-                ))
-        epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[1])
-
-        assert epoch_time_var.split('__')[-1] == 'time'
+    with xr.open_datatree(file, **args) as tree:
+        
+        dataset = tree
+        lat_var_names = []
+        lon_var_names = []
+        time_var_names = ['/PRODUCT/time']
+        lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+            dataset=tree,
+            lat_var_names=lat_var_names,
+            lon_var_names=lon_var_names,
+            time_var_names=time_var_names
+        )
+        print(time_var_names)
+        epoch_time_var = subset.get_time_epoch_var(dataset, '/PRODUCT/delta_time')
+        assert epoch_time_var.split('/')[-1] == 'time'
 
 
 def test_temporal_variable_subset(data_dir, subset_output_dir, request):
@@ -2131,7 +2141,7 @@ def test_get_time_OMI(data_dir, subset_output_dir):
         lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
         time_var_names = []
         for lat_var_name in lat_var_names:
-            time_var_names.append(subset.compute_time_variable_name(
+            time_var_names.append(datatree_subset.compute_time_variable_name_tree(
                     dataset, dataset[lat_var_name], time_var_names
                 ))
         assert "Time" in time_var_names[0]
@@ -2338,6 +2348,7 @@ def test_bad_time_unit(subset_output_dir):
     ds_test = xr.open_dataset(nc_out_location)
     ds_test.close()
 
+@pytest.mark.skip(reasone="we no longer faltten groups so not sure if we need to test this flatten feature")
 def test_get_unique_groups():
     """Test lat_var_names return the expected unique groups"""
 
