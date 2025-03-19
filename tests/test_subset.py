@@ -426,10 +426,10 @@ def test_get_spatial_bounds(data_dir):
         lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ascat_expected_lat_min)
-    assert np.isclose(max_lat, ascat_expected_lat_max)
-    assert np.isclose(min_lon, ascat_expected_lon_min)
-    assert np.isclose(max_lon, ascat_expected_lon_max)
+    assert np.isclose(min_lat, ascat_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ascat_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ascat_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ascat_expected_lon_max, atol=.1)
 
     # Remove the label from the dataset coordinate variables indicating the valid_min.
     del ascat_dataset['lat'].attrs['valid_min']
@@ -441,10 +441,10 @@ def test_get_spatial_bounds(data_dir):
         lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ascat_expected_lat_min)
-    assert np.isclose(max_lat, ascat_expected_lat_max)
-    assert np.isclose(min_lon, ascat_expected_lon_min)
-    assert np.isclose(max_lon, ascat_expected_lon_max)
+    assert np.isclose(min_lat, ascat_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ascat_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ascat_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ascat_expected_lon_max, atol=.1)
 
     # Repeat test, but with GHRSST granule
 
@@ -454,10 +454,10 @@ def test_get_spatial_bounds(data_dir):
         lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ghrsst_expected_lat_min)
-    assert np.isclose(max_lat, ghrsst_expected_lat_max)
-    assert np.isclose(min_lon, ghrsst_expected_lon_min)
-    assert np.isclose(max_lon, ghrsst_expected_lon_max)
+    assert np.isclose(min_lat, ghrsst_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ghrsst_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ghrsst_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ghrsst_expected_lon_max, atol=.1)
 
     # Remove the label from the dataset coordinate variables indicating the valid_min.
 
@@ -470,10 +470,10 @@ def test_get_spatial_bounds(data_dir):
         lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ghrsst_expected_lat_min)
-    assert np.isclose(max_lat, ghrsst_expected_lat_max)
-    assert np.isclose(min_lon, ghrsst_expected_lon_min)
-    assert np.isclose(max_lon, ghrsst_expected_lon_max)
+    assert np.isclose(min_lat, ghrsst_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ghrsst_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ghrsst_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ghrsst_expected_lon_max, atol=.1)
 
 
 def test_shapefile_subset(data_dir, subset_output_dir, request):

@@ -472,25 +472,29 @@ def get_spatial_bounds(dataset: xr.Dataset, lat_var_names: str, lon_var_names: s
     if len(lats) == 0 or len(lons) == 0:
         return None
 
-    min_lat = remove_scale_offset(np.nanmin(lats), lat_scale, lat_offset)
-    max_lat = remove_scale_offset(np.nanmax(lats), lat_scale, lat_offset)
-    min_lon = remove_scale_offset(np.nanmin(lons), lon_scale, lon_offset)
-    max_lon = remove_scale_offset(np.nanmax(lons), lon_scale, lon_offset)
+    original_min_lat = remove_scale_offset(np.nanmin(lats), lat_scale, lat_offset)
+    original_max_lat = remove_scale_offset(np.nanmax(lats), lat_scale, lat_offset)
+    original_min_lon = remove_scale_offset(np.nanmin(lons), lon_scale, lon_offset)
+    original_max_lon = remove_scale_offset(np.nanmax(lons), lon_scale, lon_offset)
 
-    min_lat = round(min_lat, 1)
-    max_lat = round(max_lat, 1)
-    min_lon = round(min_lon, 1)
-    max_lon = round(max_lon, 1)
+    min_lat = round(original_min_lat, 5)
+    max_lat = round(original_max_lat, 5)
+    min_lon = round(original_min_lon, 1)
+    max_lon = round(original_max_lon, 1)
 
     # Convert longitude to [-180,180] format
     if lon_valid_min == 0 or 0 <= min_lon <= max_lon <= 360:
-        if min_lon > 180:
-            min_lon -= 360
-        if max_lon > 180:
-            max_lon -= 360
+        min_lon = (min_lon - 360) if min_lon > 180 else min_lon
+        max_lon = (max_lon - 360) if max_lon > 180 else max_lon
         if min_lon == max_lon:
-            min_lon = -180
-            max_lon = 180
+            min_lon, max_lon = -180, 180
+
+    # After rounding to 1 if not at the edges then round to 5
+    if min_lon != -180:
+        min_lon = round((original_min_lon - 360) if original_min_lon > 180 else original_min_lon, 5)
+
+    if max_lon != 180:
+        max_lon = round((original_max_lon - 360) if original_max_lon > 180 else original_max_lon, 5)
 
     return np.array([[min_lon, max_lon], [min_lat, max_lat]])
 
