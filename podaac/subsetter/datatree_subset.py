@@ -614,7 +614,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             re.IGNORECASE
         )
 
-        possible_time = None
         # Check variables with time-related metadata
         for var_name, var in dataset.variables.items():
             if var_name in total_time_vars:
@@ -626,12 +625,8 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
                 var.attrs.get('axis') == 'T',
                 ('units' in var.attrs and time_units_pattern.match(var.attrs['units']))
             ]):
-                if np.issubdtype(var.dtype, np.dtype(np.datetime64)):
+                if var.size > 1:
                     return var_name
-                possible_time = var_name
-
-        if possible_time:
-            return possible_time
 
         # Check variables with 'time' in name and matching dimensions
         for var_name in dataset.variables:

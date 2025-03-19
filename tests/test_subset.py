@@ -2340,7 +2340,7 @@ def test_bad_time_unit(subset_output_dir):
     ds_test = xr.open_dataset(nc_out_location)
     ds_test.close()
 
-@pytest.mark.skip(reasone="we no longer faltten groups so not sure if we need to test this flatten feature")
+@pytest.mark.skip(reason="we no longer faltten groups so not sure if we need to test this flatten feature")
 def test_get_unique_groups():
     """Test lat_var_names return the expected unique groups"""
 
