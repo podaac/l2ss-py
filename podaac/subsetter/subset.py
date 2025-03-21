@@ -974,20 +974,18 @@ def override_decode_cf_datetime() -> None:
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
-def test_access_sst_dtime_values(datafile):
+def test_access_sst_dtime_values(nc_dataset):
     """
     Test accessing values of 'sst_dtime' variable in a NetCDF file.
 
     Parameters
     ----------
-    datafile (str): Path to the NetCDF file.
+    nc_dataset (netCDF4.Dataset): An open NetCDF dataset.
 
     Returns
     -------
     access_successful (bool): True if 'sst_dtime' values are accessible, False otherwise.
     """
-
-    nc_dataset, _, _ = open_as_nc_dataset(datafile)
     args = {
         'decode_coords': False,
         'mask_and_scale': True,
@@ -998,7 +996,6 @@ def test_access_sst_dtime_values(datafile):
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
         ) as dataset:
-            # pylint: disable=pointless-statement
             for var_name in dataset.variables:
                 dataset[var_name].values
     except (TypeError, ValueError, KeyError):
@@ -1168,6 +1165,15 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     if min_time or max_time:
         args['decode_times'] = True
+        with nc.Dataset(file_to_subset, 'r') as nc_dataset:
+            for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
+                time_var = nc_dataset[time_variable]
+                if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
+                   (getattr(time_var, 'long_name', None) == "reference time of sst file"):
+                    args['mask_and_scale'] = True
+                    if getattr(time_var, 'long_name', None) == "reference time of sst file":
+                        args['mask_and_scale'] = test_access_sst_dtime_values(nc_dataset)
+                    break
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 

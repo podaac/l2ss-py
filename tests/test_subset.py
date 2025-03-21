@@ -156,9 +156,6 @@ def data_files():
     """Get all the netCDF files from the test data directory."""
     test_dir = dirname(realpath(__file__))
     test_data_dir = join(test_dir, 'data')
-    #return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")][1:2]
-
-    #return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")][10:11]
     return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")]
 
 
@@ -1388,6 +1385,7 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     sndr_files = ['SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc',
                   'SNDR.AQUA.AIRS.20140110T0305.m06.g031.L2_CLIMCAPS_RET.std.v02_39.G.210131015806.nc',
                   'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc']
+    
     # do a longitude subset on these files that doesn't alter the resulting shape
     sndr_spatial = [(-180,-150), (-15,180), (-180,30)]
     for sndr_file, box in zip(sndr_files, sndr_spatial):
