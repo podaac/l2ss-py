@@ -997,7 +997,7 @@ def test_access_sst_dtime_values(nc_dataset):
                 **args
         ) as dataset:
             for var_name in dataset.variables:
-                dataset[var_name].values
+                dataset[var_name].values  # pylint: disable=pointless-statement
     except (TypeError, ValueError, KeyError):
         return False
     return True
