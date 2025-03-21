@@ -195,7 +195,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
         dataset = node.ds
         dataset = dc.remove_duplicate_dims_xarray(dataset)
 
-        if len(dataset.data_vars) > 0 and cond is not None:  # Only process if node has data
+        #if dataset.variables and cond is not None:  # Only process if node has data
+        if dataset.data_vars and cond is not None:  # Only process if node has data
+
             # Create indexers from condition
 
             if cond.values.ndim == 1:
@@ -283,11 +285,10 @@ def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
                                                                     str(original_type), dask='allowed',
                                                                     keep_attrs=True)
             processed_ds = new_dataset
+            dc.sync_dims_inplace(dataset, processed_ds)
         else:
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
-
-        dc.sync_dims_inplace(dataset, processed_ds)
 
         # Process child nodes
         processed_children = {}
@@ -300,8 +301,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
 
             # Add all processed grandchildren to the child tree
             for grandchild_name, grandchild_tree in child_children.items():
-                child_tree._children[grandchild_name] = grandchild_tree
-                grandchild_tree._parent = child_tree
+                child_tree[grandchild_name] = grandchild_tree
 
             processed_children[child_name] = child_tree
 
@@ -315,8 +315,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
 
     # Add processed children to the result tree
     for child_name, child_tree in children.items():
-        result_tree._children[child_name] = child_tree
-        child_tree._parent = result_tree
+        result_tree[child_name] = child_tree
 
     # Copy over root attributes
     result_tree.attrs.update(tree.attrs)
