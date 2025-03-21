@@ -1167,15 +1167,19 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         fill_value_f8 = nc.default_fillvals.get('f8')
         float_dtypes = ['float64', 'float32']
         args['decode_times'] = True
-        with nc.Dataset(file_to_subset, 'r') as nc_dataset:
-            for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
-                time_var = nc_dataset[time_variable]
-                if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
-                   (getattr(time_var, 'long_name', None) == "reference time of sst file"):
-                    args['mask_and_scale'] = True
-                    if getattr(time_var, 'long_name', None) == "reference time of sst file":
-                        args['mask_and_scale'] = test_access_sst_dtime_values(nc_dataset)
-                    break
+        # try to open file to see if we can access the time variable
+        try:
+            with nc.Dataset(file_to_subset, 'r') as nc_dataset:
+                for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
+                    time_var = nc_dataset[time_variable]
+                    if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
+                       (getattr(time_var, 'long_name', None) == "reference time of sst file"):
+                        args['mask_and_scale'] = True
+                        if getattr(time_var, 'long_name', None) == "reference time of sst file":
+                            args['mask_and_scale'] = test_access_sst_dtime_values(nc_dataset)
+                        break
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
