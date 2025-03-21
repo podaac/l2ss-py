@@ -195,9 +195,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
         dataset = node.ds
         dataset = dc.remove_duplicate_dims_xarray(dataset)
 
-        #if dataset.variables and cond is not None:  # Only process if node has data
-        if dataset.data_vars and cond is not None:  # Only process if node has data
-
+        if dataset.variables and cond is not None:  # Only process if node has data
             # Create indexers from condition
 
             if cond.values.ndim == 1:

@@ -1164,6 +1164,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     }
 
     if min_time or max_time:
+        fill_value_f8 = nc.default_fillvals.get('f8')
+        float_dtypes = ['float64', 'float32']
         args['decode_times'] = True
         with nc.Dataset(file_to_subset, 'r') as nc_dataset:
             for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
