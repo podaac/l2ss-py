@@ -1453,10 +1453,6 @@ def update_netcdf_attrs(output_file: str,
         if spatial_bounds_array is not None:
             # Define geographical bounds mapping
             bounds_mapping = {
-                'northernmost_latitude': (1, 1),
-                'southernmost_latitude': (1, 0),
-                'easternmost_longitude': (0, 1),
-                'westernmost_longitude': (0, 0),
                 'geospatial_lat_max': (1, 1),
                 'geospatial_lat_min': (1, 0),
                 'geospatial_lon_max': (0, 1),
@@ -1472,7 +1468,11 @@ def update_netcdf_attrs(output_file: str,
                 "start_center_longitude",
                 "start_center_latitude",
                 "end_center_longitude",
-                "end_center_latitude"
+                "end_center_latitude",
+                "northernmost_latitude",
+                "southernmost_latitude",
+                "easternmost_longitude",
+                "westernmost_longitude"
             }
 
             # Safely remove deprecated attributes if they exist
