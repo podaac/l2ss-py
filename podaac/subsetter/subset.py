@@ -1410,6 +1410,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             )
 
         update_netcdf_attrs(output_file,
+                            datasets,
+                            lon_var_names,
                             spatial_bounds_array,
                             stage_file_name_subsetted_true,
                             stage_file_name_subsetted_false)
@@ -1418,6 +1420,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
 
 def update_netcdf_attrs(output_file: str,
+                        datasets: List[xr.Dataset],
+                        lon_var_names: List[str],
                         spatial_bounds_array: Optional[list] = None,
                         stage_file_name_subsetted_true: Optional[str] = None,
                         stage_file_name_subsetted_false: Optional[str] = None) -> None:
@@ -1426,6 +1430,8 @@ def update_netcdf_attrs(output_file: str,
 
     Args:
         output_file (str): Path to the NetCDF file to be updated
+        datasets (list): List of datasets to extract longitude and latitude information
+        lon_var_names (list): List of possible longitude variable names
         spatial_bounds_array (list, optional): Nested list containing spatial bounds in format:
             [[lon_min, lon_max], [lat_min, lat_max]]
         stage_file_name_subsetted_true (str, optional): Product name when subset is True
@@ -1439,8 +1445,38 @@ def update_netcdf_attrs(output_file: str,
 
     Example:
         >>> spatial_bounds = [[120.5, 130.5], [-10.5, 10.5]]
-        >>> update_netcdf_attrs("output.nc", spatial_bounds, "subset_true.nc")
+        >>> update_netcdf_attrs("output.nc", datasets, ["lon"], spatial_bounds, "subset_true.nc", "subset_false.nc")
     """
+
+    lons_easternmost = []
+    lons_westernmost = []
+    for dataset in datasets:
+
+        lon_var_name = lon_var_names[0] if len(lon_var_names) == 1 else [
+            lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars.keys()
+        ][0]
+
+        # Extract latitude and longitude arrays
+        lons = dataset[lon_var_name].values
+        lon_fill_value = dataset[lon_var_name].attrs.get('_FillValue', np.nan)
+
+        # Get the indices for the upper right and bottom left corners
+        upper_right_idx = (0, -1)
+        bottom_left_idx = (-1, 0)
+
+        # Get the corresponding latitude and longitude values for these indices
+        lon_upper_right = lons[upper_right_idx]
+        lon_bottom_left = lons[bottom_left_idx]
+
+        # Check for NaN or fill values and replace with min/max if needed
+        if np.isnan(lon_upper_right) or lon_upper_right == lon_fill_value:
+            lon_upper_right = np.nanmax(np.where(lons != lon_fill_value, lons, np.nan))
+        if np.isnan(lon_bottom_left) or lon_bottom_left == lon_fill_value:
+            lon_bottom_left = np.nanmin(np.where(lons != lon_fill_value, lons, np.nan))
+
+        lons_easternmost.append(lon_bottom_left)
+        lons_westernmost.append(lon_upper_right)
+
     with nc.Dataset(output_file, 'a') as dataset_attr:
         original_attrs = dataset_attr.ncattrs()
 
@@ -1454,9 +1490,7 @@ def update_netcdf_attrs(output_file: str,
             # Define geographical bounds mapping
             bounds_mapping = {
                 'geospatial_lat_max': (1, 1),
-                'geospatial_lat_min': (1, 0),
-                'geospatial_lon_max': (0, 1),
-                'geospatial_lon_min': (0, 0)
+                'geospatial_lat_min': (1, 0)
             }
 
             # Set all geographic bounds attributes
@@ -1480,6 +1514,8 @@ def update_netcdf_attrs(output_file: str,
                 dataset_attr.delncattr(key)
 
             # Set CRS and bounds
+            set_attr_with_type("geospatial_lon_max", max(lons_westernmost))
+            set_attr_with_type("geospatial_lon_min", min(lons_easternmost))
             dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
             dataset_attr.setncattr("geospatial_bounds", create_geospatial_bounds(spatial_bounds_array))
 
