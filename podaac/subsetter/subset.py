@@ -1453,29 +1453,37 @@ def update_netcdf_attrs(output_file: str,
     for dataset in datasets:
 
         lon_var_name = lon_var_names[0] if len(lon_var_names) == 1 else [
-            lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars.keys()
-        ][0]
+                lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars.keys()
+            ][0]
 
         # Extract latitude and longitude arrays
         lons = dataset[lon_var_name].values
         lon_fill_value = dataset[lon_var_name].attrs.get('_FillValue', np.nan)
 
-        # Get the indices for the upper right and bottom left corners
-        upper_right_idx = (0, -1)
-        bottom_left_idx = (-1, 0)
+        if dataset[lon_var_name].ndim == 2:
+            # Get the indices for the upper right and bottom left corners
+            upper_right_idx = (0, -1)
+            bottom_left_idx = (-1, 0)
 
-        # Get the corresponding latitude and longitude values for these indices
-        lon_upper_right = lons[upper_right_idx]
-        lon_bottom_left = lons[bottom_left_idx]
+            # Get the corresponding latitude and longitude values for these indices
+            lon_upper_right = lons[upper_right_idx]
+            lon_bottom_left = lons[bottom_left_idx]
 
-        # Check for NaN or fill values and replace with min/max if needed
-        if np.isnan(lon_upper_right) or lon_upper_right == lon_fill_value:
-            lon_upper_right = np.nanmax(np.where(lons != lon_fill_value, lons, np.nan))
-        if np.isnan(lon_bottom_left) or lon_bottom_left == lon_fill_value:
-            lon_bottom_left = np.nanmin(np.where(lons != lon_fill_value, lons, np.nan))
+            # Check for NaN or fill values and replace with min/max if needed
+            if np.isnan(lon_upper_right) or lon_upper_right == lon_fill_value:
+                lon_upper_right = np.nanmax(np.where(lons != lon_fill_value, lons, np.nan))
+            if np.isnan(lon_bottom_left) or lon_bottom_left == lon_fill_value:
+                lon_bottom_left = np.nanmin(np.where(lons != lon_fill_value, lons, np.nan))
 
-        lons_easternmost.append(lon_bottom_left)
-        lons_westernmost.append(lon_upper_right)
+            lons_easternmost.append(lon_bottom_left)
+            lons_westernmost.append(lon_upper_right)
+        else:
+            # For non-2-dimensional longitude arrays, compute min and max
+            lon_min = np.nanmin(np.where(lons != lon_fill_value, lons, np.nan))
+            lon_max = np.nanmax(np.where(lons != lon_fill_value, lons, np.nan))
+
+            lons_easternmost.append(lon_min)
+            lons_westernmost.append(lon_max)
 
     with nc.Dataset(output_file, 'a') as dataset_attr:
         original_attrs = dataset_attr.ncattrs()
