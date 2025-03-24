@@ -1,6 +1,6 @@
 """script to help with subsetting xarray datatree objects"""
 
-# pylint: disable=protected-access, inconsistent-return-statements
+# pylint: disable=inconsistent-return-statements
 import logging
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -804,8 +804,7 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
             min_lons.append(min_lon)
             max_lons.append(max_lon)
 
-        except (KeyError, AttributeError) as e:
-            print(f"Warning: Error processing {lat_var_name}/{lon_var_name}: {str(e)}")
+        except (KeyError, AttributeError):
             continue
 
     if not min_lats:  # If no valid bounds were found
@@ -898,7 +897,7 @@ def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataT
                 node = tree[group_path]
                 node.ds = node.ds.drop_vars([var_name], errors='ignore')
             except KeyError:
-                print(f"Warning: Group '{group_path}' not found")
+                pass
 
     return tree
 

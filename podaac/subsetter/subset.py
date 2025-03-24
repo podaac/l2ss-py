@@ -600,7 +600,6 @@ def get_variable_data(dtree, var_path):
         group = dtree[group_name] if group_name else dtree  # Get group or root
         return group.ds[var_name]  # Extract variable values
     except KeyError:
-        print(f"Variable '{var_path}' not found.")
         return None
 
 
@@ -1217,7 +1216,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
 
             all_data_variables = datatree_subset.get_vars_with_paths(dataset)
-            print(all_data_variables)
             drop_variables = [
                 var for var in all_data_variables
                 if var not in keep_variables and var.upper() not in keep_variables
@@ -1225,7 +1223,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
             dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
 
-        print("SUBSETTING")
         if shapefile:
             datasets = subset_with_shapefile_multi(dataset, lat_var_names, lon_var_names, shapefile, cut, chunks)
         elif bbox is not None:
