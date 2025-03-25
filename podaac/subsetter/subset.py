@@ -1483,9 +1483,6 @@ def update_netcdf_attrs(output_file: str,
         lons_easternmost.append(eastmost)
         lons_westernmost.append(westmost)
 
-    final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-    final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-
     with nc.Dataset(output_file, 'a') as dataset_attr:
         original_attrs = dataset_attr.ncattrs()
 
@@ -1523,8 +1520,12 @@ def update_netcdf_attrs(output_file: str,
                 dataset_attr.delncattr(key)
 
             # Set CRS and bounds
-            set_attr_with_type("geospatial_lon_max", final_westmost)
-            set_attr_with_type("geospatial_lon_min", final_eastmost)
+            if lons_westernmost:
+                final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+                set_attr_with_type("geospatial_lon_max", final_westmost)
+            if lons_easternmost:
+                final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+                set_attr_with_type("geospatial_lon_min", final_eastmost)
             dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
             dataset_attr.setncattr("geospatial_bounds", create_geospatial_bounds(spatial_bounds_array))
 
