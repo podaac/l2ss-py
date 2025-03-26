@@ -1412,6 +1412,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         update_netcdf_attrs(output_file,
                             datasets,
                             lon_var_names,
+                            lat_var_names,
                             spatial_bounds_array,
                             stage_file_name_subsetted_true,
                             stage_file_name_subsetted_false)
@@ -1422,6 +1423,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 def update_netcdf_attrs(output_file: str,
                         datasets: List[xr.Dataset],
                         lon_var_names: List[str],
+                        lat_var_names: List[str],
                         spatial_bounds_array: Optional[list] = None,
                         stage_file_name_subsetted_true: Optional[str] = None,
                         stage_file_name_subsetted_false: Optional[str] = None) -> None:
@@ -1432,6 +1434,7 @@ def update_netcdf_attrs(output_file: str,
         output_file (str): Path to the NetCDF file to be updated
         datasets (list): List of datasets to extract longitude and latitude information
         lon_var_names (list): List of possible longitude variable names
+        lat_var_names (list): List of possible latitude variable names
         spatial_bounds_array (list, optional): Nested list containing spatial bounds in format:
             [[lon_min, lon_max], [lat_min, lat_max]]
         stage_file_name_subsetted_true (str, optional): Product name when subset is True
@@ -1450,6 +1453,8 @@ def update_netcdf_attrs(output_file: str,
 
     lons_easternmost = []
     lons_westernmost = []
+    final_eastmost = None
+    final_westmost = None
 
     for dataset in datasets:
         lon_var_name = None
@@ -1527,7 +1532,11 @@ def update_netcdf_attrs(output_file: str,
                 final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
                 set_attr_with_type("geospatial_lon_min", final_eastmost)
             dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
-            dataset_attr.setncattr("geospatial_bounds", create_geospatial_bounds(spatial_bounds_array))
+            geospatial_bounds = (
+                create_geospatial_bounds(datasets, lon_var_names, lat_var_names)
+                or create_geospatial_bounding_box(spatial_bounds_array, final_eastmost, final_westmost)
+            )
+            dataset_attr.setncattr("geospatial_bounds", geospatial_bounds)
 
         # Set product name based on conditions
         has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
@@ -1538,7 +1547,7 @@ def update_netcdf_attrs(output_file: str,
         set_attr_with_type('product_name', product_name)
 
 
-def create_geospatial_bounds(spatial_bounds_array):
+def create_geospatial_bounding_box(spatial_bounds_array, east, west):
     """
     Generate a Well-Known Text (WKT) POLYGON string representing the geospatial bounds.
 
@@ -1554,7 +1563,10 @@ def create_geospatial_bounds(spatial_bounds_array):
         A 2D list where:
         - spatial_bounds_array[0] contains [lon_min, lon_max]
         - spatial_bounds_array[1] contains [lat_min, lat_max]
-
+    east: float or None
+        - longitude spacial bound east
+    west: float or None
+        - longitude spacial bound west
     Returns:
     --------
     str
@@ -1569,10 +1581,98 @@ def create_geospatial_bounds(spatial_bounds_array):
     lon_min, lon_max = spatial_bounds_array[0]
     lat_min, lat_max = spatial_bounds_array[1]
 
+    if east:
+        lon_min = east
+    if west:
+        lon_max = west
+
     # Construct the WKT polygon string (ensuring the loop closes)
     wkt_polygon = (
-        f"POLYGON (({lon_min} {lat_min}, {lon_max} {lat_min}, "
-        f"{lon_max} {lat_max}, {lon_min} {lat_max}, {lon_min} {lat_min}))"
+        f"POLYGON (({lon_min:.5f} {lat_min:.5f}, {lon_max:.5f} {lat_min:.5f}, "
+        f"{lon_max:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_min:.5f}))"
     )
 
     return wkt_polygon
+
+
+def create_geospatial_bounds(datasets, lon_var_names, lat_var_names):
+    """Create geospatial bounds from 4 corners of 2d array"""
+
+    for dataset in datasets:
+        lon_var_name = None
+        lat_var_name = None
+
+        if len(lon_var_names) == 1:
+            lon_var_name = lon_var_names[0]
+        else:
+            matched_names = [lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars]
+            if matched_names:
+                lon_var_name = matched_names[0]
+            else:
+                continue
+
+        if len(lat_var_names) == 1:
+            lat_var_name = lat_var_names[0]
+        else:
+            matched_names = [lat_name for lat_name in lat_var_names if lat_name in dataset.data_vars]
+            if matched_names:
+                lat_var_name = matched_names[0]
+            else:
+                continue
+
+        lon = dataset[lon_var_name].values
+        lat = dataset[lat_var_name].values
+
+        lon_fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
+        lat_fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
+
+        break
+
+    # Check if the variables are 2D arrays
+    if lon.ndim != 2 or lat.ndim != 2:
+        return None
+
+    # Get the shape of the arrays (assuming they are the same shape)
+    nrows, ncols = lon.shape
+
+    points = [
+        (lon[0, 0], lat[0, 0]),        # Top-left
+        (lon[nrows - 1, 0], lat[nrows - 1, 0]),  # Bottom-left
+        (lon[nrows - 1, ncols - 1], lat[nrows - 1, ncols - 1]),  # Bottom-right
+        (lon[0, ncols - 1], lat[0, ncols - 1])   # Top-right
+    ]
+
+    # Check for NaN or fill values in corner points
+    if any(np.isnan(point[0]) or np.isnan(point[1]) or point[0] == lon_fill_value or point[1] == lat_fill_value for point in points):
+        return None
+
+    # Sort points in counter-clockwise order
+    sorted_points = ensure_counter_clockwise(points)
+
+    # Create a counter-clockwise WKT polygon with precision 5
+    wkt_polygon = (
+        f"POLYGON(({sorted_points[0][0]:.5f} {sorted_points[0][1]:.5f}, "
+        f"{sorted_points[1][0]:.5f} {sorted_points[1][1]:.5f}, "
+        f"{sorted_points[2][0]:.5f} {sorted_points[2][1]:.5f}, "
+        f"{sorted_points[3][0]:.5f} {sorted_points[3][1]:.5f}, "
+        f"{sorted_points[0][0]:.5f} {sorted_points[0][1]:.5f}))"
+    )
+
+    return wkt_polygon
+
+
+def shoelace_area(points):
+    """Computes the signed area of a polygon.
+       Negative area → Counterclockwise
+       Positive area → Clockwise (needs reversing)
+    """
+    x, y = np.array(points)[:, 0], np.array(points)[:, 1]
+    return 0.5 * np.sum(x[:-1] * y[1:] - x[1:] * y[:-1])
+
+
+def ensure_counter_clockwise(points):
+    """Ensures the points are ordered counterclockwise."""
+    area = shoelace_area(points)
+    if area > 0:  # Clockwise → Reverse order
+        return points[::-1]
+    return points
