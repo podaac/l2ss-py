@@ -1468,8 +1468,9 @@ def update_netcdf_attrs(output_file: str,
 
         eastmost, westmost = get_east_west_lon(dataset, lon_var_name)
 
-        lons_easternmost.append(eastmost)
-        lons_westernmost.append(westmost)
+        if eastmost and westmost:
+            lons_easternmost.append(eastmost)
+            lons_westernmost.append(westmost)
 
     with nc.Dataset(output_file, 'a') as dataset_attr:
         original_attrs = dataset_attr.ncattrs()
