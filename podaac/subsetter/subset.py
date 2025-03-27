@@ -1457,6 +1457,7 @@ def update_netcdf_attrs(output_file: str,
     final_westmost = None
 
     for dataset in datasets:
+
         lon_var_name = None
         if len(lon_var_names) == 1:
             lon_var_name = lon_var_names[0]
@@ -1464,26 +1465,8 @@ def update_netcdf_attrs(output_file: str,
             matched_names = [lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars]
             if matched_names:
                 lon_var_name = matched_names[0]
-            else:
-                continue
 
-        lon_2d = dataset[lon_var_name].values
-        fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
-
-        lon_flat = lon_2d.flatten()
-
-        if fill_value is not None:
-            lon_flat = lon_flat[lon_flat != fill_value]
-
-        lon_flat = lon_flat[~np.isnan(lon_flat)]
-
-        if lon_flat.size == 0:
-            continue
-
-        lon_360 = np.where(lon_flat < 0, lon_flat + 360, lon_flat)
-
-        westmost = lon_flat[np.argmin(lon_360)]
-        eastmost = lon_flat[np.argmax(lon_360)]
+        eastmost, westmost = get_east_west_lon(dataset, lon_var_name)
 
         lons_easternmost.append(eastmost)
         lons_westernmost.append(westmost)
@@ -1676,3 +1659,62 @@ def ensure_counter_clockwise(points):
     if area > 0:  # Clockwise → Reverse order
         return points[::-1]
     return points
+
+
+def get_east_west_lon(dataset, lon_var_name):
+    """
+    Determines the easternmost and westernmost longitudes from a dataset,
+    correctly handling cases where the data crosses the antimeridian.
+
+    Parameters:
+        dataset: xarray.Dataset or similar
+            The dataset containing longitude values.
+        lon_var_name: str
+            The name of the longitude variable in the dataset.
+
+    Returns:
+        tuple: (westmost, eastmost)
+            The westernmost and easternmost longitudes in [-180, 180] range.
+    """
+    lon_2d = dataset[lon_var_name].values
+    fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
+
+    lon_flat = lon_2d.flatten()
+    if fill_value is not None:
+        lon_flat = lon_flat[lon_flat != fill_value]
+    lon_flat = lon_flat[~np.isnan(lon_flat)]
+    if lon_flat.size == 0:
+        return None, None  # No valid longitude data
+
+    # Convert longitudes to [0, 360] range
+    lon_360 = np.where(lon_flat < 0, lon_flat + 360, lon_flat)
+
+    # Sort longitudes
+    lon_sorted = np.sort(lon_360)
+
+    # Compute gaps
+    gaps = np.diff(lon_sorted)
+    wrap_gap = lon_sorted[0] + 360 - lon_sorted[-1]
+    gaps = np.append(gaps, wrap_gap)
+
+    # Find the largest gap
+    max_gap_index = np.argmax(gaps)
+    max_gap = gaps[max_gap_index]
+
+    if max_gap > 180:
+        # The easternmost boundary is the first point after the gap
+        eastmost_360 = lon_sorted[(max_gap_index + 1) % len(lon_sorted)]
+        # The westernmost boundary is the point just before the gap
+        westmost_360 = lon_sorted[max_gap_index]
+    else:
+        # Otherwise, no crossing: use min/max
+        eastmost_360 = np.max(lon_sorted)
+        westmost_360 = np.min(lon_sorted)
+
+    def convert_to_standard(lon):
+        return lon - 360 if lon > 180 else lon
+
+    eastmost = round(convert_to_standard(eastmost_360), 5)
+    westmost = round(convert_to_standard(westmost_360), 5)
+
+    return westmost, eastmost
