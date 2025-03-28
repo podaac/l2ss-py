@@ -1687,6 +1687,8 @@ def get_east_west_lon(dataset, lon_var_name):
     if lon_flat.size == 0:
         return None, None  # No valid longitude data
 
+    crosses_antimeridian = np.any((lon_flat[:-1] > 150) & (lon_flat[1:] < -150))
+
     # Convert longitudes to [0, 360] range
     lon_360 = np.where(lon_flat < 0, lon_flat + 360, lon_flat)
 
@@ -1700,17 +1702,16 @@ def get_east_west_lon(dataset, lon_var_name):
 
     # Find the largest gap
     max_gap_index = np.argmax(gaps)
-    max_gap = gaps[max_gap_index]
 
-    if max_gap > 180:
+    if crosses_antimeridian:
         # The easternmost boundary is the first point after the gap
         eastmost_360 = lon_sorted[(max_gap_index + 1) % len(lon_sorted)]
         # The westernmost boundary is the point just before the gap
         westmost_360 = lon_sorted[max_gap_index]
     else:
         # Otherwise, no crossing: use min/max
-        eastmost_360 = np.max(lon_sorted)
-        westmost_360 = np.min(lon_sorted)
+        eastmost_360 = np.max(lon_flat)
+        westmost_360 = np.min(lon_flat)
 
     def convert_to_standard(lon):
         return lon - 360 if lon > 180 else lon
