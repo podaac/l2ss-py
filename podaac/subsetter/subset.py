@@ -1511,10 +1511,10 @@ def update_netcdf_attrs(output_file: str,
             # Set CRS and bounds
             if lons_westernmost:
                 final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-                set_attr_with_type("geospatial_lon_max", final_westmost)
+                set_attr_with_type("geospatial_lon_min", final_westmost)
             if lons_easternmost:
                 final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-                set_attr_with_type("geospatial_lon_min", final_eastmost)
+                set_attr_with_type("geospatial_lon_max", final_eastmost)
             dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
             geospatial_bounds = (
                 create_geospatial_bounds(datasets, lon_var_names, lat_var_names)
@@ -1704,12 +1704,9 @@ def get_east_west_lon(dataset, lon_var_name):
     max_gap_index = np.argmax(gaps)
 
     if crosses_antimeridian:
-        # The easternmost boundary is the first point after the gap
-        eastmost_360 = lon_sorted[(max_gap_index + 1) % len(lon_sorted)]
-        # The westernmost boundary is the point just before the gap
-        westmost_360 = lon_sorted[max_gap_index]
+        eastmost_360 = lon_sorted[max_gap_index]
+        westmost_360 = lon_sorted[(max_gap_index + 1) % len(lon_sorted)]
     else:
-        # Otherwise, no crossing: use min/max
         eastmost_360 = np.max(lon_flat)
         westmost_360 = np.min(lon_flat)
 
@@ -1719,4 +1716,4 @@ def get_east_west_lon(dataset, lon_var_name):
     eastmost = round(convert_to_standard(eastmost_360), 5)
     westmost = round(convert_to_standard(westmost_360), 5)
 
-    return westmost, eastmost
+    return eastmost, westmost
