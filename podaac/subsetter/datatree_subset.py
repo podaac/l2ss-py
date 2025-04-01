@@ -1,6 +1,7 @@
 """script to help with subsetting xarray datatree objects"""
 
 # pylint: disable=inconsistent-return-statements
+import datetime
 import logging
 import re
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -9,6 +10,7 @@ import cf_xarray as cfxr
 import numpy as np
 import xarray as xr
 from xarray import DataTree
+from netCDF4 import date2num  # pylint: disable=no-name-in-module
 
 from podaac.subsetter import dimension_cleanup as dc
 
@@ -1002,3 +1004,41 @@ def clean_inherited_coords(dt: DataTree) -> DataTree:
                     except Exception:  # pylint: disable=broad-exception-caught
                         pass
     return dt
+
+
+def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
+    """
+    Update dataset dimensions based on 'DimensionNames' attributes and compute a time variable
+    if not present, using values from the dataset.
+    """
+    ds = og_ds.copy()
+
+    def convert_to_int(value, unit_type):
+        if isinstance(value, np.timedelta64):
+            ns_per_unit = {'day': 24 * 60 * 60 * 1e9, 'hour': 60 * 60 * 1e9, 'minute': 60 * 1e9}
+            return int(value.astype('int64') / ns_per_unit[unit_type])
+        return int(value)
+
+    if not any(time_name in var for var in ds.variables):
+        if "ScanTime" in group_path:
+            time_unit_out = "seconds since 1980-01-06 00:00:00"
+            new_time_list = [
+                date2num(
+                    datetime.datetime(
+                        int(ds["Year"].values[i]),
+                        int(ds["Month"].values[i]),
+                        convert_to_int(ds["DayOfMonth"].values[i], 'day'),
+                        hour=convert_to_int(ds["Hour"].values[i], 'hour'),
+                        minute=convert_to_int(ds["Minute"].values[i], 'minute'),
+                        second=int(ds["Second"].values[i]),
+                        microsecond=int(ds["MilliSecond"].values[i] * 1000)
+                    ),
+                    time_unit_out,
+                )
+                for i in range(len(ds["Year"].values))
+            ]
+
+            ds[time_name] = (ds["Year"].dims, np.array(new_time_list))
+            ds[time_name].attrs["unit"] = time_unit_out
+
+    return ds

@@ -1096,34 +1096,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
 
-    file_extension = os.path.splitext(file_to_subset)[1]
-    nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
-
-
-    if has_groups:
-        # Make sure all variables start with '/'
-        if variables:
-            variables = ['/' + var if not var.startswith('/') else var for var in variables]
-        lat_var_names = ['/' + var if not var.startswith('/') else var for var in lat_var_names]
-        lon_var_names = ['/' + var if not var.startswith('/') else var for var in lon_var_names]
-        time_var_names = ['/' + var if not var.startswith('/') else var for var in time_var_names]
-        # Replace all '/' with GROUP_DELIM
-        if variables:
-            variables = [var.replace('/', GROUP_DELIM) for var in variables]
-        lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
-        lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
-        time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
-
-    if '.HDF5' == file_extension:
-        # GPM files will have a ScanTime group
-        if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
-            gc.change_var_dims(nc_dataset, variables)
-            hdf_type = 'GPM'
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': False,
-        'decode_times': False
-    }
     # clean up time variable in SNDR before decode_times
     # SNDR.AQUA files have ascending node time blank
     if any('__asc_node_tai93' in i for i in list(nc_dataset.variables)):
@@ -1131,36 +1103,24 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if not asc_time_var[:] > 0:
             del nc_dataset.variables['__asc_node_tai93']
 
-    if min_time or max_time:
-        args['decode_times'] = True
-        float_dtypes = ['float64', 'float32']
-        fill_value_f8 = nc.default_fillvals.get('f8')
-
-        for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
-            time_var = nc_dataset[time_variable]
-
-            if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
-               (getattr(time_var, 'long_name', None) == "reference time of sst file"):
-                args['mask_and_scale'] = True
-                if getattr(time_var, 'long_name', None) == "reference time of sst file":
-                    args['mask_and_scale'] = test_access_sst_dtime_values(file_to_subset)
-                break
-
-    if hdf_type == 'GPM':
-        args['decode_times'] = False
-
-    nc_dataset.close()
     """
 
-    # file_extension = os.path.splitext(file_to_subset)[1]
+    file_extension = os.path.splitext(file_to_subset)[1]
     override_decode_cf_datetime()
 
     hdf_type = False
+
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
         'decode_times': False
     }
+
+    with xr.open_datatree(file_to_subset, **args) as dataset:
+        if '.HDF5' == file_extension:
+            for group in dataset.groups:
+                if "ScanTime" in group:
+                    hdf_type = 'GPM'
 
     if min_time or max_time:
         fill_value_f8 = nc.default_fillvals.get('f8')
@@ -1180,6 +1140,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         except Exception:  # pylint: disable=broad-exception-caught
             pass
 
+    if hdf_type == 'GPM':
+        args['decode_times'] = False
+
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
         hdf_type = get_hdf_type(dataset)
@@ -1196,12 +1159,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
 
-        # to be implemented
-        # if '.HDF5' == file_extension:
-        #    # GPM files will have a ScanTime group
-        #    if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
-        #        gc.change_var_dims(nc_dataset, normalized_variables)
-        #        hdf_type = 'GPM'
+        if '.HDF5' == file_extension:
+            for group in dataset.groups:
+                if "ScanTime" in group:
+                    group_dataset = dataset[group].ds
+                    dataset[group].ds = datatree_subset.update_dataset_with_time(group_dataset, group_path=group)
 
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)

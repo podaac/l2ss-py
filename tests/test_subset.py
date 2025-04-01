@@ -2398,3 +2398,40 @@ def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
         
         for dim in dims:
             assert 'phony' not in dim
+
+def test_subset_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
+    """Test GPM files that have scantime variable to compute the time for seconds
+    since 1980-01-06"""
+    
+    gpm_dir = join(data_dir, 'GPM')
+    gpm_file = 'GPM_test_file_2.HDF5'  # Keep the correct file name
+
+    # Correct bbox with (min_lon, min_lat) and (max_lon, max_lat)
+    bbox = np.array(((-180, 90), (-90, 90)))
+
+    output_file = f"gpm_test_{gpm_file}"  # Keep the extension
+    subset_output_file = join(subset_output_dir, output_file)
+    subset.subset(
+        file_to_subset=join(gpm_dir, gpm_file),  
+        bbox=bbox,
+        output_file=subset_output_file
+    )    
+
+    # Open subsetted file using xarray-datatree
+    dtree = xr.open_datatree(subset_output_file)
+
+    # Check the dimensions
+    for node in dtree.subtree:
+        ds = node.ds  # Get the dataset at this node
+        if isinstance(ds, xr.Dataset):
+            dims = ds.dims.keys()
+
+            # Ensure no 'phony' dimensions
+            for dim in dims:
+                assert 'phony' not in dim, f"Unexpected 'phony' dimension found: {dim}"
+
+    for group in dtree.groups:
+        if "ScanTime" in group:
+            assert int(dtree[group].ds.variables["timeMidScan"][:][0]) == 1306403820
+
+
