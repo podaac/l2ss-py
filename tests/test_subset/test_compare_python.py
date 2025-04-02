@@ -115,12 +115,6 @@ def test_compare_python_compact(test_file, data_dir, subset_output_dir, request)
     box. For simplicity the subsetted python granules have been
     manually run and copied into this project. This test DOES
     cut the scanline.
-
-    No longer testing VIIRS VIIRS_NPP-NAVO-L2P-v3.0.nc cell 77 92
-    there is one cell that doesn't match latitude is 65.00000####,
-    updated to numpy ^ 2.0.0, most likely due to higher precision so 
-    we no longer want to test since new numpy is more precise than the 
-    python subsetted
     """
 
     compare_python(test_file, True, data_dir, subset_output_dir, request)
