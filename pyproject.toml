@@ -38,7 +38,7 @@ julian = "^0.14"
 importlib-metadata = "^8.2.0"
 h5py = "^3.6.0"
 cf-xarray = "*"
-numpy = "^1.26.4"
+numpy = "^2.2.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^8.0.2"

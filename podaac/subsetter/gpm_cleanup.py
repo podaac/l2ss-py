@@ -5,27 +5,40 @@ to nscan, nbin, nfreq by using the DimensionNames variable attribute
 
 import datetime
 from netCDF4 import date2num  # pylint: disable=no-name-in-module
+import numpy as np
 
 dim_dict = {}
 
 
 def compute_new_time_data(time_group, nc_dataset):
     """
-    create a time variable, timeMidScan, that is present in other
+    Create a time variable, timeMidScan, that is present in other
     GPM collections but not the ENV collections.
     """
-    # set the time unit for GPM
+    # Set the time unit for GPM
     time_unit_out = "seconds since 1980-01-06 00:00:00"
-    # conver to a float, seconds variable
-    new_time_list = [date2num(datetime.datetime(
-        nc_dataset[time_group+'__Year'][:][i],
-        nc_dataset[time_group+'__Month'][:][i],
-        nc_dataset[time_group+'__DayOfMonth'][:][i],
-        hour=nc_dataset[time_group+'__Hour'][:][i],
-        minute=nc_dataset[time_group+'__Minute'][:][i],
-        second=nc_dataset[time_group+'__Second'][:][i],
-        microsecond=nc_dataset[time_group+'__MilliSecond'][:][i]*1000),
-        time_unit_out) for i in range(len(nc_dataset[time_group+'__Year'][:]))]
+
+    new_time_list = []
+    for i in range(len(nc_dataset[time_group+'__Year'][:])):
+        try:
+            # Safely convert milliseconds to microseconds
+            millisecond = int(nc_dataset[time_group+'__MilliSecond'][:][i])  # Cast to int first
+            microsecond = np.clip(millisecond * 1000, 0, 999999)  # Ensure within range
+
+            dt = datetime.datetime(
+                int(nc_dataset[time_group+'__Year'][:][i]),
+                int(nc_dataset[time_group+'__Month'][:][i]),
+                int(nc_dataset[time_group+'__DayOfMonth'][:][i]),
+                hour=int(nc_dataset[time_group+'__Hour'][:][i]),
+                minute=int(nc_dataset[time_group+'__Minute'][:][i]),
+                second=int(nc_dataset[time_group+'__Second'][:][i]),
+                microsecond=microsecond
+            )
+
+            new_time_list.append(date2num(dt, time_unit_out))
+
+        except (ValueError, OverflowError) as e:
+            print(f"Skipping invalid entry at index {i}: {e}")
 
     return new_time_list, time_unit_out
 
