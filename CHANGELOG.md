@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
+## [2.14.0]
+### Added
 - [issue/314](https://github.com/podaac/l2ss-py/pull/324):
 	- Update python libraries
 	- Update harmony service library version
