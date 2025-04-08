@@ -77,19 +77,25 @@ def parse_args(args: list) -> tuple:
         help='Path to either shapefile or geojson file used to subset '
              'the provided input granule'
     )
+    parser.add_argument(
+        '--pixel_subset',
+        default=False,
+        action='store_true',
+        help='To pixel cut based the lon lat on the bounding box'
+    )
 
     args = parser.parse_args(args=args)
     bbox = np.array([[args.bbox[0], args.bbox[2]], [args.bbox[1], args.bbox[3]]])
 
     return args.input_file, args.output_file, bbox, args.variables, \
-        args.min_time, args.max_time, args.cut, args.shapefile
+        args.min_time, args.max_time, args.cut, args.shapefile, args.pixel_subset
 
 
 def run_subsetter(args: list) -> None:
     """
     Parse arguments and run subsetter on the specified input file
     """
-    input_file, output_file, bbox, variables, min_time, max_time, cut, shapefile = parse_args(args)
+    input_file, output_file, bbox, variables, min_time, max_time, cut, shapefile, pixel_subset = parse_args(args)
 
     logging.info('Executing subset on %s...', input_file)
     subset.subset(
@@ -101,7 +107,8 @@ def run_subsetter(args: list) -> None:
         min_time=min_time,
         max_time=max_time,
         origin_source=os.path.basename(input_file),
-        shapefile=shapefile
+        shapefile=shapefile,
+        pixel_subset=pixel_subset
     )
     logging.info('Subset complete. Result in %s', output_file)
 

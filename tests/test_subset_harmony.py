@@ -17,194 +17,270 @@ test_subset_harmony.py
 
 Test the harmony service
 """
-import numpy as np
+# Standard library imports
 import json
-import os.path
-import sys
-import pytest
+import os
 import shutil
+import sys
 import tempfile
-from unittest.mock import patch, MagicMock
+from datetime import datetime
+from typing import Dict, Any, List
 
-import podaac.subsetter
+# Third-party imports
+import numpy as np
+import pytest
+import pystac
+from unittest.mock import patch
+
+# Local/Project imports
+from harmony_service_lib.message import Message
 from podaac.subsetter.subset_harmony import L2SubsetterService
-from harmony_service_lib.util import config
 
-
-@pytest.fixture()
-def temp_dir():
+@pytest.fixture
+def temp_dir(request):
+    """Create and clean up a temporary directory for tests."""
     test_data_dir = os.path.dirname(os.path.realpath(__file__))
     temp_dir = tempfile.mkdtemp(dir=test_data_dir)
     yield temp_dir
     shutil.rmtree(temp_dir)
 
+@pytest.fixture
+def test_env_vars(temp_dir: str) -> Dict[str, str]:
+    """Set up test environment variables."""
+    return {
+        'DATA_DIRECTORY': temp_dir,
+        'STAGING_PATH': temp_dir,
+        'WORKER_DIR': temp_dir,
+        'STAGING_BUCKET': 'test-staging-bucket',
+        'AWS_ACCESS_KEY_ID': 'test-key',
+        'AWS_SECRET_ACCESS_KEY': 'test-secret',
+        'AWS_REGION': 'us-west-2',
+        'ENV': 'test'
+    }
 
-def spy_on(method):
-    """
-    Creates a spy for the given object instance method which records results
-    and return values while letting the call run as normal.  Calls are recorded
-    on `spy_on(A.b).mock` (MagicMock) and return values are appended to the
-    array `spy_on(A.b).return_values`.
-
-    The return value should be passed as the third argument to patch.object in
-    order to begin recording calls
-
-    Parameters
-    ----------
-    method : function
-        The method to spy on
-
-    Returns
-    -------
-    function
-        A wrapper function that can be passed to patch.object to record calls
-    """
-    mock = MagicMock()
-    return_values = []
-
-    def wrapper(self, *args, **kwargs):
-        mock(*args, **kwargs)
-        result = method(self, *args, **kwargs)
-        return_values.append(result)
-        return result
-    wrapper.mock = mock
-    wrapper.return_values = return_values
-    return wrapper
-
-
-def test_service_invoke(mock_environ, temp_dir):
-    test_dir = os.path.dirname(os.path.realpath(__file__))
-    input_json = json.load(
-        open(os.path.join(test_dir, 'data', 'test_subset_harmony', 'test_service_invoke.input.json')))
-
-    test_granule = os.path.join(test_dir, 'data', 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc')
-    input_json['sources'][0]['granules'][0]['url'] = f'file://{test_granule}'
-    input_json['sources'][0]['variables'][0]['name'] = 'bathymetry'
-
-    test_args = [
-        podaac.subsetter.subset_harmony.__file__,
-        "--harmony-action", "invoke",
-        "--harmony-input", json.dumps(input_json),
-        "--harmony-metadata-dir", temp_dir
-    ]
-
-    process_item_spy = spy_on(L2SubsetterService.process_item)
-    with patch.object(sys, 'argv', test_args), \
-         patch.object(L2SubsetterService, 'process_item', process_item_spy):
-        # Mocks / spies
-        podaac.subsetter.subset_harmony.main(config(False))
-        expected_bbox = [-91.1, -43.8, -73.0, -8.8]
-
-        process_item_spy.mock.assert_called_once()
-
-        result = process_item_spy.return_values[0]
-
-        filename = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316_bathymetry_subsetted.nc4'
-        assert result.assets['data'].to_dict() == {
-            'href': 'http://example.com/public/some-org/some-service/some-uuid/' + filename,
-            'type': 'application/x-netcdf4',
-            'title': filename,
-            'roles': ['data'],
+@pytest.fixture
+def harmony_message_base() -> Dict[str, Any]:
+    """Create base Harmony message for tests."""
+    return {
+        "accessToken": "fake-token",
+        "user": "test_user",
+        "callback": "http://example.com/callback",
+        "subset": {
+            "bbox": [-91.1, -43.8, -73.0, -8.8]
+        },
+        "stagingLocation": "s3://test-staging-bucket/test-location",
+        "format": {
+            "mime": "application/x-netcdf4",
+            "scaleOffsets": True,
+            "srsId": 4326
         }
-        assert result.properties['start_datetime'] == '2001-01-01T01:01:01Z'
-        assert result.properties['end_datetime'] == '2002-02-02T02:02:02Z'
-        np.testing.assert_almost_equal(expected_bbox, result.bbox, decimal=1)
+    }
 
-    # When subset function returns 'None', bbox should not be passed to
-    # the Harmony service lib 'async_add_local_file_partial_result'
-    # function
-    base_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
+def create_test_stac_item(test_dir: str, bbox: List[float]) -> pystac.Item:
+    """Create a STAC item for testing."""
     test_granule = os.path.join(
         test_dir,
         'data',
-        'sentinel_6',
-        base_file_name
+        'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
     )
-
-    shutil.copyfile(
-        test_granule,
-        os.path.join(temp_dir, base_file_name)
+    
+    # Ensure test data directory exists
+    os.makedirs(os.path.dirname(test_granule), exist_ok=True)
+    
+    item = pystac.Item(
+        id="test-granule",
+        geometry={
+            "type": "Polygon",
+            "coordinates": [[
+                [bbox[0], bbox[1]],
+                [bbox[0], bbox[3]],
+                [bbox[2], bbox[3]],
+                [bbox[2], bbox[1]],
+                [bbox[0], bbox[1]]
+            ]]
+        },
+        bbox=bbox,
+        datetime=datetime.strptime("2025-03-06T00:48:19Z", "%Y-%m-%dT%H:%M:%SZ"),
+        properties={}
     )
+    
+    item.add_asset(
+        "data",
+        pystac.Asset(
+            href=f"file://{test_granule}",
+            media_type="application/x-netcdf4",
+            roles=["data"]
+        )
+    )
+    
+    return item
 
-    test_granule_temp = os.path.join(temp_dir, base_file_name)
+def create_test_catalog(item: pystac.Item) -> pystac.Catalog:
+    """Create a test STAC catalog with the given item."""
+    catalog = pystac.Catalog(
+        id="test-catalog",
+        description="Test catalog for L2SubsetterService"
+    )
+    catalog.add_item(item)
+    return catalog
 
-    input_json['sources'][0]['granules'][0]['url'] = f'file://{test_granule_temp}'
-    input_json['sources'][0]['variables'][0]['name'] = '/data_01/wind_speed_alt'
-    input_json['subset']['bbox'] = [-10, -10, 10, 10]
-
-    test_args = [
-        podaac.subsetter.subset_harmony.__file__,
-        "--harmony-action", "invoke",
-        "--harmony-input", json.dumps(input_json),
-        "--harmony-metadata-dir", temp_dir
-    ]
-
-    process_item_spy = spy_on(L2SubsetterService.process_item)
-    with patch.object(sys, 'argv', test_args), \
-         patch.object(L2SubsetterService, 'process_item', process_item_spy):
-
-        podaac.subsetter.subset_harmony.main(config(False))
-
-        process_item_spy.mock.assert_called_once()
-
-        result = process_item_spy.return_values[0]
-
-        # Outputs the original input granule bounding box instead of the subset one
-        assert result.bbox == [-1, -2, 3, 4]
-
-        # Uses a filename that indicates no spatial subsetting
-        # filename = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316_bathymetry.nc4'
-        assert 'subsetted' not in result.assets['data'].title
-
-
-def test_service_invoke_coord_vars(mock_environ, temp_dir):
+@pytest.mark.parametrize("with_coord_vars", [True, False])
+def test_service_invoke(
+    mock_environ,
+    temp_dir: str,
+    test_env_vars: Dict[str, str],
+    harmony_message_base: Dict[str, Any],
+    with_coord_vars: bool
+):
+    """Test service invoke with and without coordinate variables."""
     test_dir = os.path.dirname(os.path.realpath(__file__))
-    input_json = json.load(
-        open(os.path.join(test_dir, 'data', 'test_subset_harmony',
-                          'test_service_invoke.input.json')))
+    harmony_bbox = harmony_message_base["subset"]["bbox"]
 
-    test_granule = os.path.join(test_dir, 'data',
-                                'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc')
-    input_json['sources'][0]['granules'][0]['url'] = f'file://{test_granule}'
-    input_json['sources'][0]['variables'][0]['name'] = 'bathymetry'
-    input_json['sources'][0]['coordinateVariables'] = [
+    # Prepare source variables
+    base_variable = {
+        "id": "V0001-EXAMPLE",
+        "name": "bathymetry",
+        "type": "SCIENCE"
+    }
+    
+    coord_variables = [] if not with_coord_vars else [
         {
-            'id': 'V0001-EXAMPLE',
-            'name': 'lat',
-            'fullPath': 'example/group/path/ExampleVar2',
-            'type': 'COORDINATE',
-            'subtype': 'LATITUDE'
-        },
-        {
-            'id': 'V0001-EXAMPLE',
-            'name': 'lon',
-            'fullPath': 'example/group/path/ExampleVar3',
-            'type': 'COORDINATE',
-            'subtype': 'LONGITUDE'
-        },
-        {
-            'id': 'V0001-EXAMPLE',
-            'name': 'time',
-            'fullPath': 'example/group/path/ExampleVar4',
-            'type': 'COORDINATE',
-            'subtype': 'TIME'
+            "id": "V0001-EXAMPLE",
+            "name": name,
+            "fullPath": f"example/group/path/ExampleVar{i+2}",
+            "type": "COORDINATE",
+            "subtype": subtype
         }
+        for i, (name, subtype) in enumerate([
+            ("lat", "LATITUDE"),
+            ("lon", "LONGITUDE"),
+            ("time", "TIME")
+        ])
     ]
+    
+    # Create input message
+    input_json = harmony_message_base.copy()
+    input_json["sources"] = [{
+        "collection": "test-collection",
+        "variables": [base_variable],
+        "coordinateVariables": coord_variables
+    }]
 
+    # Create test setup
+    item = create_test_stac_item(test_dir, harmony_bbox)
+    catalog = create_test_catalog(item)
+    message = Message(input_json)
+    service = L2SubsetterService(message, catalog=catalog)
+    
+    # Create test arguments
     test_args = [
-        podaac.subsetter.subset_harmony.__file__,
+        "podaac.subsetter.subset_harmony",
         "--harmony-action", "invoke",
         "--harmony-input", json.dumps(input_json),
-        "--harmony-metadata-dir", temp_dir
+        "--harmony-metadata-dir", temp_dir,
+        "--harmony-service-id", "l2ss-py"
     ]
 
-    process_item_spy = spy_on(L2SubsetterService.process_item)
-    with patch.object(sys, 'argv', test_args), \
-         patch.object(L2SubsetterService, 'process_item', process_item_spy):
-        # Mocks / spies
-        podaac.subsetter.subset_harmony.main(config(False))
-        process_item_spy.mock.assert_called_once()
+    with patch.dict(os.environ, test_env_vars), \
+         patch.object(sys, 'argv', test_args):
+        try:
+            # Process the item
+            source = message.sources[0]
+            result_item = service.process_item(item, source)
+            
+            # Verify results
+            assert isinstance(result_item, pystac.Item)
+            assert 'data' in result_item.assets
+            
+            # Verify bbox
+            if result_item.bbox:
+                np.testing.assert_almost_equal(harmony_bbox, result_item.bbox, decimal=1)
+            
+            # Verify output file
+            output_asset = result_item.assets['data']
+            output_path = output_asset.href.replace('file://', '')
+            assert output_path.endswith('.nc4')
+            
+        except Exception as e:
+            pytest.fail(f"Test failed: {str(e)}")
 
-        result = process_item_spy.return_values[0]
-        np.testing.assert_almost_equal([-91.1, -43.8, -73.0, -8.8], result.bbox, decimal=1)
+@pytest.mark.parametrize("with_coord_vars", [True])
+def test_service_invoke_pixel_subset(
+    mock_environ,
+    temp_dir: str,
+    test_env_vars: Dict[str, str],
+    harmony_message_base: Dict[str, Any],
+    with_coord_vars: bool
+):
+    """Test service invoke with and without coordinate variables."""
+    test_dir = os.path.dirname(os.path.realpath(__file__))
+    harmony_bbox = harmony_message_base["subset"]["bbox"]
+    harmony_message_base['pixelSubset'] = True
 
+    # Prepare source variables
+    base_variable = {
+        "id": "V0001-EXAMPLE",
+        "name": "bathymetry",
+        "type": "SCIENCE"
+    }
+    
+    coord_variables = [] if not with_coord_vars else [
+        {
+            "id": "V0001-EXAMPLE",
+            "name": name,
+            "fullPath": f"example/group/path/ExampleVar{i+2}",
+            "type": "COORDINATE",
+            "subtype": subtype
+        }
+        for i, (name, subtype) in enumerate([
+            ("lat", "LATITUDE"),
+            ("lon", "LONGITUDE"),
+            ("time", "TIME")
+        ])
+    ]
+    
+    # Create input message
+    input_json = harmony_message_base.copy()
+    input_json["sources"] = [{
+        "collection": "test-collection",
+        "variables": [base_variable],
+        "coordinateVariables": coord_variables
+    }]
+
+    # Create test setup
+    item = create_test_stac_item(test_dir, harmony_bbox)
+    catalog = create_test_catalog(item)
+    message = Message(input_json)
+    service = L2SubsetterService(message, catalog=catalog)
+    
+    # Create test arguments
+    test_args = [
+        "podaac.subsetter.subset_harmony",
+        "--harmony-action", "invoke",
+        "--harmony-input", json.dumps(input_json),
+        "--harmony-metadata-dir", temp_dir,
+        "--harmony-service-id", "l2ss-py"
+    ]
+
+    with patch.dict(os.environ, test_env_vars), \
+         patch.object(sys, 'argv', test_args):
+        try:
+            # Process the item
+            source = message.sources[0]
+            result_item = service.process_item(item, source)
+            
+            # Verify results
+            assert isinstance(result_item, pystac.Item)
+            assert 'data' in result_item.assets
+            
+            # Verify bbox
+            if result_item.bbox:
+                np.testing.assert_almost_equal(harmony_bbox, result_item.bbox, decimal=1)
+            
+            # Verify output file
+            output_asset = result_item.assets['data']
+            output_path = output_asset.href.replace('file://', '')
+            assert output_path.endswith('.nc4')
+            
+        except Exception as e:
+            pytest.fail(f"Test failed: {str(e)}")

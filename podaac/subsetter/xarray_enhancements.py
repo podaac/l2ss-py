@@ -183,7 +183,7 @@ def get_variables_with_indexers(dataset, indexers):
     return subset_vars, no_subset_vars
 
 
-def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool) -> xr.Dataset:
+def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool, pixel_subset=False) -> xr.Dataset:
     """
     Return a dataset which meets the given condition.
 
@@ -199,7 +199,9 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     cut : boolean
         True if the scanline should be cut, False if the scanline should
         not be cut.
-
+    pixel_subset : boolean
+        Cut the lon lat based on the rows and columns within the bounding box,
+        but could result with lon lats that are outside the bounding box
     Returns
     -------
     xarray.Dataset
@@ -211,6 +213,7 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
     However in that mask, True represents valid data and False
     represents invalid data.
     """
+
     if cond.values.ndim == 1:
         indexers = get_indexers_from_1d(cond)
     else:
@@ -229,15 +232,62 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
 
     indexed_cond = cond.isel(**indexers)
     indexed_ds = dataset.isel(**indexers)
-    subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
-    # dataset with variables that need to be subsetted
-    new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
-    # data with variables that shouldn't be subsetted
-    new_dataset_non_sub = indexed_ds[non_subset_vars]
+    if pixel_subset:
+        # Directly assign indexed_ds to new_dataset when pixel_subset is True
+        new_dataset = indexed_ds
+    else:
+        # Get variables that should and shouldn't be subsetted
+        subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
-    # merge the datasets
-    new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
+        # Subset the indexed dataset based on the condition
+        subsetted_data = indexed_ds[subset_vars].where(indexed_cond)
+
+        # Extract data for variables that shouldn't be subsetted
+        non_subsetted_data = indexed_ds[non_subset_vars]
+
+        # Merge the subsetted and non-subsetted datasets
+        new_dataset = xr.merge([non_subsetted_data, subsetted_data])
+
+        process_dataset_variables(
+            new_dataset=new_dataset,
+            indexed_ds=indexed_ds,
+            dataset=dataset,
+            indexers=indexers,
+            partial_dim_in_in_vars=partial_dim_in_in_vars,
+            cond=cond,
+            pixel_subset=pixel_subset
+        )
+
+    dc.sync_dims_inplace(dataset, new_dataset)
+    return new_dataset
+
+
+def process_dataset_variables(new_dataset, indexed_ds, dataset, indexers, partial_dim_in_in_vars, cond, pixel_subset=False):
+    """
+    Process dataset variables by handling type casting, fill values, and dimension indexing.
+
+    Parameters:
+    -----------
+    new_dataset : xarray.Dataset
+        The target dataset to be modified
+    indexed_ds : xarray.Dataset
+        The indexed source dataset
+    dataset : xarray.Dataset
+        The original dataset
+    indexers : dict
+        Dictionary of dimension indices
+    partial_dim_in_in_vars : bool
+        Flag indicating if partial dimensions are in variables
+    cond : xarray.DataArray
+        Condition array for filtering
+    pixel_subset : bool, optional
+        Flag for pixel subsetting, defaults to False
+
+    Returns:
+    --------
+    None (modifies new_dataset in place)
+    """
 
     # Cast all variables to their original type
     for variable_name, variable in new_dataset.data_vars.items():
@@ -261,41 +311,37 @@ def where(dataset: xr.Dataset, cond: Union[xr.Dataset, xr.DataArray], cut: bool)
         elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
                 indexers.keys()).intersection(new_dataset[variable_name].dims):
             new_dataset[variable_name] = indexed_var
-
             new_dataset[variable_name].attrs = indexed_var.attrs
             variable.attrs = indexed_var.attrs
+
         # Check if variable has no _FillValue. If so, use original data
-        if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
+        if not pixel_subset:
+            if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
+                if original_type != new_type:
+                    new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
+                                                                str(original_type), dask='allowed',
+                                                                keep_attrs=True)
 
-            if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
-                                                            str(original_type), dask='allowed',
-                                                            keep_attrs=True)
+                # Replace nans with values from original dataset. If the
+                # variable has more than one dimension, copy the entire
+                # variable over, otherwise use a NaN mask to copy over the
+                # relevant values.
+                new_dataset[variable_name] = indexed_var
+                new_dataset[variable_name].attrs = indexed_var.attrs
+                variable.attrs = indexed_var.attrs
+                new_dataset[variable_name].encoding['_FillValue'] = None
+                variable.encoding['_FillValue'] = None
 
-            # Replace nans with values from original dataset. If the
-            # variable has more than one dimension, copy the entire
-            # variable over, otherwise use a NaN mask to copy over the
-            # relevant values.
-            new_dataset[variable_name] = indexed_var
-
-            new_dataset[variable_name].attrs = indexed_var.attrs
-            variable.attrs = indexed_var.attrs
-            new_dataset[variable_name].encoding['_FillValue'] = None
-            variable.encoding['_FillValue'] = None
-
-        else:
-            # Manually replace nans with FillValue
-            # If variable represents time, cast _FillValue to datetime
-            fill_value = new_dataset[variable_name].attrs.get('_FillValue')
-            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
-                fill_value = np.datetime64('nat')
-            if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
-                fill_value = np.timedelta64('nat')
-            new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
-            if original_type != new_type:
-                new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
-                                                            str(original_type), dask='allowed',
-                                                            keep_attrs=True)
-
-    dc.sync_dims_inplace(dataset, new_dataset)
-    return new_dataset
+            else:
+                # Manually replace nans with FillValue
+                # If variable represents time, cast _FillValue to datetime
+                fill_value = new_dataset[variable_name].attrs.get('_FillValue')
+                if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
+                    fill_value = np.datetime64('nat')
+                if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
+                    fill_value = np.timedelta64('nat')
+                new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
+                if original_type != new_type:
+                    new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
+                                                                str(original_type), dask='allowed',
+                                                                keep_attrs=True)
