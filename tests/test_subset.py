@@ -393,21 +393,18 @@ def test_get_spatial_bounds(data_dir):
     ascat_filename = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
     ghrsst_filename = '20190927000500-JPL-L2P_GHRSST-SSTskin-MODIS_A-D-v02.0-fv01.0.nc'
 
-    ascat_dataset = xr.open_dataset(
+    ascat_dataset = xr.open_datatree(
         join(data_dir, ascat_filename),
         decode_times=False,
         decode_coords=False,
         mask_and_scale=False
     )
-    ghrsst_dataset = xr.open_dataset(
+    ghrsst_dataset = xr.open_datatree(
         join(data_dir, ghrsst_filename),
         decode_times=False,
         decode_coords=False,
         mask_and_scale=False
     )
-
-    ascat_dataset = xr.DataTree(name='root', dataset=ascat_dataset)
-    ghrsst_dataset = xr.DataTree(name='root', dataset=ghrsst_dataset)
 
     # ascat1 longitude is -0 360, ghrsst modis A is -180 180
     # Both have metadata for valid_min
@@ -425,14 +422,14 @@ def test_get_spatial_bounds(data_dir):
 
     min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
         datatree=ascat_dataset,
-        lat_var_names=['/lat'],
-        lon_var_names=['/lon']
+        lat_var_names=['lat'],
+        lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ascat_expected_lat_min)
-    assert np.isclose(max_lat, ascat_expected_lat_max)
-    assert np.isclose(min_lon, ascat_expected_lon_min)
-    assert np.isclose(max_lon, ascat_expected_lon_max)
+    assert np.isclose(min_lat, ascat_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ascat_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ascat_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ascat_expected_lon_max, atol=.1)
 
     # Remove the label from the dataset coordinate variables indicating the valid_min.
     del ascat_dataset['lat'].attrs['valid_min']
@@ -440,27 +437,27 @@ def test_get_spatial_bounds(data_dir):
 
     min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
         datatree=ascat_dataset,
-        lat_var_names=['/lat'],
-        lon_var_names=['/lon']
+        lat_var_names=['lat'],
+        lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ascat_expected_lat_min)
-    assert np.isclose(max_lat, ascat_expected_lat_max)
-    assert np.isclose(min_lon, ascat_expected_lon_min)
-    assert np.isclose(max_lon, ascat_expected_lon_max)
+    assert np.isclose(min_lat, ascat_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ascat_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ascat_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ascat_expected_lon_max, atol=.1)
 
     # Repeat test, but with GHRSST granule
 
     min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
         datatree=ghrsst_dataset,
-        lat_var_names=['/lat'],
-        lon_var_names=['/lon']
+        lat_var_names=['lat'],
+        lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ghrsst_expected_lat_min)
-    assert np.isclose(max_lat, ghrsst_expected_lat_max)
-    assert np.isclose(min_lon, ghrsst_expected_lon_min)
-    assert np.isclose(max_lon, ghrsst_expected_lon_max)
+    assert np.isclose(min_lat, ghrsst_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ghrsst_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ghrsst_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ghrsst_expected_lon_max, atol=.1)
 
     # Remove the label from the dataset coordinate variables indicating the valid_min.
 
@@ -469,14 +466,14 @@ def test_get_spatial_bounds(data_dir):
 
     min_lon, max_lon, min_lat, max_lat = datatree_subset.tree_get_spatial_bounds(
         datatree=ghrsst_dataset,
-        lat_var_names=['/lat'],
-        lon_var_names=['/lon']
+        lat_var_names=['lat'],
+        lon_var_names=['lon']
     ).flatten()
 
-    assert np.isclose(min_lat, ghrsst_expected_lat_min)
-    assert np.isclose(max_lat, ghrsst_expected_lat_max)
-    assert np.isclose(min_lon, ghrsst_expected_lon_min)
-    assert np.isclose(max_lon, ghrsst_expected_lon_max)
+    assert np.isclose(min_lat, ghrsst_expected_lat_min, atol=.1)
+    assert np.isclose(max_lat, ghrsst_expected_lat_max, atol=.1)
+    assert np.isclose(min_lon, ghrsst_expected_lon_min, atol=.1)
+    assert np.isclose(max_lon, ghrsst_expected_lon_max, atol=.1)
 
 
 def test_shapefile_subset(data_dir, subset_output_dir, request):

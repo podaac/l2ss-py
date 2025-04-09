@@ -77,6 +77,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
+    
     # Non-data vars are by default included in the result
     non_data_vars = set(in_ds.variables.keys()) - set(in_ds.data_vars.keys())
 

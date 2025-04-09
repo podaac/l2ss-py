@@ -232,7 +232,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
                 # Merge the datasets
                 new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
-            
+
             new_dataset.attrs.update(dataset.attrs)
 
             # Cast all variables to their original type
@@ -727,12 +727,6 @@ def get_variable_from_path(datatree: Any, path: str) -> Optional[Union[xr.DataAr
         return None
 
 
-def get_path(s):
-    """Extracts the path by removing the last part after the final '/'."""
-    path = s.rsplit('/', 1)[0] if '/' in s else s
-    return f"/{path}"
-
-
 def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     """Remove scale and offset from the given value"""
     return (value * scale) - offset
@@ -766,9 +760,6 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
             # Get variables from paths
             lat_data = get_variable_from_path(datatree, lat_var_name)
             lon_data = get_variable_from_path(datatree, lon_var_name)
-
-            if get_path(lat_var_name) != get_path(lon_var_name):
-                continue
 
             # Get metadata attributes efficiently
             lat_attrs = lat_data.attrs

@@ -634,25 +634,21 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
 
     def build_cond(str_timestamp, compare):
         timestamp = translate_timestamp(str_timestamp)
+        time_data = dataset[time_var_name]
 
-        time_var = get_variable_data(dataset, time_var_name)
-
-        if np.issubdtype(time_var.dtype, np.dtype(np.datetime64)):
-            timestamp = pd.to_datetime(timestamp)
-        if np.issubdtype(time_var.dtype, np.dtype(np.timedelta64)):
+        if np.issubdtype(time_data.dtype, np.datetime64):
+            timestamp = pd.to_datetime(timestamp).to_datetime64()
+        elif np.issubdtype(time_data.dtype, np.timedelta64):
             if is_time_mjd(dataset, time_var_name):
                 mjd_datetime = datetime_from_mjd(dataset, time_var_name)
                 if mjd_datetime is None:
                     raise ValueError('Unable to get datetime from dataset to calculate time delta')
-
-                # timedelta between timestamp and mjd
                 timestamp = np.datetime64(timestamp) - np.datetime64(mjd_datetime)
             else:
                 epoch_time_var_name = get_time_epoch_var(dataset, time_var_name)
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
-        time_data = time_var
         if getattr(time_data, 'long_name', None) == "reference time of sst file":
             timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
             time_data = time_data + timedelta_seconds
@@ -1048,7 +1044,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
-           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (), 
+           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (),
            pixel_subset: bool = False, stage_file_name_subsetted_true: str = None,
            stage_file_name_subsetted_false: str = None
            ) -> Union[np.ndarray, None]:
@@ -1210,7 +1206,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,
-                max_time=max_time
+                max_time=max_time,
+                pixel_subset=pixel_subset
             )
         else:
             raise ValueError('Either bbox or shapefile must be provided')
@@ -1221,7 +1218,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
         encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset)
-        subsetted_dataset.to_netcdf(output_file, encoding=encoding)
 
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
             subsetted_dataset,
@@ -1237,7 +1233,10 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                             stage_file_name_subsetted_true,
                             stage_file_name_subsetted_false)
 
+        subsetted_dataset.to_netcdf(output_file, encoding=encoding)
+
         return spatial_bounds_array
+
 
 def update_netcdf_attrs(output_file: str,
                         dataset: xr.DataTree,
@@ -1283,63 +1282,59 @@ def update_netcdf_attrs(output_file: str,
             lons_easternmost.append(eastmost)
             lons_westernmost.append(westmost)
 
-    with nc.Dataset(output_file, 'a') as dataset_attr:
-        original_attrs = dataset_attr.ncattrs()
+    def set_attr_with_type(tree: DataTree, attr_name: str, value: Any) -> None:
+        """Set attribute on a DataTree node while preserving its original type, if it exists."""
+        original_attrs = tree.attrs
+        if attr_name in original_attrs:
+            original_type = type(original_attrs[attr_name])
+            tree.attrs[attr_name] = original_type(value)
 
-        def set_attr_with_type(attr_name: str, value: Any) -> None:
-            """Set attribute while preserving its original type if it exists."""
-            if attr_name in original_attrs:
-                original_type = type(dataset_attr.getncattr(attr_name))
-                dataset_attr.setncattr(attr_name, original_type(value))
+    if spatial_bounds_array is not None:
+        # Define geographical bounds mapping
+        bounds_mapping = {
+            'geospatial_lat_max': (1, 1),
+            'geospatial_lat_min': (1, 0)
+        }
 
-        if spatial_bounds_array is not None:
-            # Define geographical bounds mapping
-            bounds_mapping = {
-                'geospatial_lat_max': (1, 1),
-                'geospatial_lat_min': (1, 0)
-            }
+        for attr_name, (i, j) in bounds_mapping.items():
+            set_attr_with_type(dataset, attr_name, spatial_bounds_array[i][j])
 
-            # Set all geographic bounds attributes
-            for attr_name, (i, j) in bounds_mapping.items():
-                set_attr_with_type(attr_name, spatial_bounds_array[i][j])
+        # Remove deprecated center coordinates
+        deprecated_keys = {
+            "start_center_longitude",
+            "start_center_latitude",
+            "end_center_longitude",
+            "end_center_latitude",
+            "northernmost_latitude",
+            "southernmost_latitude",
+            "easternmost_longitude",
+            "westernmost_longitude"
+        }
 
-            # Remove deprecated center coordinates
-            deprecated_keys = {
-                "start_center_longitude",
-                "start_center_latitude",
-                "end_center_longitude",
-                "end_center_latitude",
-                "northernmost_latitude",
-                "southernmost_latitude",
-                "easternmost_longitude",
-                "westernmost_longitude"
-            }
+        for key in deprecated_keys & dataset.attrs.keys():
+            del dataset.attrs[key]
 
-            # Safely remove deprecated attributes if they exist
-            for key in deprecated_keys & set(dataset_attr.ncattrs()):
-                dataset_attr.delncattr(key)
+        # Set CRS and bounds
+        if lons_westernmost:
+            final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+            set_attr_with_type(dataset, "geospatial_lon_min", final_westmost)
+        if lons_easternmost:
+            final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+            set_attr_with_type(dataset, "geospatial_lon_max", final_eastmost)
+        dataset.attrs["geospatial_bounds_crs"] = "EPSG:4326"
+        geospatial_bounds = (
+            create_geospatial_bounds(dataset, lon_var_names, lat_var_names)
+            or create_geospatial_bounding_box(spatial_bounds_array, final_eastmost, final_westmost)
+        )
+        dataset.attrs["geospatial_bounds"] = geospatial_bounds
 
-            # Set CRS and bounds
-            if lons_westernmost:
-                final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-                set_attr_with_type("geospatial_lon_min", final_westmost)
-            if lons_easternmost:
-                final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-                set_attr_with_type("geospatial_lon_max", final_eastmost)
-            dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
-            geospatial_bounds = (
-                create_geospatial_bounds(dataset, lon_var_names, lat_var_names)
-                or create_geospatial_bounding_box(spatial_bounds_array, final_eastmost, final_westmost)
-            )
-            dataset_attr.setncattr("geospatial_bounds", geospatial_bounds)
+    # Set product name based on conditions
+    has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
+    product_name = (stage_file_name_subsetted_true if has_spatial_bounds and stage_file_name_subsetted_true
+                    else stage_file_name_subsetted_false if stage_file_name_subsetted_false
+                    else output_file)
 
-        # Set product name based on conditions
-        has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
-        product_name = (stage_file_name_subsetted_true if has_spatial_bounds and stage_file_name_subsetted_true
-                        else stage_file_name_subsetted_false if stage_file_name_subsetted_false
-                        else output_file)
-
-        set_attr_with_type('product_name', product_name)
+    set_attr_with_type(dataset, "product_name", product_name)
 
 
 def create_geospatial_bounding_box(spatial_bounds_array, east, west):
@@ -1403,19 +1398,36 @@ def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
 
         break
 
+    lon_scale = lon.attrs.get('scale_factor', 1.0)
+    lon_offset = lon.attrs.get('add_offset', 0.0)
+
+    lat_scale = lat.attrs.get('scale_factor', 1.0)
+    lat_offset = lat.attrs.get('add_offset', 0.0)
+
     # Check if the variables are 2D arrays
     if lon.ndim != 2 or lat.ndim != 2:
-        print("WHAT")
         return None
 
     # Get the shape of the arrays (assuming they are the same shape)
     nrows, ncols = lon.shape
 
     points = [
-        (lon[0, 0], lat[0, 0]),        # Top-left
-        (lon[nrows - 1, 0], lat[nrows - 1, 0]),  # Bottom-left
-        (lon[nrows - 1, ncols - 1], lat[nrows - 1, ncols - 1]),  # Bottom-right
-        (lon[0, ncols - 1], lat[0, ncols - 1])   # Top-right
+        (
+            float(remove_scale_offset(lon[0, 0], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[0, 0], lat_scale, lat_offset))
+        ),
+        (
+            float(remove_scale_offset(lon[nrows - 1, 0], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[nrows - 1, 0], lat_scale, lat_offset))
+        ),
+        (
+            float(remove_scale_offset(lon[nrows - 1, ncols - 1], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[nrows - 1, ncols - 1], lat_scale, lat_offset))
+        ),
+        (
+            float(remove_scale_offset(lon[0, ncols - 1], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[0, ncols - 1], lat_scale, lat_offset))
+        )
     ]
 
     # Check for NaN or fill values in corner points
@@ -1471,7 +1483,10 @@ def get_east_west_lon(dataset, lon_var_name):
     """
 
     lon_2d = datatree_subset.get_variable_from_path(dataset, lon_var_name)
-    print(lon_2d)
+
+    if lon_2d is None:
+        return None, None
+
     fill_value = lon_2d.attrs.get('_FillValue', None)
 
     lon_flat = lon_2d.values.flatten()
