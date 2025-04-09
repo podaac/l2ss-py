@@ -151,7 +151,7 @@ def get_sibling_or_parent_condition(condition_dict, path):
     return condition_dict.get("/", None)
 
 
-def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
+def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
     Return a DataTree which meets the given condition, processing all nodes in the tree.
 
@@ -163,6 +163,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
         Locations at which to preserve this object's values
     cut : boolean
         True if the scanline should be cut, False if not
+    pixel_subset : boolean
+        Cut the lon lat based on the rows and columns within the bounding box,
+        but could result with lon lats that are outside the bounding box
 
     Returns
     -------
@@ -217,15 +220,19 @@ def where_tree(tree: DataTree, condition_dict, cut: bool) -> DataTree:
             # test to make it pass test_omi_novars_subset
             indexed_ds = dataset.isel(**indexers, missing_dims='ignore')
 
-            # Get variables with and without indexers
-            subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
-            new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
+            if pixel_subset:
+                new_dataset = indexed_ds
+            else:
+                # Get variables with and without indexers
+                subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
+                new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
 
-            # data with variables that shouldn't be subsetted
-            new_dataset_non_sub = indexed_ds[non_subset_vars]
+                # data with variables that shouldn't be subsetted
+                new_dataset_non_sub = indexed_ds[non_subset_vars]
 
-            # Merge the datasets
-            new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
+                # Merge the datasets
+                new_dataset = xr.merge([new_dataset_non_sub, new_dataset_sub])
+            
             new_dataset.attrs.update(dataset.attrs)
 
             # Cast all variables to their original type
@@ -726,6 +733,11 @@ def get_path(s):
     return f"/{path}"
 
 
+def remove_scale_offset(value: float, scale: float, offset: float) -> float:
+    """Remove scale and offset from the given value"""
+    return (value * scale) - offset
+
+
 def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_var_names: List[str]) -> Union[np.ndarray, None]:
     """
     Get the spatial bounds for this dataset tree. These values are masked and scaled.
@@ -785,21 +797,29 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
             if len(lats) == 0 or len(lons) == 0:
                 continue
 
-            # Calculate bounds efficiently using vectorized operations
-            min_lat = round((np.nanmin(lats) * lat_scale) - lat_offset, 1)
-            max_lat = round((np.nanmax(lats) * lat_scale) - lat_offset, 1)
-            min_lon = round((np.nanmin(lons) * lon_scale) - lon_offset, 1)
-            max_lon = round((np.nanmax(lons) * lon_scale) - lon_offset, 1)
+            original_min_lat = remove_scale_offset(np.nanmin(lats), lat_scale, lat_offset)
+            original_max_lat = remove_scale_offset(np.nanmax(lats), lat_scale, lat_offset)
+            original_min_lon = remove_scale_offset(np.nanmin(lons), lon_scale, lon_offset)
+            original_max_lon = remove_scale_offset(np.nanmax(lons), lon_scale, lon_offset)
 
-            # Handle longitude conversion to [-180, 180] format
+            min_lat = round(original_min_lat, 5)
+            max_lat = round(original_max_lat, 5)
+            min_lon = round(original_min_lon, 1)
+            max_lon = round(original_max_lon, 1)
+
+            # Convert longitude to [-180,180] format
             if lon_valid_min == 0 or 0 <= min_lon <= max_lon <= 360:
-                if min_lon > 180:
-                    min_lon -= 360
-                if max_lon > 180:
-                    max_lon -= 360
+                min_lon = (min_lon - 360) if min_lon > 180 else min_lon
+                max_lon = (max_lon - 360) if max_lon > 180 else max_lon
                 if min_lon == max_lon:
-                    min_lon = -180
-                    max_lon = 180
+                    min_lon, max_lon = -180, 180
+
+            # After rounding to 1 if not at the edges then round to 5
+            if min_lon != -180:
+                min_lon = round((original_min_lon - 360) if original_min_lon > 180 else original_min_lon, 5)
+
+            if max_lon != 180:
+                max_lon = round((original_max_lon - 360) if original_max_lon > 180 else original_max_lon, 5)
 
             min_lats.append(min_lat)
             max_lats.append(max_lat)

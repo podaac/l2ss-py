@@ -23,7 +23,7 @@ import functools
 import json
 import operator
 import os
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dateutil
 from dateutil import parser
@@ -769,7 +769,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      bbox: np.ndarray = None,
                      cut: bool = True,
                      min_time: str = None,
-                     max_time: str = None) -> np.ndarray:
+                     max_time: str = None,
+                     pixel_subset: bool = False) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -793,6 +794,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         ISO timestamp of min temporal bound
     max_time : str
         ISO timestamp of max temporal bound
+    pixel_subset : boolean
+        Cut the lon lat based on the rows and columns within the bounding box,
+        but could result with lon lats that are outside the bounding box
+
     TODO: add docstring and type hint for `variables` parameter.
 
     Returns
@@ -831,7 +836,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         if lat_path == lon_path and lat_path == time_path and lon_path == time_path:
             subset_dictionary[lat_path] = operation
 
-    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut)
+    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
     return return_dataset
 
 
@@ -1043,7 +1048,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            # pylint: disable=too-many-branches, disable=too-many-statements
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
-           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = ()
+           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (), 
+           pixel_subset: bool = False, stage_file_name_subsetted_true: str = None,
+           stage_file_name_subsetted_false: str = None
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -1095,6 +1102,13 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         variables for this granule. This list will only contain more
         than one value in the case where there are multiple groups and
         different coordinate variables for each group.
+    pixel_subset : boolean
+        Cut the lon lat based on the rows and columns within the bounding box,
+        but could result with lon lats that are outside the bounding box
+    stage_file_name_subsetted_true: str
+        stage file name if subsetting is true name depends on result of subset
+    stage_file_name_subsetted_false: str
+        stage file name if subsetting is false name depends on result of subset
 
     # clean up time variable in SNDR before decode_times
     # SNDR.AQUA files have ascending node time blank
@@ -1186,9 +1200,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
 
         if shapefile:
-            datasets = subset_with_shapefile_multi(dataset, lat_var_names, lon_var_names, shapefile, cut, chunks)
+            subsetted_dataset = subset_with_shapefile_multi(dataset, lat_var_names, lon_var_names, shapefile, cut, chunks)
         elif bbox is not None:
-            datasets = subset_with_bbox(
+            subsetted_dataset = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
                 lon_var_names=lon_var_names,
@@ -1201,16 +1215,299 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
-        set_version_history(datasets, cut, bbox, shapefile)
-        set_json_history(datasets, cut, file_to_subset, bbox, shapefile, origin_source)
+        set_version_history(subsetted_dataset, cut, bbox, shapefile)
+        set_json_history(subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source)
 
-        datasets = datatree_subset.clean_inherited_coords(datasets)
+        subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
-        encoding = datatree_subset.prepare_basic_encoding(datasets)
-        datasets.to_netcdf(output_file, encoding=encoding)
+        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset)
+        subsetted_dataset.to_netcdf(output_file, encoding=encoding)
 
-        return datatree_subset.tree_get_spatial_bounds(
-            datasets,
+        spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
+            subsetted_dataset,
             lat_var_names,
             lon_var_names
         )
+
+        update_netcdf_attrs(output_file,
+                            subsetted_dataset,
+                            lon_var_names,
+                            lat_var_names,
+                            spatial_bounds_array,
+                            stage_file_name_subsetted_true,
+                            stage_file_name_subsetted_false)
+
+        return spatial_bounds_array
+
+def update_netcdf_attrs(output_file: str,
+                        dataset: xr.DataTree,
+                        lon_var_names: List[str],
+                        lat_var_names: List[str],
+                        spatial_bounds_array: Optional[list] = None,
+                        stage_file_name_subsetted_true: Optional[str] = None,
+                        stage_file_name_subsetted_false: Optional[str] = None) -> None:
+    """
+    Update NetCDF file attributes with spatial bounds and product name information.
+
+    Args:
+        output_file (str): Path to the NetCDF file to be updated
+        dataset (xr.DataTree): xarray data tree
+        lon_var_names (list): List of possible longitude variable names
+        lat_var_names (list): List of possible latitude variable names
+        spatial_bounds_array (list, optional): Nested list containing spatial bounds in format:
+            [[lon_min, lon_max], [lat_min, lat_max]]
+        stage_file_name_subsetted_true (str, optional): Product name when subset is True
+        stage_file_name_subsetted_false (str, optional): Product name when subset is False
+
+    Notes:
+        - Updates various geospatial attributes in the NetCDF file
+        - Removes deprecated center coordinate attributes
+        - Sets the product name based on provided parameters
+        - Preserves original attribute types when setting new values
+
+    Example:
+        >>> spatial_bounds = [[120.5, 130.5], [-10.5, 10.5]]
+        >>> update_netcdf_attrs("output.nc", datasets, ["lon"], spatial_bounds, "subset_true.nc", "subset_false.nc")
+    """
+
+    lons_easternmost = []
+    lons_westernmost = []
+    final_eastmost = None
+    final_westmost = None
+
+    for lon_var_name in lon_var_names:
+
+        eastmost, westmost = get_east_west_lon(dataset, lon_var_name)
+
+        if eastmost and westmost:
+            lons_easternmost.append(eastmost)
+            lons_westernmost.append(westmost)
+
+    with nc.Dataset(output_file, 'a') as dataset_attr:
+        original_attrs = dataset_attr.ncattrs()
+
+        def set_attr_with_type(attr_name: str, value: Any) -> None:
+            """Set attribute while preserving its original type if it exists."""
+            if attr_name in original_attrs:
+                original_type = type(dataset_attr.getncattr(attr_name))
+                dataset_attr.setncattr(attr_name, original_type(value))
+
+        if spatial_bounds_array is not None:
+            # Define geographical bounds mapping
+            bounds_mapping = {
+                'geospatial_lat_max': (1, 1),
+                'geospatial_lat_min': (1, 0)
+            }
+
+            # Set all geographic bounds attributes
+            for attr_name, (i, j) in bounds_mapping.items():
+                set_attr_with_type(attr_name, spatial_bounds_array[i][j])
+
+            # Remove deprecated center coordinates
+            deprecated_keys = {
+                "start_center_longitude",
+                "start_center_latitude",
+                "end_center_longitude",
+                "end_center_latitude",
+                "northernmost_latitude",
+                "southernmost_latitude",
+                "easternmost_longitude",
+                "westernmost_longitude"
+            }
+
+            # Safely remove deprecated attributes if they exist
+            for key in deprecated_keys & set(dataset_attr.ncattrs()):
+                dataset_attr.delncattr(key)
+
+            # Set CRS and bounds
+            if lons_westernmost:
+                final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+                set_attr_with_type("geospatial_lon_min", final_westmost)
+            if lons_easternmost:
+                final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+                set_attr_with_type("geospatial_lon_max", final_eastmost)
+            dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
+            geospatial_bounds = (
+                create_geospatial_bounds(dataset, lon_var_names, lat_var_names)
+                or create_geospatial_bounding_box(spatial_bounds_array, final_eastmost, final_westmost)
+            )
+            dataset_attr.setncattr("geospatial_bounds", geospatial_bounds)
+
+        # Set product name based on conditions
+        has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
+        product_name = (stage_file_name_subsetted_true if has_spatial_bounds and stage_file_name_subsetted_true
+                        else stage_file_name_subsetted_false if stage_file_name_subsetted_false
+                        else output_file)
+
+        set_attr_with_type('product_name', product_name)
+
+
+def create_geospatial_bounding_box(spatial_bounds_array, east, west):
+    """
+    Generate a Well-Known Text (WKT) POLYGON string representing the geospatial bounds.
+
+    The polygon is defined using the min/max longitude and latitude values and follows
+    the format: "POLYGON ((lon_min lat_min, lon_max lat_min, lon_max lat_max,
+                           lon_min lat_max, lon_min lat_min))"
+
+    This ensures the polygon forms a closed loop.
+
+    Parameters:
+    -----------
+    spatial_bounds_array : list of lists
+        A 2D list where:
+        - spatial_bounds_array[0] contains [lon_min, lon_max]
+        - spatial_bounds_array[1] contains [lat_min, lat_max]
+    east: float or None
+        - longitude spacial bound east
+    west: float or None
+        - longitude spacial bound west
+    Returns:
+    --------
+    str
+        A WKT POLYGON string representing the bounding box.
+
+    Example:
+    --------
+    >>> spatial_bounds = [[81.489693, 85.129562], [-78.832314, 49.646988]]
+    >>> create_geospatial_bounds(spatial_bounds)
+    'POLYGON ((81.489693 -78.832314, 85.129562 -78.832314, 85.129562 49.646988, 81.489693 49.646988, 81.489693 -78.832314))'
+    """
+    lon_min, lon_max = spatial_bounds_array[0]
+    lat_min, lat_max = spatial_bounds_array[1]
+
+    if east:
+        lon_min = east
+    if west:
+        lon_max = west
+
+    # Construct the WKT polygon string (ensuring the loop closes)
+    wkt_polygon = (
+        f"POLYGON (({lon_min:.5f} {lat_min:.5f}, {lon_max:.5f} {lat_min:.5f}, "
+        f"{lon_max:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_min:.5f}))"
+    )
+
+    return wkt_polygon
+
+
+def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
+    """Create geospatial bounds from 4 corners of 2d array"""
+
+    for lon_var_name, lat_var_name in zip(lon_var_names, lat_var_names):
+
+        lon = datatree_subset.get_variable_from_path(dataset, lon_var_name)
+        lat = datatree_subset.get_variable_from_path(dataset, lat_var_name)
+
+        lon_fill_value = lon.attrs.get('_FillValue', None)
+        lat_fill_value = lat.attrs.get('_FillValue', None)
+
+        break
+
+    # Check if the variables are 2D arrays
+    if lon.ndim != 2 or lat.ndim != 2:
+        print("WHAT")
+        return None
+
+    # Get the shape of the arrays (assuming they are the same shape)
+    nrows, ncols = lon.shape
+
+    points = [
+        (lon[0, 0], lat[0, 0]),        # Top-left
+        (lon[nrows - 1, 0], lat[nrows - 1, 0]),  # Bottom-left
+        (lon[nrows - 1, ncols - 1], lat[nrows - 1, ncols - 1]),  # Bottom-right
+        (lon[0, ncols - 1], lat[0, ncols - 1])   # Top-right
+    ]
+
+    # Check for NaN or fill values in corner points
+    if any(np.isnan(point[0]) or np.isnan(point[1]) or point[0] == lon_fill_value or point[1] == lat_fill_value for point in points):
+        return None
+
+    # Sort points in counter-clockwise order
+    sorted_points = ensure_counter_clockwise(points)
+
+    # Create a counter-clockwise WKT polygon with precision 5
+    wkt_polygon = (
+        f"POLYGON(({sorted_points[0][0]:.5f} {sorted_points[0][1]:.5f}, "
+        f"{sorted_points[1][0]:.5f} {sorted_points[1][1]:.5f}, "
+        f"{sorted_points[2][0]:.5f} {sorted_points[2][1]:.5f}, "
+        f"{sorted_points[3][0]:.5f} {sorted_points[3][1]:.5f}, "
+        f"{sorted_points[0][0]:.5f} {sorted_points[0][1]:.5f}))"
+    )
+
+    return wkt_polygon
+
+
+def shoelace_area(points):
+    """Computes the signed area of a polygon.
+       Negative area → Counterclockwise
+       Positive area → Clockwise (needs reversing)
+    """
+    x, y = np.array(points)[:, 0], np.array(points)[:, 1]
+    return 0.5 * np.sum(x[:-1] * y[1:] - x[1:] * y[:-1])
+
+
+def ensure_counter_clockwise(points):
+    """Ensures the points are ordered counterclockwise."""
+    area = shoelace_area(points)
+    if area > 0:  # Clockwise → Reverse order
+        return points[::-1]
+    return points
+
+
+def get_east_west_lon(dataset, lon_var_name):
+    """
+    Determines the easternmost and westernmost longitudes from a dataset,
+    correctly handling cases where the data crosses the antimeridian.
+
+    Parameters:
+        dataset: xarray.Dataset or similar
+            The dataset containing longitude values.
+        lon_var_name: str
+            The name of the longitude variable in the dataset.
+
+    Returns:
+        tuple: (westmost, eastmost)
+            The westernmost and easternmost longitudes in [-180, 180] range.
+    """
+
+    lon_2d = datatree_subset.get_variable_from_path(dataset, lon_var_name)
+    print(lon_2d)
+    fill_value = lon_2d.attrs.get('_FillValue', None)
+
+    lon_flat = lon_2d.values.flatten()
+    if fill_value is not None:
+        lon_flat = lon_flat[lon_flat != fill_value]
+    lon_flat = lon_flat[~np.isnan(lon_flat)]
+    if lon_flat.size == 0:
+        return None, None  # No valid longitude data
+
+    crosses_antimeridian = np.any((lon_flat[:-1] > 150) & (lon_flat[1:] < -150))
+
+    # Convert longitudes to [0, 360] range
+    lon_360 = np.where(lon_flat < 0, lon_flat + 360, lon_flat)
+
+    # Sort longitudes
+    lon_sorted = np.sort(lon_360)
+
+    # Compute gaps
+    gaps = np.diff(lon_sorted)
+    wrap_gap = lon_sorted[0] + 360 - lon_sorted[-1]
+    gaps = np.append(gaps, wrap_gap)
+
+    # Find the largest gap
+    max_gap_index = np.argmax(gaps)
+
+    if crosses_antimeridian:
+        eastmost_360 = lon_sorted[max_gap_index]
+        westmost_360 = lon_sorted[(max_gap_index + 1) % len(lon_sorted)]
+    else:
+        eastmost_360 = np.max(lon_flat)
+        westmost_360 = np.min(lon_flat)
+
+    def convert_to_standard(lon):
+        return lon - 360 if lon > 180 else lon
+
+    eastmost = round(convert_to_standard(eastmost_360), 5)
+    westmost = round(convert_to_standard(westmost_360), 5)
+
+    return eastmost, westmost

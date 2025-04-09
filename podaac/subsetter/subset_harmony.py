@@ -147,7 +147,6 @@ class L2SubsetterService(BaseHarmonyAdapter):
         temp_dir = mkdtemp()
         output_dir = self.data_dir
         self.prepare_output_dir(output_dir)
-
         try:
             # Get the data file
             asset = next(v for k, v in item.assets.items() if 'data' in (v.roles or []))
@@ -182,6 +181,9 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 subset_params['min_time'] = message.temporal.start
                 subset_params['max_time'] = message.temporal.end
 
+            if message.pixelSubset:
+                subset_params['pixel_subset'] = message.pixelSubset
+
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
 
             try:
@@ -207,7 +209,21 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             subset_params['output_file'] = f'{output_dir}/{os.path.basename(input_filename)}'
             subset_params['file_to_subset'] = input_filename
-            subset_params['origin_source'] = asset.href
+
+            operations = {
+                "variable_subset": subset_params.get('variables'),
+                "is_subsetted": True
+            }
+            staged_filename_true = generate_output_filename(asset.href, '.nc4', **operations)
+
+            operations = {
+                "variable_subset": subset_params.get('variables'),
+                "is_subsetted": False
+            }
+            staged_filename_false = generate_output_filename(asset.href, '.nc4', **operations)
+
+            subset_params['stage_file_name_subsetted_true'] = staged_filename_true
+            subset_params['stage_file_name_subsetted_false'] = staged_filename_false
 
             self.logger.info('Calling l2ss-py subset with params %s', subset_params)
             result_bbox = subset.subset(**subset_params)
