@@ -1975,4 +1975,3 @@ def test_subset_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     for group in dtree.groups:
         if "ScanTime" in group:
             assert int(dtree[group].ds.variables["timeMidScan"][:][0]) == 1306403820
-
