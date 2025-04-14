@@ -101,12 +101,13 @@ def sync_dims_inplace(original_dataset: xr.Dataset, new_dataset: xr.Dataset) -> 
     """
 
     for variable_name in new_dataset.variables:
-        original_variable_dims = original_dataset[variable_name].dims
-        new_variable_dims = new_dataset[variable_name].dims
+        if variable_name in original_dataset.variables:
+            original_variable_dims = original_dataset[variable_name].dims
+            new_variable_dims = new_dataset[variable_name].dims
 
-        for new_dim in new_variable_dims:
-            if new_dim not in original_variable_dims:
-                new_dataset[variable_name] = new_dataset[variable_name].isel({new_dim: 0})
+            for new_dim in new_variable_dims:
+                if new_dim not in original_variable_dims:
+                    new_dataset[variable_name] = new_dataset[variable_name].isel({new_dim: 0})
 
 
 def recreate_pixcore_dimensions(datasets: list):

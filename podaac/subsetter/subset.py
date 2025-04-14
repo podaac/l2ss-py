@@ -1168,8 +1168,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if not time_var_names and (min_time or max_time):
             raise ValueError('Could not determine time variable')
 
-        normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
-
         if '.HDF5' == file_extension:
             for group in dataset.groups:
                 if "ScanTime" in group:
@@ -1185,6 +1183,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
+            normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
 
             keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
 
