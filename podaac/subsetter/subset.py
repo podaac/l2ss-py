@@ -1155,7 +1155,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
-        hdf_type = get_hdf_type(dataset)
+        if hdf_type is False:
+            hdf_type = get_hdf_type(dataset)
 
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
