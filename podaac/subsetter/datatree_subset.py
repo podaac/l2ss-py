@@ -297,7 +297,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
 
-        # Process child nodes
         processed_children = {}
         for child_name, child_node in node.children.items():
             # Process the child node
@@ -915,7 +914,7 @@ def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataT
     return tree
 
 
-def prepare_basic_encoding(datasets: DataTree) -> dict:
+def prepare_basic_encoding(datasets: DataTree, time_encoding=None) -> dict:
     """
     Prepare basic encoding dictionary for DataTree organized by groups.
     Only applies zlib and complevel for float32, float64, int32, uint16 datatypes.
@@ -968,6 +967,18 @@ def prepare_basic_encoding(datasets: DataTree) -> dict:
 
     # Start processing from root with '/'
     process_node(datasets, '/')
+
+    def deep_merge(dict1, dict2):
+        merged = dict1.copy()
+        for key, value in dict2.items():
+            if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+                merged[key] = deep_merge(merged[key], value)
+            else:
+                merged[key] = value
+        return merged
+
+    if time_encoding:
+        group_encodings = deep_merge(group_encodings, time_encoding)
 
     return group_encodings
 

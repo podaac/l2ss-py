@@ -1153,6 +1153,43 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     if hdf_type == 'GPM':
         args['decode_times'] = False
 
+    time_encoding = {}
+    time_calendar_attributes = {}
+
+    if args['decode_times']:
+        # Get time encoding
+        with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
+
+            lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
+                dataset=dataset,
+                lat_var_names=lat_var_names,
+                lon_var_names=lon_var_names,
+                time_var_names=time_var_names
+            )
+            for time in time_var_names:
+
+                time_var = dataset[time]
+                var_name = os.path.basename(time)
+                group_path = os.path.dirname(time)
+
+                units = time_var.attrs.get('units')
+                dtype = time_var.dtype
+                calendar = time_var.attrs.get('calendar')
+
+                if group_path not in time_encoding:
+                    time_encoding[group_path] = {}
+
+                time_encoding[group_path][var_name] = {}
+
+                if calendar:
+                    time_encoding[group_path][var_name]['calendar'] = calendar
+                if units:
+                    time_encoding[group_path][var_name]['units'] = units
+                time_encoding[group_path][var_name]['dtype'] = dtype
+
+                if calendar:
+                    time_calendar_attributes[time] = calendar
+
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
         if hdf_type is False:
@@ -1215,9 +1252,20 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         set_version_history(subsetted_dataset, cut, bbox, shapefile)
         set_json_history(subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source)
 
+        if time_calendar_attributes:
+            for time_var, calendar in time_calendar_attributes.items():
+                if 'calendar' in subsetted_dataset[time_var].attrs:
+                    subsetted_dataset[time_var].attrs['calendar'] = calendar
+                    # if we set the calendar attribute remove calendar encoding
+                    var_name = os.path.basename(time_var)
+                    group_path = os.path.dirname(time_var)
+                    # Safely remove calendar from encoding if it exists
+                    if group_path in time_encoding and var_name in time_encoding[group_path]:
+                        time_encoding[group_path][var_name].pop('calendar', None)
+
         subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
-        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset)
+        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
 
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
             subsetted_dataset,
