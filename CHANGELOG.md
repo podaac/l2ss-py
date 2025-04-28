@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	- Update python libraries
 	- Update harmony service library version
 	- Add in feature pixel subsetting
+- Added detailed instructions to the README.md for integrating l2ss-py with new EOSDIS collections
 ### Changed
 ### Deprecated 
 ### Removed
