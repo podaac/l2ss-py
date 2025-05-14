@@ -12,7 +12,7 @@
 
 [tool.poetry]
 name = "l2ss-py"
-version = "2.13.0"
+version = "2.14.0rc3"
 description = "L2 Subsetter Service"
 authors = ["podaac-tva <podaac-tva@jpl.nasa.gov>"]
 license = "Apache-2.0"
@@ -29,16 +29,16 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.10"
 netCDF4 = "^1.5"
-xarray = {version = "*", extras = ["parallel"]}
+xarray = {version = "<=2025.1.0", extras = ["parallel"]}
 geopandas ="^1.0.1"
 Shapely = "^2.0.6"
-harmony-service-lib = { version = "<=2.2.0", optional = true }
+harmony-service-lib = { version = "^2.0.0", optional = true }
 pystac = { version = "^1.10.1", optional = true }
 julian = "^0.14"
 importlib-metadata = "^8.2.0"
 h5py = "^3.6.0"
 cf-xarray = "*"
-numpy = "^1.26.4"
+numpy = "^2.2.4"
 
 [tool.poetry.dev-dependencies]
 pytest = "^8.0.2"

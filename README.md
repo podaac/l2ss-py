@@ -115,3 +115,7 @@ In order to fully test l2ss-py with Harmony, you can run Harmony locally. This r
     ```
    localhost:3000/YOUR_COLLECTION_ID/ogc-api-coverages/1.0.0/collections/all/coverage/rangeset?format=application%2Fx-netcdf4&subset=lat(-10%3A10)&subset=lon(-10%3A10)&maxResults=2
    ```
+
+## NASA EOSDIS Integration
+
+Detailed instructions for integrating with EOSDIS can be found [here](EOSDISIntegrations.md).
