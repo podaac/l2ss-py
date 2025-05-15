@@ -12,7 +12,7 @@
 
 [tool.poetry]
 name = "l2ss-py"
-version = "2.15.0a0"
+version = "3.0.0a0"
 description = "L2 Subsetter Service"
 authors = ["podaac-tva <podaac-tva@jpl.nasa.gov>"]
 license = "Apache-2.0"
@@ -40,7 +40,7 @@ h5py = "^3.6.0"
 cf-xarray = "*"
 numpy = "^2.2.4"
 
-[tool.poetry.dev-dependencies]
+[tool.poetry.group.dev.dependencies]
 pytest = "^8.0.2"
 flake8 = "^7.0.0"
 pytest-cov = "^6.0.0"
