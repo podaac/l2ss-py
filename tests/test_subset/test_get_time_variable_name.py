@@ -10,7 +10,7 @@ import pytest
 import xarray as xr
 
 from podaac.subsetter import subset
-
+from podaac.subsetter import datatree_subset
 
 @pytest.fixture(scope='class')
 def data_dir():
@@ -49,7 +49,7 @@ def test_get_time_variable_name(test_file, data_dir):
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
-    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name], [])
+    time_var_name = datatree_subset.compute_time_variable_name_tree(ds, ds[lat_var_name], [])
 
     assert time_var_name is not None
     assert 'time' in time_var_name

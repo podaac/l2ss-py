@@ -199,7 +199,7 @@ def test_service_invoke(
             # Verify output file
             output_asset = result_item.assets['data']
             output_path = output_asset.href.replace('file://', '')
-            assert output_path.endswith('.nc4')
+            assert output_path.endswith('.nc')
             
         except Exception as e:
             pytest.fail(f"Test failed: {str(e)}")
@@ -280,7 +280,7 @@ def test_service_invoke_pixel_subset(
             # Verify output file
             output_asset = result_item.assets['data']
             output_path = output_asset.href.replace('file://', '')
-            assert output_path.endswith('.nc4')
+            assert output_path.endswith('.nc')
             
         except Exception as e:
             pytest.fail(f"Test failed: {str(e)}")
