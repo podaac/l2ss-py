@@ -17,6 +17,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [2.14.0]
+### Added
+- [issue/314](https://github.com/podaac/l2ss-py/pull/324):
+	- Update python libraries
+	- Update harmony service library version
+	- Add in feature pixel subsetting
+- Added detailed instructions to the README.md for integrating l2ss-py with new EOSDIS collections
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
 ## [2.13.0]
 ### Added
 ### Changed
