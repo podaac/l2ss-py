@@ -169,8 +169,8 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
     -180 --> 180 for longitude and -90, 90 for latitude.
     """
 
-    lon_data = datatree_subset.get_variable_from_path(dataset, lon_var_name)
-    lat_data = datatree_subset.get_variable_from_path(dataset, lat_var_name)
+    lon_data = dataset[lon_var_name]
+    lat_data = dataset[lat_var_name]
 
     return np.array([convert_bound(bbox[0], 360, lon_data),
                      convert_bound(bbox[1], 180, lat_data)])
@@ -819,8 +819,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
 
-        lon_data = datatree_subset.get_variable_from_path(dataset, lon_var_name)
-        lat_data = datatree_subset.get_variable_from_path(dataset, lat_var_name)
+        lon_data = dataset[lon_var_name]
+        lat_data = dataset[lat_var_name]
 
         operation = (
             oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
@@ -1438,8 +1438,8 @@ def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
 
     for lon_var_name, lat_var_name in zip(lon_var_names, lat_var_names):
 
-        lon = datatree_subset.get_variable_from_path(dataset, lon_var_name)
-        lat = datatree_subset.get_variable_from_path(dataset, lat_var_name)
+        lon = dataset[lon_var_name]
+        lat = dataset[lat_var_name]
 
         lon_fill_value = lon.attrs.get('_FillValue', None)
         lat_fill_value = lat.attrs.get('_FillValue', None)
@@ -1530,7 +1530,7 @@ def get_east_west_lon(dataset, lon_var_name):
             The westernmost and easternmost longitudes in [-180, 180] range.
     """
 
-    lon_2d = datatree_subset.get_variable_from_path(dataset, lon_var_name)
+    lon_2d = dataset[lon_var_name]
 
     if lon_2d is None:
         return None, None
