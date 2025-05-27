@@ -45,7 +45,6 @@ from xarray import DataTree
 
 from podaac.subsetter import (
     dimension_cleanup as dc,
-    # gpm_cleanup as gc,
     datatree_subset,
     tree_time_converting as tree_time_converting
 )
