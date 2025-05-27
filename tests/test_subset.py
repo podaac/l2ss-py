@@ -87,7 +87,6 @@ def data_dir():
     return join(test_dir, 'data')
 
 
-#Simon
 @pytest.fixture(scope='class')
 def subset_output_dir(data_dir):
     """Makes a new temporary directory to hold the subset results while tests are running."""
@@ -150,7 +149,6 @@ def history_json_schema():
     }
 
 
-#SIMON
 def data_files():
     """Get all the netCDF files from the test data directory."""
     test_dir = dirname(realpath(__file__))
