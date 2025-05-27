@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 	- Update python libraries
 	- Update harmony service library version
 	- Add in feature pixel subsetting
+- [issue/322] Fix a time conversion bug with tempo data
+- [issue/308] l2ss-py should handle no data results in a manner consistent with other harmony services
+
 ### Changed
 ### Deprecated 
 ### Removed
