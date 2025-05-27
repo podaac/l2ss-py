@@ -23,9 +23,8 @@ import functools
 import json
 import operator
 import os
-import re
-from itertools import zip_longest
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
+
 import dateutil
 from dateutil import parser
 
@@ -39,15 +38,22 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 import xarray.coding.times
-from shapely.geometry import Point, Polygon, MultiPolygon
+from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.ops import transform
 
-from podaac.subsetter import gpm_cleanup as gc
-from podaac.subsetter import time_converting as tc
-from podaac.subsetter import dimension_cleanup as dc
-from podaac.subsetter import xarray_enhancements as xre
-from podaac.subsetter.group_handling import GROUP_DELIM, transform_grouped_dataset, recombine_grouped_datasets, \
-    h5file_transform
+from xarray import DataTree
+
+from podaac.subsetter import (
+    dimension_cleanup as dc,
+    datatree_subset,
+    tree_time_converting as tree_time_converting
+)
+from podaac.subsetter.group_handling import (
+    GROUP_DELIM,
+    h5file_transform,
+    transform_grouped_dataset,
+)
+
 
 SERVICE_NAME = 'l2ss-py'
 
@@ -161,8 +167,12 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
     Assumption that the provided bounding box is always between
     -180 --> 180 for longitude and -90, 90 for latitude.
     """
-    return np.array([convert_bound(bbox[0], 360, dataset[lon_var_name]),
-                     convert_bound(bbox[1], 180, dataset[lat_var_name])])
+
+    lon_data = dataset[lon_var_name]
+    lat_data = dataset[lat_var_name]
+
+    return np.array([convert_bound(bbox[0], 360, lon_data),
+                     convert_bound(bbox[1], 180, lat_data)])
 
 
 def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
@@ -280,46 +290,6 @@ def calculate_chunks(dataset: xr.Dataset) -> dict:
     return chunk
 
 
-def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str]:
-    """
-    As a backup for finding a coordinate var, look at the 'coordinates'
-    metadata attribute of all data vars in the granule. Return any
-    coordinate vars that have name matches with the provided
-    'match_list'
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        Dataset to search data variable coordinate metadata attribute
-    match_list : list (str)
-        List of possible matches to search for. For example,
-        ['lat', 'latitude'] would search for variables in the
-        'coordinates' metadata attribute containing either 'lat'
-        or 'latitude'
-
-    Returns
-    -------
-    list (str)
-        List of matching coordinate variables names
-    """
-    coord_attrs = [
-        var.attrs['coordinates'] for var_name, var in dataset.data_vars.items()
-        if 'coordinates' in var.attrs
-    ]
-    coord_attrs = list(set(coord_attrs))
-    match_coord_vars = []
-    for coord_attr in coord_attrs:
-        coords = coord_attr.split(' ')
-        match_vars = [
-            coord for coord in coords
-            if any(coord_cand in coord for coord_cand in match_list)
-        ]
-        if match_vars and match_vars[0] in dataset:
-            # Check if the var actually exists in the dataset
-            match_coord_vars.append(match_vars[0])
-    return match_coord_vars
-
-
 def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[str], str], Union[List[str], str]]:
     """
     Given a dataset, determine the coordinate variable from a list
@@ -337,7 +307,7 @@ def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[s
         name and the second element is the lon coordinate name
     """
 
-    dataset = xr.decode_cf(dataset, decode_times=False)
+    dataset = xr.decode_cf(dataset)
 
     # look for lon and lat using standard name in coordinates and axes
     custom_criteria = {
@@ -362,8 +332,8 @@ def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[s
         lambda var_name: var_is_coord(var_name, possible_lon_coord_names), dataset.variables))
 
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-        lat_coord_names = find_matching_coords(dataset, possible_lat_coord_names)
-        lon_coord_names = find_matching_coords(dataset, possible_lon_coord_names)
+        lat_coord_names = datatree_subset.find_matching_coords(dataset, possible_lat_coord_names)
+        lon_coord_names = datatree_subset.find_matching_coords(dataset, possible_lon_coord_names)
 
     # Couldn't find lon lat in data variables look in coordinates
     if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
@@ -419,152 +389,6 @@ def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
         return False
 
     return False
-
-
-def get_spatial_bounds(dataset: xr.Dataset, lat_var_names: str, lon_var_names: str) -> Union[np.ndarray, None]:
-    """
-    Get the spatial bounds for this dataset. These values are masked
-    and scaled.
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        Dataset to retrieve spatial bounds for
-    lat_var_names : str
-        Name of the lat variable
-    lon_var_names : str
-        Name of the lon variable
-
-    Returns
-    -------
-    np.array
-        [[lon min, lon max], [lat min, lat max]]
-    """
-
-    lat_var_name = lat_var_names[0] if len(lat_var_names) == 1 else [
-        lat_name for lat_name in lat_var_names if lat_name in dataset.data_vars.keys()
-    ][0]
-    lon_var_name = lon_var_names[0] if len(lon_var_names) == 1 else [
-        lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars.keys()
-    ][0]
-
-    # Get scale from coordinate variable metadata attributes
-    lat_scale = dataset[lat_var_name].attrs.get('scale_factor', 1.0)
-    lon_scale = dataset[lon_var_name].attrs.get('scale_factor', 1.0)
-    lat_offset = dataset[lat_var_name].attrs.get('add_offset', 0.0)
-    lon_offset = dataset[lon_var_name].attrs.get('add_offset', 0.0)
-    lon_valid_min = dataset[lon_var_name].attrs.get('valid_min', None)
-    lat_fill_value = dataset[lat_var_name].attrs.get('_FillValue', None)
-    lon_fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
-
-    # Apply mask and scale to min/max coordinate variables to get
-    # spatial bounds
-
-    # Remove fill value. Might cause errors when getting min and max
-    lats = dataset[lat_var_name].values.flatten()
-    lons = dataset[lon_var_name].values.flatten()
-
-    if lat_fill_value:
-        lats = list(filter(lambda a: not a == lat_fill_value, lats))
-    if lon_fill_value:
-        lons = list(filter(lambda a: not a == lon_fill_value, lons))
-
-    if len(lats) == 0 or len(lons) == 0:
-        return None
-
-    original_min_lat = remove_scale_offset(np.nanmin(lats), lat_scale, lat_offset)
-    original_max_lat = remove_scale_offset(np.nanmax(lats), lat_scale, lat_offset)
-    original_min_lon = remove_scale_offset(np.nanmin(lons), lon_scale, lon_offset)
-    original_max_lon = remove_scale_offset(np.nanmax(lons), lon_scale, lon_offset)
-
-    min_lat = round(original_min_lat, 5)
-    max_lat = round(original_max_lat, 5)
-    min_lon = round(original_min_lon, 1)
-    max_lon = round(original_max_lon, 1)
-
-    # Convert longitude to [-180,180] format
-    if lon_valid_min == 0 or 0 <= min_lon <= max_lon <= 360:
-        min_lon = (min_lon - 360) if min_lon > 180 else min_lon
-        max_lon = (max_lon - 360) if max_lon > 180 else max_lon
-        if min_lon == max_lon:
-            min_lon, max_lon = -180, 180
-
-    # After rounding to 1 if not at the edges then round to 5
-    if min_lon != -180:
-        min_lon = round((original_min_lon - 360) if original_min_lon > 180 else original_min_lon, 5)
-
-    if max_lon != 180:
-        max_lon = round((original_max_lon - 360) if original_max_lon > 180 else original_max_lon, 5)
-
-    return np.array([[min_lon, max_lon], [min_lat, max_lat]])
-
-
-def compute_time_variable_name(dataset: xr.Dataset, lat_var: xr.Variable, total_time_vars: list) -> str:
-    """
-    Try to determine the name of the 'time' variable. This is done as
-    follows:
-
-    - The variable name contains 'time'
-    - The variable dimensions match the dimensions of the given lat var
-    - The variable that hasn't already been found
-
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        xarray dataset to find time variable from
-    lat_var : xr.Variable
-        Lat variable for this dataset
-
-    Returns
-    -------
-    str
-        The name of the variable
-
-    Raises
-    ------
-    ValueError
-        If the time variable could not be determined
-    """
-
-    time_vars = find_matching_coords(dataset, ['time'])
-    if time_vars:
-        # There should only be one time var match (this is called once
-        # per lat var)
-        return time_vars[0]
-
-    # Filter variables with 'time' in the name to avoid extra work
-    time_vars = list(filter(lambda var_name: 'time' in var_name, dataset.sizes.keys()))
-
-    for var_name in time_vars:
-        if var_name not in total_time_vars and "time" in var_name and dataset[var_name].squeeze().dims == lat_var.squeeze().dims:
-            return var_name
-
-    # first check if any variables are named 'time'
-    for var_name in list(dataset.data_vars.keys()):
-        var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-        if len(dataset[var_name].squeeze().dims) == 0:
-            continue
-        if var_name not in total_time_vars and ('time' == var_name_time.lower() or 'timeMidScan' == var_name_time) and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
-            return var_name
-
-    time_units_pattern = re.compile(r"(days|d|hours|hr|h|minutes|min|m|seconds|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?")
-    # Check variables for common time variable indicators
-    for var_name, var in dataset.variables.items():
-        # pylint: disable=too-many-boolean-expressions
-        if ((('standard_name' in var.attrs and var.attrs['standard_name'] == 'time') or
-           ('axis' in var.attrs and var.attrs['axis'] == 'T') or
-           ('units' in var.attrs and time_units_pattern.match(var.attrs['units'])))) and var_name not in total_time_vars:
-            return var_name
-
-    # then check if any variables have 'time' in the string if the above loop doesn't return anything
-    for var_name in list(dataset.data_vars.keys()):
-        var_name_time = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-        if len(dataset[var_name].squeeze().dims) == 0:
-            continue
-        if var_name not in total_time_vars and 'time' in var_name_time.lower() and dataset[var_name].squeeze().dims[0] in lat_var.squeeze().dims:
-            return var_name
-
-    return None
 
 
 def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
@@ -625,7 +449,7 @@ def translate_longitude(geometry):
         return geometry
 
 
-def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
+def get_time_epoch_var(tree: DataTree, time_var_name: str) -> str:
     """
     Get the name of the epoch time var. This is only needed in the case
     where there is a single time var (of size 1) that contains the time
@@ -633,8 +457,8 @@ def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
 
     Parameters
     ----------
-    dataset : xr.Dataset
-        Dataset that contains time var
+    tree : DataTree
+        DataTree that contains time var
     time_var_name : str
         The name of the actual time var (with matching dims to the
         coord vars)
@@ -644,18 +468,26 @@ def get_time_epoch_var(dataset: xr.Dataset, time_var_name: str) -> str:
     str
         The name of the epoch time variable
     """
-    time_var = dataset[time_var_name]
+    # Split the time_var_name path to get the group and variable name
+    path_parts = time_var_name.split('/')
+    group_path = '/'.join(path_parts[:-1])
+    var_name = path_parts[-1]
+
+    # Get the dataset at the correct group level
+    dataset = tree[group_path].ds if group_path else tree.ds
+    time_var = dataset[var_name]
 
     if 'comment' in time_var.attrs:
         epoch_var_name = time_var.attrs['comment'].split('plus')[0].strip()
-    elif 'time' in dataset.variables.keys() and time_var_name != 'time':
-        epoch_var_name = 'time'
-    elif any('time' in s for s in list(dataset.variables.keys())) and time_var_name != 'time':
+    elif 'time' in dataset.variables.keys() and var_name != 'time':
+        epoch_var_name = f"{group_path}/time" if group_path else "time"
+    elif any('time' in s for s in list(dataset.variables.keys())) and var_name != 'time':
         for i in list(dataset.variables.keys()):
-            group_list = i.split(GROUP_DELIM)
-            if group_list[-1] == 'time':
-                epoch_var_name = i
+            if i.endswith('time'):
+                epoch_var_name = f"{group_path}/{i}" if group_path else i
                 break
+        else:
+            raise ValueError('Unable to determine time variables')
         return epoch_var_name
     else:
         raise ValueError('Unable to determine time variables')
@@ -749,7 +581,29 @@ def datetime_from_mjd(dataset: xr.Dataset, time_var_name: str) -> Union[datetime
     return None
 
 
-def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str) -> Union[np.ndarray, bool]:
+def get_variable_data(dtree, var_path):
+    """
+    Retrieve data from a DataTree object given a variable path.
+
+    Parameters:
+    - dtree: DataTree object
+    - var_path: str, path to the variable (e.g., "group/time")
+
+    Returns:
+    - The data of the variable if found, else None.
+    """
+    parts = var_path.split("/")  # Split path into group and variable names
+    group_name, var_name = "/".join(parts[:-1]), parts[-1]  # Extract group and variable
+
+    try:
+        group = dtree[group_name] if group_name else dtree  # Get group or root
+        return group.ds[var_name]  # Extract variable values
+    except KeyError:
+        return None
+
+
+def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str
+                            ) -> Union[np.ndarray, bool]:
     """
     Build the temporal condition used in the xarray 'where' call which
     drops data not in the given bounds. If the data in the time var is
@@ -771,7 +625,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
 
     Returns
     -------
-    np.ndarray or bool
+    np.array or boolean
         If temporally subsetted, returns a boolean ND-array the shape
         of which matches the dimensions of the coordinate vars. 'True'
         is essentially a noop.
@@ -802,63 +656,111 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
 
     temporal_conds = []
     if min_time:
-        temporal_conds.append(build_cond(min_time, operator.ge))
+        comparison_op = operator.ge
+        temporal_conds.append(build_cond(min_time, comparison_op))
     if max_time:
-        temporal_conds.append(build_cond(max_time, operator.le))
-
-    if temporal_conds:
+        comparison_op = operator.le
+        temporal_conds.append(build_cond(max_time, comparison_op))
+    temporal_cond = True
+    if min_time or max_time:
         temporal_cond = functools.reduce(lambda cond_a, cond_b: cond_a & cond_b, temporal_conds)
-    else:
-        temporal_cond = True
-
     return temporal_cond
 
 
-def get_base_group_names(lats: List[str]) -> Tuple[List[str], List[Union[int, str]]]:  # pylint: disable=too-many-branches
-    """Latitude groups may be at different depths. This function gets the level
-    number that makes each latitude group unique from the other latitude names"""
-    unique_groups = []
-    group_list = [lat.strip(GROUP_DELIM).split(GROUP_DELIM) for lat in lats]
+def get_path(s):
+    """Extracts the path by removing the last part after the final '/'."""
+    path = s.rsplit('/', 1)[0] if '/' in s else s
+    return path if path.startswith('/') else f'/{path}'
 
-    # make all lists of group levels the same length
-    group_list = list(zip(*zip_longest(*group_list, fillvalue='')))
 
-    # put the groups in the same levels in the same list
-    group_list_transpose = np.array(group_list).T.tolist()
+def subset_with_shapefile_multi(dataset: xr.Dataset,
+                                lat_var_names: List[str],
+                                lon_var_names: List[str],
+                                shapefile: str,
+                                cut: bool,
+                                chunks) -> Dict[str, np.ndarray]:
+    """
+    Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
 
-    diff_count = ['' for _ in range(len(group_list))]
-    group_count = 0
-    # loop through each group level
-    for my_list in group_list_transpose:
-        for i in range(len(my_list)):  # pylint: disable=consider-using-enumerate
-            count = 0
-            for j in range(len(my_list)):  # pylint: disable=consider-using-enumerate
-                # go through each lat name and compare the level names
-                if my_list[i] == my_list[j] and not isinstance(diff_count[j], int):
-                    count += 1
-            # if the lat names is equivalent to only itself then insert the level number
-            if count == 1:
-                if isinstance(diff_count[i], int):
-                    continue
-                if 'lat' in my_list[i].lower():  # if we get to the end of the list, go to the previous level
-                    diff_count[i] = group_count - 1
-                    continue
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        Dataset to subset
+    lat_var_names : List[str]
+        List of latitude variable names in the given dataset
+    lon_var_names : List[str]
+        List of longitude variable names in the given dataset
+    shapefile : str
+        Absolute path to the shapefile used to subset the given dataset
+    cut : bool
+        True if scanline should be cut
+    chunks : Union[Dict, None]
+        Chunking specification for dask arrays
 
-                diff_count[i] = group_count
+    Returns
+    -------
+    Dict[str, np.ndarray]
+        Dictionary mapping variable names to their respective boolean masks
+        Keys are formatted as "{lat_var_name}_{lon_var_name}"
+    """
+    if len(lat_var_names) != len(lon_var_names):
+        raise ValueError("Number of latitude variables must match number of longitude variables")
 
-        group_count += 1
+    shapefile_df = gpd.read_file(shapefile)
+    masks = {}
 
-    # go back and re-put together the unique groups
-    for lat in enumerate(lats):
-        unique_groups.append(f'{GROUP_DELIM}{GROUP_DELIM.join(lat[1].strip(GROUP_DELIM).split(GROUP_DELIM)[:(diff_count[lat[0]]+1)])}')
-    return unique_groups, diff_count
+    # Mask and scale shapefile
+    def scale(lon, lat, extra=None):  # pylint: disable=unused-argument
+        lon = tuple(map(functools.partial(apply_scale_offset, lon_scale, lon_offset), lon))
+        lat = tuple(map(functools.partial(apply_scale_offset, lat_scale, lat_offset), lat))
+        return lon, lat
+
+    def in_shape(data_lon, data_lat):
+        point = Point(data_lon, data_lat)
+        point_in_shapefile = current_shapefile_df.contains(point)
+        return point_in_shapefile.array[0]
+
+    for lat_var_name, lon_var_name in zip(lat_var_names, lon_var_names):
+        # Get scaling factors and offsets for this pair
+        lat_scale = dataset[lat_var_name].attrs.get('scale_factor', 1.0)
+        lon_scale = dataset[lon_var_name].attrs.get('scale_factor', 1.0)
+        lat_offset = dataset[lat_var_name].attrs.get('add_offset', 0.0)
+        lon_offset = dataset[lon_var_name].attrs.get('add_offset', 0.0)
+
+        # Create a copy of shapefile_df for this pair
+        current_shapefile_df = shapefile_df.copy()
+
+        # If data is '360', convert shapefile to '360' as well
+        if is_360(dataset[lon_var_name], lon_scale, lon_offset):
+            current_shapefile_df.geometry = current_shapefile_df['geometry'].apply(translate_longitude)
+
+        geometries = [transform(scale, geometry) for geometry in current_shapefile_df.geometry]
+        current_shapefile_df.geometry = geometries
+
+        dask = "forbidden"
+        if chunks:
+            dask = "allowed"
+
+        in_shape_vec = np.vectorize(in_shape)
+        boolean_mask = xr.apply_ufunc(
+            in_shape_vec,
+            dataset[lon_var_name],
+            dataset[lat_var_name],
+            dask=dask
+        )
+
+        # Store mask with a key that combines both variable names
+        lat_path = get_path(lat_var_name)
+        masks[lat_path] = boolean_mask
+
+    return_dataset = datatree_subset.where_tree(dataset, masks, cut)
+    return return_dataset
 
 
 def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      lat_var_names: list,
                      lon_var_names: list,
                      time_var_names: list,
-                     variables: Optional[List[str]] = None,
                      bbox: np.ndarray = None,
                      cut: bool = True,
                      min_time: str = None,
@@ -890,6 +792,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     pixel_subset : boolean
         Cut the lon lat based on the rows and columns within the bounding box,
         but could result with lon lats that are outside the bounding box
+
     TODO: add docstring and type hint for `variables` parameter.
 
     Returns
@@ -905,162 +808,66 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     if lon_bounds[0] > lon_bounds[1]:
         oper = operator.or_
 
-    # get unique group names for latitude coordinates
-    diff_count = [-1]
-    if len(lat_var_names) > 1:
-        unique_groups, diff_count = get_base_group_names(lat_var_names)
-    else:
-        unique_groups = [f'{GROUP_DELIM}{GROUP_DELIM.join(x.strip(GROUP_DELIM).split(GROUP_DELIM)[:-1])}' for x in lat_var_names]
+    subset_dictionary = {}
 
-    datasets = []
-    total_list = []  # don't include repeated variables
+    for lat_var_name, lon_var_name, time_var_name in zip(lat_var_names, lon_var_names, time_var_names):
 
-    for lat_var_name, lon_var_name, time_var_name, diffs in zip_longest(lat_var_names, lon_var_names, time_var_names, diff_count, fillvalue=None):
+        lat_path = get_path(lat_var_name)
+        lon_path = get_path(lon_var_name)
+        time_path = get_path(time_var_name)
 
-        # If there is an extra time variable with no lon lat zip to it
-        if lon_var_name is None and lat_var_name is None:
-            continue
+        temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
 
-        if GROUP_DELIM in lat_var_name:
-            lat_var_prefix = GROUP_DELIM.join(lat_var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)])
+        lon_data = dataset[lon_var_name]
+        lat_data = dataset[lat_var_name]
 
-            if diffs == -1:  # if the lat name is in the root group: take only the root group vars
-                group_vars = list(dataset.data_vars.keys())
-                # include the coordinate variables if user asks for
-                group_vars.extend([
-                        var for var in list(dataset.coords.keys())
-                        if var in variables and var not in group_vars
-                    ])
-            else:
-                group_vars = [
-                    var for var in dataset.data_vars.keys()
-                    if GROUP_DELIM.join(var.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
-                ]
-                # include variables that aren't in a latitude group
-                if variables:
-                    group_vars.extend([
-                        var for var in dataset.variables.keys()
-                        if (var in variables and
-                            var not in group_vars and
-                            var not in total_list and
-                            not var.startswith(tuple(unique_groups))
-                            )
-                    ])
-                else:
-                    group_vars.extend([
-                        var for var in dataset.data_vars.keys()
-                        if (var not in group_vars and
-                            var not in total_list and
-                            not var.startswith(tuple(unique_groups))
-                            )
-                        ])
-
-                # group dimensions do not get carried over if unused by data variables (MLS nTotalTimes var)
-                # get all dimensions from data variables
-                dim_list = []
-                for var in group_vars:
-                    dim_list.extend(list(list(dataset[var].dims)))
-                # get all group dimensions
-                group_dims = [
-                    dim for dim in list(dataset.coords.keys())
-                    if GROUP_DELIM.join(dim.strip(GROUP_DELIM).split(GROUP_DELIM)[:(diffs+1)]) == lat_var_prefix
-                ]
-                # include any group dimensions that aren't accounted for in variable dimensions
-                var_included = list(set(group_dims) - set(dim_list))
-                group_vars.extend(var_included)
-
-        else:
-            group_vars = list(dataset.keys())
-
-        group_dataset = dataset[group_vars]
-
-        # Calculate temporal conditions
-        temporal_cond = build_temporal_cond(min_time, max_time, group_dataset, time_var_name)
-        group_dataset = xre.where(
-            group_dataset,
-            oper(
-                (group_dataset[lon_var_name] >= lon_bounds[0]),
-                (group_dataset[lon_var_name] <= lon_bounds[1])
-            ) &
-            (group_dataset[lat_var_name] >= lat_bounds[0]) &
-            (group_dataset[lat_var_name] <= lat_bounds[1]) &
-            temporal_cond,
-            cut,
-            pixel_subset=pixel_subset
+        operation = (
+            oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
+            (lat_data >= lat_bounds[0]) &
+            (lat_data <= lat_bounds[1]) &
+            temporal_cond
         )
 
-        datasets.append(group_dataset)
-        total_list.extend(group_vars)
-        if diffs == -1:
-            return datasets
+        if lat_path == lon_path and lat_path == time_path and lon_path == time_path:
+            subset_dictionary[lat_path] = operation
 
-    dim_cleaned_datasets = dc.recreate_pixcore_dimensions(datasets)
-    return dim_cleaned_datasets
+    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
+    return return_dataset
 
 
-def subset_with_shapefile(dataset: xr.Dataset,
-                          lat_var_name: str,
-                          lon_var_name: str,
-                          shapefile: str,
-                          cut: bool,
-                          chunks) -> np.ndarray:
+def normalize_paths(paths):
     """
-    Subset an xarray Dataset using a shapefile
+    Convert paths with __ notation to normal group paths, removing leading /
+    and converting __ to /
 
     Parameters
     ----------
-    dataset : xr.Dataset
-        Dataset to subset
-    lat_var_name : str
-        Name of the latitude variable in the given dataset
-    lon_var_name : str
-        Name of the longitude variable in the given dataset
-    shapefile : str
-        Absolute path to the shapefile used to subset the given dataset
-    cut : bool
-        True if scanline should be cut.
-    TODO: add docstring and type hint for `chunks` parameter.
+    paths : list of str
+        List of paths with __ notation
 
     Returns
     -------
-    np.array
-        Spatial bounds of Dataset after shapefile subset operation
-    TODO - fix this docstring type and the type hint to match code (currently returning a xr.Dataset)
+    list of str
+        Normalized paths
+
+    Examples
+    --------
+    >>> paths = ['/__geolocation__latitude', '/__geolocation__longitude']
+    >>> normalize_paths(paths)
+    ['/geolocation/latitude', '/geolocation/longitude']
     """
-    shapefile_df = gpd.read_file(shapefile)
-
-    lat_scale = dataset[lat_var_name].attrs.get('scale_factor', 1.0)
-    lon_scale = dataset[lon_var_name].attrs.get('scale_factor', 1.0)
-    lat_offset = dataset[lat_var_name].attrs.get('add_offset', 0.0)
-    lon_offset = dataset[lon_var_name].attrs.get('add_offset', 0.0)
-
-    # If data is '360', convert shapefile to '360' as well. There is an
-    # assumption that the shapefile is -180,180.
-    if is_360(dataset[lon_var_name], lon_scale, lon_offset):
-        # Transform
-        shapefile_df.geometry = shapefile_df['geometry'].apply(translate_longitude)
-
-    # Mask and scale shapefile
-    def scale(lon, lat, extra=None):  # pylint: disable=unused-argument
-        lon = tuple(map(functools.partial(apply_scale_offset, lon_scale, lon_offset), lon))
-        lat = tuple(map(functools.partial(apply_scale_offset, lat_scale, lat_offset), lat))
-        return lon, lat
-
-    geometries = [transform(scale, geometry) for geometry in shapefile_df.geometry]
-    shapefile_df.geometry = geometries
-
-    def in_shape(lon, lat):
-        point = Point(lon, lat)
-        point_in_shapefile = shapefile_df.contains(point)
-        return point_in_shapefile.array[0]
-
-    dask = "forbidden"
-    if chunks:
-        dask = "allowed"
-
-    in_shape_vec = np.vectorize(in_shape)
-    boolean_mask = xr.apply_ufunc(in_shape_vec, dataset[lon_var_name], dataset[lat_var_name], dask=dask)
-    return xre.where(dataset, boolean_mask, cut)
+    normalized = []
+    for path in paths:
+        # Replace double underscore with slash
+        path = path.replace('__', '/')
+        # Remove any double slashes
+        while '//' in path:
+            path = path.replace('//', '/')
+        # Ensure path starts with /
+        if not path.startswith('/'):
+            path = '/' + path
+        normalized.append(path)
+    return normalized
 
 
 def get_coordinate_variable_names(dataset: xr.Dataset,
@@ -1089,18 +896,38 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     TODO: add return type docstring and type hint.
     """
 
+    if isinstance(dataset, xr.Dataset):
+        tree = DataTree(dataset=dataset)
+    else:
+        tree = dataset
+
+    dataset = tree
+
     if not lat_var_names or not lon_var_names:
-        lat_var_names, lon_var_names = compute_coordinate_variable_names(dataset)
+        lon_var_names, lat_var_names = datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
     if not time_var_names:
         time_var_names = []
         for lat_var_name in lat_var_names:
-            time_var_names.append(compute_time_variable_name(dataset,
-                                                             dataset[lat_var_name],
-                                                             time_var_names))
 
-        time_var_names.append(compute_utc_name(dataset))
-        time_var_names = [x for x in time_var_names if x is not None]  # remove Nones and any duplicates
+            parent_path = '/'.join(lat_var_name.split('/')[:-1])  # gives "data_20/c"
 
+            subtree = dataset[parent_path]  # Gets the subtree at data_20/c
+            variable = dataset[lat_var_name]  # Gets the latitude variable
+            time_name = datatree_subset.compute_time_variable_name_tree(subtree,
+                                                                        variable,
+                                                                        time_var_names)
+            time_var = f"{parent_path}{time_name}"
+            time_var_names.append(time_var)
+
+        if not time_var_names:
+            time_var_names.append(compute_utc_name(dataset))
+
+        seen = set()
+        time_var_names = [x for x in time_var_names if x is not None and not (x in seen or seen.add(x))]
+
+    lat_var_names = normalize_paths(lat_var_names)
+    lon_var_names = normalize_paths(lon_var_names)
+    time_var_names = normalize_paths(time_var_names)
     return lat_var_names, lon_var_names, time_var_names
 
 
@@ -1146,20 +973,18 @@ def override_decode_cf_datetime() -> None:
     xarray.coding.times.decode_cf_datetime = decode_cf_datetime
 
 
-def test_access_sst_dtime_values(datafile):
+def test_access_sst_dtime_values(nc_dataset):
     """
     Test accessing values of 'sst_dtime' variable in a NetCDF file.
 
     Parameters
     ----------
-    datafile (str): Path to the NetCDF file.
+    nc_dataset (netCDF4.Dataset): An open NetCDF dataset.
 
     Returns
     -------
     access_successful (bool): True if 'sst_dtime' values are accessible, False otherwise.
     """
-
-    nc_dataset, _, _ = open_as_nc_dataset(datafile)
     args = {
         'decode_coords': False,
         'mask_and_scale': True,
@@ -1170,12 +995,47 @@ def test_access_sst_dtime_values(datafile):
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
         ) as dataset:
-            # pylint: disable=pointless-statement
             for var_name in dataset.variables:
-                dataset[var_name].values
+                dataset[var_name].values  # pylint: disable=pointless-statement
     except (TypeError, ValueError, KeyError):
         return False
     return True
+
+
+def get_hdf_type(tree: xr.DataTree) -> Optional[str]:
+    """
+    Determine the HDF type (OMI or MLS) from a DataTree object.
+
+    Parameters
+    ----------
+    tree : DataTree
+        DataTree object containing the HDF data
+
+    Returns
+    -------
+    Optional[str]
+        'OMI', 'MLS', or None if type cannot be determined
+    """
+    try:
+        # Try to get instrument information from FILE_ATTRIBUTES
+        additional_attrs = tree['/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES']
+        if additional_attrs is not None and 'InstrumentName' in additional_attrs.attrs:
+            instrument = additional_attrs.attrs['InstrumentName']
+            if isinstance(instrument, bytes):
+                instrument = instrument.decode("utf-8")
+        else:
+            return None
+
+        # Determine HDF type based on instrument name
+        if 'OMI' in instrument:
+            return 'OMI'
+        if 'MLS' in instrument:
+            return 'MLS'
+
+    except (KeyError, AttributeError):
+        pass
+
+    return None
 
 
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
@@ -1184,7 +1044,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
            origin_source: str = None,
            lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (),
-           pixel_subset: bool = False, stage_file_name_subsetted_true: str = None, stage_file_name_subsetted_false: str = None
+           pixel_subset: bool = False, stage_file_name_subsetted_true: str = None,
+           stage_file_name_subsetted_false: str = None
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -1243,36 +1104,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         stage file name if subsetting is true name depends on result of subset
     stage_file_name_subsetted_false: str
         stage file name if subsetting is false name depends on result of subset
-    """
-    file_extension = os.path.splitext(file_to_subset)[1]
-    nc_dataset, has_groups, hdf_type = open_as_nc_dataset(file_to_subset)
 
-    override_decode_cf_datetime()
-
-    if has_groups:
-        # Make sure all variables start with '/'
-        if variables:
-            variables = ['/' + var if not var.startswith('/') else var for var in variables]
-        lat_var_names = ['/' + var if not var.startswith('/') else var for var in lat_var_names]
-        lon_var_names = ['/' + var if not var.startswith('/') else var for var in lon_var_names]
-        time_var_names = ['/' + var if not var.startswith('/') else var for var in time_var_names]
-        # Replace all '/' with GROUP_DELIM
-        if variables:
-            variables = [var.replace('/', GROUP_DELIM) for var in variables]
-        lat_var_names = [var.replace('/', GROUP_DELIM) for var in lat_var_names]
-        lon_var_names = [var.replace('/', GROUP_DELIM) for var in lon_var_names]
-        time_var_names = [var.replace('/', GROUP_DELIM) for var in time_var_names]
-
-    if '.HDF5' == file_extension:
-        # GPM files will have a ScanTime group
-        if 'ScanTime' in [var.split('__')[-2] for var in list(nc_dataset.variables.keys())]:
-            gc.change_var_dims(nc_dataset, variables)
-            hdf_type = 'GPM'
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': False,
-        'decode_times': False
-    }
     # clean up time variable in SNDR before decode_times
     # SNDR.AQUA files have ascending node time blank
     if any('__asc_node_tai93' in i for i in list(nc_dataset.variables)):
@@ -1280,30 +1112,87 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if not asc_time_var[:] > 0:
             del nc_dataset.variables['__asc_node_tai93']
 
+    """
+
+    file_extension = os.path.splitext(file_to_subset)[1]
+    override_decode_cf_datetime()
+
+    hdf_type = False
+
+    args = {
+        'decode_coords': False,
+        'mask_and_scale': False,
+        'decode_times': False
+    }
+
+    with xr.open_datatree(file_to_subset, **args) as dataset:
+        if '.HDF5' == file_extension:
+            for group in dataset.groups:
+                if "ScanTime" in group:
+                    hdf_type = 'GPM'
+
     if min_time or max_time:
-        args['decode_times'] = True
-        float_dtypes = ['float64', 'float32']
         fill_value_f8 = nc.default_fillvals.get('f8')
-
-        for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
-            time_var = nc_dataset[time_variable]
-
-            if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
-               (getattr(time_var, 'long_name', None) == "reference time of sst file"):
-                args['mask_and_scale'] = True
-                if getattr(time_var, 'long_name', None) == "reference time of sst file":
-                    args['mask_and_scale'] = test_access_sst_dtime_values(file_to_subset)
-                break
+        float_dtypes = ['float64', 'float32']
+        args['decode_times'] = True
+        # try to open file to see if we can access the time variable
+        try:
+            with nc.Dataset(file_to_subset, 'r') as nc_dataset:
+                for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
+                    time_var = nc_dataset[time_variable]
+                    if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
+                       (getattr(time_var, 'long_name', None) == "reference time of sst file"):
+                        args['mask_and_scale'] = True
+                        if getattr(time_var, 'long_name', None) == "reference time of sst file":
+                            args['mask_and_scale'] = test_access_sst_dtime_values(nc_dataset)
+                        break
+        except Exception:  # pylint: disable=broad-exception-caught
+            pass
 
     if hdf_type == 'GPM':
         args['decode_times'] = False
 
-    with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
-    ) as dataset:
+    time_encoding = {}
+    time_calendar_attributes = {}
 
-        original_dataset = dataset
+    if args['decode_times']:
+        # Get time encoding
+        with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
+
+            lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
+                dataset=dataset,
+                lat_var_names=lat_var_names,
+                lon_var_names=lon_var_names,
+                time_var_names=time_var_names
+            )
+            for time in time_var_names:
+
+                time_var = dataset[time]
+                var_name = os.path.basename(time)
+                group_path = os.path.dirname(time)
+
+                units = time_var.attrs.get('units')
+                dtype = time_var.dtype
+                calendar = time_var.attrs.get('calendar')
+
+                if group_path not in time_encoding:
+                    time_encoding[group_path] = {}
+
+                time_encoding[group_path][var_name] = {}
+
+                if calendar:
+                    time_encoding[group_path][var_name]['calendar'] = calendar
+                if units:
+                    time_encoding[group_path][var_name]['units'] = units
+                time_encoding[group_path][var_name]['dtype'] = dtype
+
+                if calendar:
+                    time_calendar_attributes[time] = calendar
+
+    with xr.open_datatree(file_to_subset, **args) as dataset:
+
+        if hdf_type is False:
+            hdf_type = get_hdf_type(dataset)
 
         lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(
             dataset=dataset,
@@ -1315,9 +1204,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if not time_var_names and (min_time or max_time):
             raise ValueError('Could not determine time variable')
 
-        start_date = None
+        if '.HDF5' == file_extension:
+            for group in dataset.groups:
+                if "ScanTime" in group:
+                    group_dataset = dataset[group].ds
+                    dataset[group].ds = datatree_subset.update_dataset_with_time(group_dataset, group_path=group)
+
         if hdf_type and (min_time or max_time):
-            dataset, start_date = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
+            dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
         chunks = calculate_chunks(dataset)
         if chunks:
@@ -1325,27 +1219,26 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting
-            variables_upper = [variable.upper() for variable in variables]
-            vars_to_drop = [
-                var_name for var_name, var in dataset.data_vars.items()
-                if var_name.upper() not in variables_upper
-                and var_name not in lat_var_names
-                and var_name not in lon_var_names
-                and var_name not in time_var_names
+            normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
+
+            keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
+
+            all_data_variables = datatree_subset.get_vars_with_paths(dataset)
+            drop_variables = [
+                var for var in all_data_variables
+                if var not in keep_variables and var.upper() not in keep_variables
             ]
 
-            dataset = dataset.drop_vars(vars_to_drop)
+            dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
+
         if shapefile:
-            datasets = [
-                subset_with_shapefile(dataset, lat_var_names[0], lon_var_names[0], shapefile, cut, chunks)
-            ]
+            subsetted_dataset = subset_with_shapefile_multi(dataset, lat_var_names, lon_var_names, shapefile, cut, chunks)
         elif bbox is not None:
-            datasets = subset_with_bbox(
+            subsetted_dataset = subset_with_bbox(
                 dataset=dataset,
                 lat_var_names=lat_var_names,
                 lon_var_names=lon_var_names,
                 time_var_names=time_var_names,
-                variables=variables,
                 bbox=bbox,
                 cut=cut,
                 min_time=min_time,
@@ -1355,73 +1248,45 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
-        spatial_bounds = []
-        for dataset in datasets:
-            # Set version and JSON history efficiently
-            set_version_history(dataset, cut, bbox, shapefile)
-            set_json_history(dataset, cut, file_to_subset, bbox, shapefile, origin_source)
+        set_version_history(subsetted_dataset, cut, bbox, shapefile)
+        set_json_history(subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source)
 
-            if has_groups:
-                spatial_bounds.append(get_spatial_bounds(
-                    dataset=dataset,
-                    lat_var_names=lat_var_names,
-                    lon_var_names=lon_var_names
-                ))
-            else:
-                for var, data_var in dataset.data_vars.items():
-                    # Optimize string handling and decoding
-                    fill_value = data_var.attrs.get('_FillValue')
-                    if data_var.dtype == 'S1' and isinstance(fill_value, bytes):
-                        data_var.attrs['_FillValue'] = fill_value.decode('UTF-8')
+        if time_calendar_attributes:
+            for time_var, calendar in time_calendar_attributes.items():
+                if 'calendar' in subsetted_dataset[time_var].attrs:
+                    subsetted_dataset[time_var].attrs['calendar'] = calendar
+                    # if we set the calendar attribute remove calendar encoding
+                    var_name = os.path.basename(time_var)
+                    group_path = os.path.dirname(time_var)
+                    # Safely remove calendar from encoding if it exists
+                    if group_path in time_encoding and var_name in time_encoding[group_path]:
+                        time_encoding[group_path][var_name].pop('calendar', None)
 
-                    # Efficiently prepare encoding options
-                    var_encoding = {
-                        "zlib": True,
-                        "complevel": 5,
-                        "_FillValue": original_dataset[var].encoding.get('_FillValue')
-                    }
+        subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
-                    # Load, write, and release memory efficiently
-                    data_var.load()
-                    data_var.to_netcdf(output_file, 'a', encoding={var: var_encoding})
-                    del data_var  # Explicitly free memory
+        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
 
-                # Set global attributes efficiently
-                with nc.Dataset(output_file, 'a') as dataset_attr:
-                    dataset_attr.setncatts(dataset.attrs)
-
-        if has_groups:
-            recombine_grouped_datasets(datasets, output_file, start_date, time_var_names)
-            # Check if the spatial bounds are all 'None'. This means the
-            # subset result is empty.
-
-            if any(bound is None for bound in spatial_bounds):
-                return None
-            min_lon = min(bound[0][0] for bound in spatial_bounds)
-            max_lon = max(bound[0][1] for bound in spatial_bounds)
-            min_lat = min(bound[1][0] for bound in spatial_bounds)
-            max_lat = max(bound[1][1] for bound in spatial_bounds)
-            spatial_bounds_array = np.array([[min_lon, max_lon], [min_lat, max_lat]])
-        else:
-            spatial_bounds_array = get_spatial_bounds(
-                dataset=datasets[0],
-                lat_var_names=lat_var_names,
-                lon_var_names=lon_var_names
-            )
+        spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
+            subsetted_dataset,
+            lat_var_names,
+            lon_var_names
+        )
 
         update_netcdf_attrs(output_file,
-                            datasets,
+                            subsetted_dataset,
                             lon_var_names,
                             lat_var_names,
                             spatial_bounds_array,
                             stage_file_name_subsetted_true,
                             stage_file_name_subsetted_false)
 
+        subsetted_dataset.to_netcdf(output_file, encoding=encoding)
+
         return spatial_bounds_array
 
 
 def update_netcdf_attrs(output_file: str,
-                        datasets: List[xr.Dataset],
+                        dataset: xr.DataTree,
                         lon_var_names: List[str],
                         lat_var_names: List[str],
                         spatial_bounds_array: Optional[list] = None,
@@ -1432,7 +1297,7 @@ def update_netcdf_attrs(output_file: str,
 
     Args:
         output_file (str): Path to the NetCDF file to be updated
-        datasets (list): List of datasets to extract longitude and latitude information
+        dataset (xr.DataTree): xarray data tree
         lon_var_names (list): List of possible longitude variable names
         lat_var_names (list): List of possible latitude variable names
         spatial_bounds_array (list, optional): Nested list containing spatial bounds in format:
@@ -1456,15 +1321,7 @@ def update_netcdf_attrs(output_file: str,
     final_eastmost = None
     final_westmost = None
 
-    for dataset in datasets:
-
-        lon_var_name = None
-        if len(lon_var_names) == 1:
-            lon_var_name = lon_var_names[0]
-        else:
-            matched_names = [lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars]
-            if matched_names:
-                lon_var_name = matched_names[0]
+    for lon_var_name in lon_var_names:
 
         eastmost, westmost = get_east_west_lon(dataset, lon_var_name)
 
@@ -1472,63 +1329,59 @@ def update_netcdf_attrs(output_file: str,
             lons_easternmost.append(eastmost)
             lons_westernmost.append(westmost)
 
-    with nc.Dataset(output_file, 'a') as dataset_attr:
-        original_attrs = dataset_attr.ncattrs()
+    def set_attr_with_type(tree: DataTree, attr_name: str, value: Any) -> None:
+        """Set attribute on a DataTree node while preserving its original type, if it exists."""
+        original_attrs = tree.attrs
+        if attr_name in original_attrs:
+            original_type = type(original_attrs[attr_name])
+            tree.attrs[attr_name] = original_type(value)
 
-        def set_attr_with_type(attr_name: str, value: Any) -> None:
-            """Set attribute while preserving its original type if it exists."""
-            if attr_name in original_attrs:
-                original_type = type(dataset_attr.getncattr(attr_name))
-                dataset_attr.setncattr(attr_name, original_type(value))
+    if spatial_bounds_array is not None:
+        # Define geographical bounds mapping
+        bounds_mapping = {
+            'geospatial_lat_max': (1, 1),
+            'geospatial_lat_min': (1, 0)
+        }
 
-        if spatial_bounds_array is not None:
-            # Define geographical bounds mapping
-            bounds_mapping = {
-                'geospatial_lat_max': (1, 1),
-                'geospatial_lat_min': (1, 0)
-            }
+        for attr_name, (i, j) in bounds_mapping.items():
+            set_attr_with_type(dataset, attr_name, spatial_bounds_array[i][j])
 
-            # Set all geographic bounds attributes
-            for attr_name, (i, j) in bounds_mapping.items():
-                set_attr_with_type(attr_name, spatial_bounds_array[i][j])
+        # Remove deprecated center coordinates
+        deprecated_keys = {
+            "start_center_longitude",
+            "start_center_latitude",
+            "end_center_longitude",
+            "end_center_latitude",
+            "northernmost_latitude",
+            "southernmost_latitude",
+            "easternmost_longitude",
+            "westernmost_longitude"
+        }
 
-            # Remove deprecated center coordinates
-            deprecated_keys = {
-                "start_center_longitude",
-                "start_center_latitude",
-                "end_center_longitude",
-                "end_center_latitude",
-                "northernmost_latitude",
-                "southernmost_latitude",
-                "easternmost_longitude",
-                "westernmost_longitude"
-            }
+        for key in deprecated_keys & dataset.attrs.keys():
+            del dataset.attrs[key]
 
-            # Safely remove deprecated attributes if they exist
-            for key in deprecated_keys & set(dataset_attr.ncattrs()):
-                dataset_attr.delncattr(key)
+        # Set CRS and bounds
+        if lons_westernmost:
+            final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+            set_attr_with_type(dataset, "geospatial_lon_min", final_westmost)
+        if lons_easternmost:
+            final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
+            set_attr_with_type(dataset, "geospatial_lon_max", final_eastmost)
+        dataset.attrs["geospatial_bounds_crs"] = "EPSG:4326"
+        geospatial_bounds = (
+            create_geospatial_bounds(dataset, lon_var_names, lat_var_names)
+            or create_geospatial_bounding_box(spatial_bounds_array, final_eastmost, final_westmost)
+        )
+        dataset.attrs["geospatial_bounds"] = geospatial_bounds
 
-            # Set CRS and bounds
-            if lons_westernmost:
-                final_westmost = min(lons_westernmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-                set_attr_with_type("geospatial_lon_min", final_westmost)
-            if lons_easternmost:
-                final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
-                set_attr_with_type("geospatial_lon_max", final_eastmost)
-            dataset_attr.setncattr("geospatial_bounds_crs", "EPSG:4326")
-            geospatial_bounds = (
-                create_geospatial_bounds(datasets, lon_var_names, lat_var_names)
-                or create_geospatial_bounding_box(spatial_bounds_array, final_eastmost, final_westmost)
-            )
-            dataset_attr.setncattr("geospatial_bounds", geospatial_bounds)
+    # Set product name based on conditions
+    has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
+    product_name = (stage_file_name_subsetted_true if has_spatial_bounds and stage_file_name_subsetted_true
+                    else stage_file_name_subsetted_false if stage_file_name_subsetted_false
+                    else output_file)
 
-        # Set product name based on conditions
-        has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
-        product_name = (stage_file_name_subsetted_true if has_spatial_bounds and stage_file_name_subsetted_true
-                        else stage_file_name_subsetted_false if stage_file_name_subsetted_false
-                        else output_file)
-
-        set_attr_with_type('product_name', product_name)
+    set_attr_with_type(dataset, "product_name", product_name)
 
 
 def create_geospatial_bounding_box(spatial_bounds_array, east, west):
@@ -1579,38 +1432,24 @@ def create_geospatial_bounding_box(spatial_bounds_array, east, west):
     return wkt_polygon
 
 
-def create_geospatial_bounds(datasets, lon_var_names, lat_var_names):
+def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
     """Create geospatial bounds from 4 corners of 2d array"""
 
-    for dataset in datasets:
-        lon_var_name = None
-        lat_var_name = None
+    for lon_var_name, lat_var_name in zip(lon_var_names, lat_var_names):
 
-        if len(lon_var_names) == 1:
-            lon_var_name = lon_var_names[0]
-        else:
-            matched_names = [lon_name for lon_name in lon_var_names if lon_name in dataset.data_vars]
-            if matched_names:
-                lon_var_name = matched_names[0]
-            else:
-                continue
+        lon = dataset[lon_var_name]
+        lat = dataset[lat_var_name]
 
-        if len(lat_var_names) == 1:
-            lat_var_name = lat_var_names[0]
-        else:
-            matched_names = [lat_name for lat_name in lat_var_names if lat_name in dataset.data_vars]
-            if matched_names:
-                lat_var_name = matched_names[0]
-            else:
-                continue
-
-        lon = dataset[lon_var_name].values
-        lat = dataset[lat_var_name].values
-
-        lon_fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
-        lat_fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
+        lon_fill_value = lon.attrs.get('_FillValue', None)
+        lat_fill_value = lat.attrs.get('_FillValue', None)
 
         break
+
+    lon_scale = lon.attrs.get('scale_factor', 1.0)
+    lon_offset = lon.attrs.get('add_offset', 0.0)
+
+    lat_scale = lat.attrs.get('scale_factor', 1.0)
+    lat_offset = lat.attrs.get('add_offset', 0.0)
 
     # Check if the variables are 2D arrays
     if lon.ndim != 2 or lat.ndim != 2:
@@ -1620,10 +1459,22 @@ def create_geospatial_bounds(datasets, lon_var_names, lat_var_names):
     nrows, ncols = lon.shape
 
     points = [
-        (lon[0, 0], lat[0, 0]),        # Top-left
-        (lon[nrows - 1, 0], lat[nrows - 1, 0]),  # Bottom-left
-        (lon[nrows - 1, ncols - 1], lat[nrows - 1, ncols - 1]),  # Bottom-right
-        (lon[0, ncols - 1], lat[0, ncols - 1])   # Top-right
+        (
+            float(remove_scale_offset(lon[0, 0], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[0, 0], lat_scale, lat_offset))
+        ),
+        (
+            float(remove_scale_offset(lon[nrows - 1, 0], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[nrows - 1, 0], lat_scale, lat_offset))
+        ),
+        (
+            float(remove_scale_offset(lon[nrows - 1, ncols - 1], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[nrows - 1, ncols - 1], lat_scale, lat_offset))
+        ),
+        (
+            float(remove_scale_offset(lon[0, ncols - 1], lon_scale, lon_offset)),
+            float(remove_scale_offset(lat[0, ncols - 1], lat_scale, lat_offset))
+        )
     ]
 
     # Check for NaN or fill values in corner points
@@ -1677,10 +1528,15 @@ def get_east_west_lon(dataset, lon_var_name):
         tuple: (westmost, eastmost)
             The westernmost and easternmost longitudes in [-180, 180] range.
     """
-    lon_2d = dataset[lon_var_name].values
-    fill_value = dataset[lon_var_name].attrs.get('_FillValue', None)
 
-    lon_flat = lon_2d.flatten()
+    lon_2d = dataset[lon_var_name]
+
+    if lon_2d is None:
+        return None, None
+
+    fill_value = lon_2d.attrs.get('_FillValue', None)
+
+    lon_flat = lon_2d.values.flatten()
     if fill_value is not None:
         lon_flat = lon_flat[lon_flat != fill_value]
     lon_flat = lon_flat[~np.isnan(lon_flat)]

@@ -14,7 +14,7 @@ import pytest
 import xarray as xr
 
 from podaac.subsetter import subset
-
+from harmony_service_lib.exceptions import NoDataException
 
 @pytest.fixture(scope='class')
 def data_dir():
@@ -51,12 +51,16 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
 
     bbox = np.array(((120, 125), (-90, -85)))
     output_file = "{}_{}".format(request.node.name, test_file)
-    subset.subset(
-        file_to_subset=join(data_dir, test_file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file)
-    )
 
+    with pytest.raises(NoDataException, match="No data in subsetted granule."):
+
+        subset.subset(
+            file_to_subset=join(data_dir, test_file),
+            bbox=bbox,
+            output_file=join(subset_output_dir, output_file)
+        )
+
+    """
     test_input_dataset = xr.open_dataset(
         nc_copy_for_expected_results,
         decode_times=False,
@@ -83,6 +87,8 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
             assert condition, f"Data does not match fill value for variable: {variable}"
 
     assert test_input_dataset.dims.keys() == empty_dataset.dims.keys()
-
+    
     test_input_dataset.close()
     empty_dataset.close()
+
+    """

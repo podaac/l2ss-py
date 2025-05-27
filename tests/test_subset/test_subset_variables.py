@@ -10,7 +10,7 @@ import pytest
 import xarray as xr
 
 from podaac.subsetter import subset
-
+from podaac.subsetter import datatree_subset
 
 @pytest.fixture(scope='class')
 def data_dir():
@@ -67,7 +67,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
     time_var_name = None
     try:
         lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
-        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name], [])
+        time_var_name = datatree_subset.compute_time_variable_name_tree(in_ds, in_ds[lat_var_name], [])
     except ValueError:
         # unable to determine lon lat vars
         pass
@@ -82,7 +82,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
         # compare names
         assert in_var[0] == out_var[0]
 
-        # compare attributes
+        # compare attributes    
         np.testing.assert_equal(in_var[1].attrs, out_var[1].attrs)
 
         # compare type and dimension names

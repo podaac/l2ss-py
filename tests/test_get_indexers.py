@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import xarray as xr
 import operator
-from podaac.subsetter.xarray_enhancements import get_indexers_from_nd
+from podaac.subsetter.datatree_subset import get_indexers_from_nd
 
 def create_lon_lat_condition_dataset(
     lon_bounds, lat_bounds, 
