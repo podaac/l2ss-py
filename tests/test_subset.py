@@ -54,8 +54,7 @@ from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter.datatree_subset import get_indexers_from_nd
 from podaac.subsetter import gpm_cleanup as gc
-# from podaac.subsetter import time_converting as tc
-# from podaac.subsetter import dimension_cleanup as dc
+from harmony_service_lib.exceptions import NoDataException
 
 import gc as garbage_collection
 
@@ -1640,13 +1639,14 @@ def test_grouped_empty_subset(data_dir, subset_output_dir, request):
     shutil.copyfile(os.path.join(data_dir, 'sentinel_6', file),
                     os.path.join(subset_output_dir, file))
 
-    spatial_bounds = subset.subset(
-        file_to_subset=join(subset_output_dir, file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file)
-    )
+    with pytest.raises(NoDataException, match="No data in subsetted granule."):
+        spatial_bounds = subset.subset(
+            file_to_subset=join(subset_output_dir, file),
+            bbox=bbox,
+            output_file=join(subset_output_dir, output_file)
+        )
 
-    assert spatial_bounds is None
+       #assert spatial_bounds is None
 
 
 def test_get_time_OMI(data_dir, subset_output_dir):
@@ -1693,23 +1693,25 @@ def test_empty_temporal_subset(data_dir, subset_output_dir, request):
     min_time = '2019-09-01'
     max_time = '2019-09-30'
 
-    subset.subset(
-        file_to_subset=join(data_dir, file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file),
-        min_time=min_time,
-        max_time=max_time
-    )
+    with pytest.raises(NoDataException, match="No data in subsetted granule."):
 
-    # Check that all times are within the given bounds. Open
-    # dataset using 'decode_times=True' for auto-conversions to
-    # datetime
-    ds = xr.open_dataset(
-        join(subset_output_dir, output_file),
-        decode_coords=False
-    )
+        subset.subset(
+            file_to_subset=join(data_dir, file),
+            bbox=bbox,
+            output_file=join(subset_output_dir, output_file),
+            min_time=min_time,
+            max_time=max_time
+        )
 
-    assert all(dim_size == 1 for dim_size in ds.dims.values())
+        # Check that all times are within the given bounds. Open
+        # dataset using 'decode_times=True' for auto-conversions to
+        # datetime
+        #ds = xr.open_dataset(
+        #    join(subset_output_dir, output_file),
+        #    decode_coords=False
+        #)
+
+        #assert all(dim_size == 1 for dim_size in ds.dims.values())
 
 
 def test_passed_coords(data_dir):

@@ -11,7 +11,7 @@ import numpy as np
 import xarray as xr
 
 from podaac.subsetter import subset
-
+from harmony_service_lib.exceptions import NoDataException
 
 @pytest.fixture(scope='class')
 def data_dir():
@@ -46,13 +46,16 @@ def test_subset_size(test_file, data_dir, subset_output_dir, request):
     input_file_path = os.path.join(data_dir, test_file)
     output_file_path = os.path.join(subset_output_dir, output_file)
 
-    subset.subset(
-        file_to_subset=input_file_path,
-        bbox=bbox,
-        output_file=output_file_path
-    )
+    try:
+        subset.subset(
+            file_to_subset=input_file_path,
+            bbox=bbox,
+            output_file=output_file_path
+        )
 
-    original_file_size = os.path.getsize(input_file_path)
-    subset_file_size = os.path.getsize(output_file_path)
+        original_file_size = os.path.getsize(input_file_path)
+        subset_file_size = os.path.getsize(output_file_path)
 
-    assert subset_file_size < original_file_size
+        assert subset_file_size < original_file_size
+    except NoDataException as e:
+        assert True

@@ -11,6 +11,7 @@ import numpy as np
 import xarray as xr
 from xarray import DataTree
 from netCDF4 import date2num  # pylint: disable=no-name-in-module
+from harmony_service_lib.exceptions import NoDataException
 
 from podaac.subsetter import dimension_cleanup as dc
 
@@ -209,7 +210,8 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 indexers = get_indexers_from_nd(cond, cut)
 
             if not all(len(value) > 0 for value in indexers.values()):
-                return copy_empty_dataset(dataset), {}
+                raise NoDataException("No data in subsetted granule.")
+                # return copy_empty_dataset(dataset), {}
 
             # Check for partial dimension overlap
             partial_dim_in_vars = check_partial_dim_overlap_node(dataset, indexers)
@@ -674,58 +676,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     return traverse_tree(tree, "")
 
 
-def get_variable_from_path(datatree: Any, path: str) -> Optional[Union[xr.DataArray, xr.Dataset]]:
-    """
-    Get a variable from a datatree object using a path-like string.
-
-    Parameters
-    ----------
-    datatree : Any
-        The datatree object to search through
-    path : str
-        Path to the variable using '/' as delimiter
-        Example: "group1/subgroup/variable_name"
-
-    Returns
-    -------
-    Optional[Union[xr.DataArray, xr.Dataset]]
-        The variable found at the specified path, or None if not found
-
-    """
-    # Handle empty path
-    if not path:
-        return None
-
-    # Clean path by removing leading/trailing slashes and whitespace
-    clean_path = path.strip().strip('/')
-
-    # Split path into components
-    path_components = clean_path.split('/')
-
-    # Start at root
-    current = datatree
-
-    try:
-        # Traverse through path components
-        for component in path_components:
-            # Skip empty components
-            if not component:
-                continue
-
-            # Check if component exists
-            if not hasattr(current, component):
-                return None
-
-            # Move to next level
-            current = getattr(current, component)
-
-        return current
-
-    except (AttributeError, TypeError):
-        # Return None if any error occurs during traversal
-        return None
-
-
 def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     """Remove scale and offset from the given value"""
     return (value * scale) - offset
@@ -757,8 +707,8 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
     for lat_var_name, lon_var_name in zip(lat_var_names, lon_var_names):
         try:
             # Get variables from paths
-            lat_data = get_variable_from_path(datatree, lat_var_name)
-            lon_data = get_variable_from_path(datatree, lon_var_name)
+            lat_data = datatree[lat_var_name]
+            lon_data = datatree[lon_var_name]
 
             # Get metadata attributes efficiently
             lat_attrs = lat_data.attrs
