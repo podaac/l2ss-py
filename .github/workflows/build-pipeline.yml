@@ -179,7 +179,7 @@ jobs:
         run: |
           OUTPUT_FILE=result.json
 
-          PAYLOAD=$(echo '{"client_id": "l2ss-py-github-action", "minimum_alive_secs": 300}')
+          PAYLOAD=$(echo '{"client_id": "L2SSpyGithubAction", "minimum_alive_secs": 300}')
 
           aws lambda invoke \
             --function-name ${{ env.venue }}-launchpad_token_dispenser \
