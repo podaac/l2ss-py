@@ -184,8 +184,7 @@ jobs:
           aws lambda invoke \
             --function-name ${{ env.venue }}-launchpad_token_dispenser \
             --payload "$PAYLOAD" \
-            $OUTPUT_FILE \
-            --cli-binary-format raw-in-base64-out >/dev/null
+            $OUTPUT_FILE 
 
           RESULT=$(jq -r '.' < "$OUTPUT_FILE")
           echo "::add-mask::$RESULT"
