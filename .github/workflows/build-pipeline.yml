@@ -44,6 +44,7 @@ jobs:
           new_ver="${{ steps.get-version.outputs.current_version }}+$(git rev-parse --short ${GITHUB_SHA})"
           poetry version $new_ver
           echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
+          echo "venue=sit" >> $GITHUB_ENV
       - name: Bump alpha version
         # If triggered by push to the develop branch
         if: ${{ github.ref == 'refs/heads/develop' }}
