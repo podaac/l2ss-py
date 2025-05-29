@@ -468,22 +468,38 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
         current_lat_coord_names = []
         current_lon_coord_names = []
 
+        possible_pairs = [
+            ('lat', 'lon'),
+            ('latitude', 'longitude'),
+            ('y', 'x')
+        ]
+
+        current_lat_coord_names = []
+        current_lon_coord_names = []
+
+        dataset = xr.decode_cf(dataset)
+
+        def append_coords_pair(pair):
+            lat_name, lon_name = pair
+            lat_found = None
+            lon_found = None
+            for var_name in dataset.variables:
+                lname = var_name.lower()
+                if lname == lat_name:
+                    lat_found = f"{path}/{var_name}"
+                if lname == lon_name:
+                    lon_found = f"{path}/{var_name}"
+            if lat_found and lon_found:
+                current_lat_coord_names.append(lat_found)
+                current_lon_coord_names.append(lon_found)
+
+        for pair in possible_pairs:
+            append_coords_pair(pair)
+
         custom_criteria = {
             "latitude": {"standard_name": "latitude|projection_y_coordinate"},
             "longitude": {"standard_name": "longitude|projection_x_coordinate"},
         }
-
-        dataset = xr.decode_cf(dataset)
-
-        def append_coords_matching(names_set, coords_list):
-            """Append matching coordinates to the list."""
-            for var_name in dataset.variables:
-                if var_name.lower() in names_set:
-                    coords_list.append(f"{path}/{var_name}")
-
-        # First check for direct matches
-        append_coords_matching(possible_lat_coord_names, current_lat_coord_names)
-        append_coords_matching(possible_lon_coord_names, current_lon_coord_names)
 
         # Fallback: check metadata for coordinates if not found
         if not current_lat_coord_names or not current_lon_coord_names:
