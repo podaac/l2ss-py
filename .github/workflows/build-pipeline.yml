@@ -157,22 +157,20 @@ jobs:
           git commit -am "/version ${{ env.software_version }}"
           git push
 
-      - name: Set AWS secrets based on venue
-        id: set-creds
-        run: |
-          if [ "$venue" = "sit" ]; then
-            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_UAT }}" >> $GITHUB_ENV
-            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_UAT }}" >> $GITHUB_ENV
-          elif [ "$venue" = "ops" ]; then
-            echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_OPS }}" >> $GITHUB_ENV
-            echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_OPS }}" >> $GITHUB_ENV
-          fi
-
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials for SIT
+        if: env.venue == 'sit'
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          aws-access-key-id: ${{ env.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_UAT }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_UAT }}
+          aws-region: us-west-2
+
+      - name: Configure AWS credentials for OPS
+        if: env.venue == 'ops'
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_OPS }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_OPS }}
           aws-region: us-west-2
 
       - name: Get Lauchpad Token
