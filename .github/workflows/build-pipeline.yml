@@ -184,11 +184,11 @@ jobs:
           aws lambda invoke \
             --function-name ${{ env.venue }}-launchpad_token_dispenser \
             --payload "$PAYLOAD" \
-            $OUTPUT_FILE 
+            $OUTPUT_FILE > /dev/null 2>&1
 
-          RESULT=$(jq -r '.' < "$OUTPUT_FILE")
+          RESULT=$(jq -r '.sm_token' < "$OUTPUT_FILE")
           echo "::add-mask::$RESULT"
-          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+          echo "RESULT=$RESULT" >> $GITHUB_ENV
 
       - name: Publish UMM-S with new version
         id: publish-umm-s
