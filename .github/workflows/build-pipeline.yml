@@ -44,7 +44,7 @@ jobs:
           new_ver="${{ steps.get-version.outputs.current_version }}+$(git rev-parse --short ${GITHUB_SHA})"
           poetry version $new_ver
           echo "software_version=$(poetry version | awk '{print $2}')" >> $GITHUB_ENV
-          echo "venue=sit" >> $GITHUB_ENV
+          echo "venue=uat" >> $GITHUB_ENV
       - name: Bump alpha version
         # If triggered by push to the develop branch
         if: ${{ github.ref == 'refs/heads/develop' }}
@@ -158,8 +158,8 @@ jobs:
           git commit -am "/version ${{ env.software_version }}"
           git push
 
-      - name: Configure AWS credentials for SIT
-        if: env.venue == 'sit'
+      - name: Configure AWS credentials for UAT
+        if: env.venue == 'uat'
         uses: aws-actions/configure-aws-credentials@v3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_UAT }}
