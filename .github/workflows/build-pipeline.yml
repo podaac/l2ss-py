@@ -162,16 +162,16 @@ jobs:
         if: env.venue == 'uat'
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_UAT }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_UAT }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
           aws-region: us-west-2
 
       - name: Configure AWS credentials for OPS
         if: env.venue == 'ops'
         uses: aws-actions/configure-aws-credentials@v3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_OPS }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_OPS }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_OPS }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_OPS }}
           aws-region: us-west-2
 
       - name: Get Lauchpad Token
