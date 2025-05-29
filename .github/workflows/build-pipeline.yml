@@ -154,6 +154,31 @@ jobs:
           git config --global user.email 'l2ss-py@noreply.github.com'
           git commit -am "/version ${{ env.software_version }}"
           git push
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets[format('AWS_ACCESS_KEY_ID_SERVICES_{0}', env.venue.upper())] }}
+          aws-secret-access-key: ${{ secrets[format('AWS_SECRET_ACCESS_KEY_SERVICES_{0}', env.venue.upper())] }}
+          aws-region: us-west-2
+
+      - name: Invoke Lambda and capture result securely
+        id: lambda
+        run: |
+          OUTPUT_FILE=result.json
+
+          PAYLOAD=$(echo '{"client_id": "l2ss-py-github-action", "minimum_alive_secs": 300}')
+
+          aws lambda invoke \
+            --function-name ${{ env.venue }}-launchpad_token_dispenser \
+            --payload "$PAYLOAD" \
+            $OUTPUT_FILE \
+            --cli-binary-format raw-in-base64-out >/dev/null
+
+          RESULT=$(jq -r '.' < "$OUTPUT_FILE")
+          echo "::add-mask::$RESULT"
+          echo "result=$RESULT" >> "$GITHUB_OUTPUT"
+
       - name: Publish UMM-S with new version
         id: publish-umm-s
         uses: podaac/cmr-umm-updater@0.6.0
@@ -170,10 +195,11 @@ jobs:
           umm_type: 'umm-s'
           use_associations: 'false'        
         env:
-          LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
-          LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
-          LAUNCHPAD_TOKEN_OPS: ${{secrets.LAUNCHPAD_TOKEN_OPS}}
+          LAUNCHPAD_TOKEN_SIT: ${{ steps.lambda.outputs.result }}
+          LAUNCHPAD_TOKEN_UAT: ${{ steps.lambda.outputs.result }}
+          LAUNCHPAD_TOKEN_OPS: ${{ steps.lambda.outputs.result }}
         continue-on-error: true
+
       - name: Wait to retry publishing umm-s
         if: steps.publish-umm-s.outcome == 'failure'
         run: |
@@ -193,9 +219,10 @@ jobs:
           umm_type: 'umm-s'
           use_associations: 'false'        
         env:
-          LAUNCHPAD_TOKEN_SIT: ${{secrets.LAUNCHPAD_TOKEN_SIT}}
-          LAUNCHPAD_TOKEN_UAT: ${{secrets.LAUNCHPAD_TOKEN_UAT}}
-          LAUNCHPAD_TOKEN_OPS: ${{secrets.LAUNCHPAD_TOKEN_OPS}}
+          LAUNCHPAD_TOKEN_SIT: ${{ steps.lambda.outputs.result }}
+          LAUNCHPAD_TOKEN_UAT: ${{ steps.lambda.outputs.result }}
+          LAUNCHPAD_TOKEN_OPS: ${{ steps.lambda.outputs.result }}
+
       - name: Build Docs
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
