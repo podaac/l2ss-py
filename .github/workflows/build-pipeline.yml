@@ -188,9 +188,8 @@ jobs:
 
           RESULT=$(jq -r '.sm_token' < "$OUTPUT_FILE")
           echo "::add-mask::$RESULT"
-          echo "RESULT=$RESULT" >> $GITHUB_ENV
+          echo "result=$RESULT" >> $GITHUB_OUTPUT
 
-          
       - name: Publish UMM-S with new version
         id: publish-umm-s
         uses: podaac/cmr-umm-updater@0.6.0
@@ -210,6 +209,7 @@ jobs:
           LAUNCHPAD_TOKEN_SIT: ${{ steps.lambda.outputs.result }}
           LAUNCHPAD_TOKEN_UAT: ${{ steps.lambda.outputs.result }}
           LAUNCHPAD_TOKEN_OPS: ${{ steps.lambda.outputs.result }}
+
         continue-on-error: true
       - name: Wait to retry publishing umm-s
         if: steps.publish-umm-s.outcome == 'failure'
