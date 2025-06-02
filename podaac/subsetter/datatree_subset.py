@@ -152,6 +152,21 @@ def get_sibling_or_parent_condition(condition_dict, path):
     return condition_dict.get("/", None)
 
 
+def align_by_shared_dims(ds1, ds2):
+    """Function to align parent and child"""
+
+    # Find shared dimension names
+    shared_dims = set(ds1.dims).intersection(ds2.dims)
+    # For each shared dim, find the minimum length
+    min_sizes = {dim: min(ds1.dims[dim], ds2.dims[dim]) for dim in shared_dims}
+    # Slice each dataset along shared dims to the minimum size
+
+    def slice_ds(ds, min_sizes):
+        indexers = {dim: slice(0, min_sizes[dim]) for dim in min_sizes if dim in ds.dims}
+        return ds.isel(**indexers)
+    return slice_ds(ds1, min_sizes), slice_ds(ds2, min_sizes)
+
+
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
     Return a DataTree which meets the given condition, processing all nodes in the tree.
@@ -303,6 +318,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         for child_name, child_node in node.children.items():
             # Process the child node
             child_ds, child_children = process_node(child_node, f"{path}/{child_name}")
+
+            # --- Align parent and child datasets before attaching child ---
+            processed_ds, child_ds = align_by_shared_dims(processed_ds, child_ds)
 
             # Create new DataTree for the processed child
             child_tree = DataTree(name=child_name, dataset=child_ds)
