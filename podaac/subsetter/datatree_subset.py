@@ -1026,23 +1026,24 @@ def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
         return int(value)
 
     if not any(time_name in var for var in ds.variables):
-        if "ScanTime" in group_path:
+        if "ScanTime" in (group_path or ""):
             time_unit_out = "seconds since 1980-01-06 00:00:00"
-            new_time_list = [
-                date2num(
-                    datetime.datetime(
-                        int(ds["Year"].values[i]),
-                        int(ds["Month"].values[i]),
-                        convert_to_int(ds["DayOfMonth"].values[i], 'day'),
-                        hour=convert_to_int(ds["Hour"].values[i], 'hour'),
-                        minute=convert_to_int(ds["Minute"].values[i], 'minute'),
-                        second=int(ds["Second"].values[i]),
-                        microsecond=int(ds["MilliSecond"].values[i] * 1000)
-                    ),
-                    time_unit_out,
+            new_time_list = []
+            for i, _ in enumerate(ds["Year"].values):
+                ms = int(ds["MilliSecond"].values[i])
+                if not 0 <= ms < 1000:
+                    raise ValueError(f"Milliseconds out of range: {ms} at index {i}")
+                microsecond = ms * 1000
+                dt = datetime.datetime(
+                    int(ds["Year"].values[i]),
+                    int(ds["Month"].values[i]),
+                    convert_to_int(ds["DayOfMonth"].values[i], 'day'),
+                    hour=convert_to_int(ds["Hour"].values[i], 'hour'),
+                    minute=convert_to_int(ds["Minute"].values[i], 'minute'),
+                    second=int(ds["Second"].values[i]),
+                    microsecond=microsecond
                 )
-                for i in range(len(ds["Year"].values))
-            ]
+                new_time_list.append(date2num(dt, time_unit_out))
 
             ds[time_name] = (ds["Year"].dims, np.array(new_time_list))
             ds[time_name].attrs["unit"] = time_unit_out
