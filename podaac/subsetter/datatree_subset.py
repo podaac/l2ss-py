@@ -4,7 +4,7 @@
 import datetime
 import logging
 import re
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, Dict, List, Set, Tuple, Union
 
 import cf_xarray as cfxr
 import numpy as np
@@ -616,107 +616,93 @@ def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str
 
 
 def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
-    """attempt to get the time variable for a datatree"""
+    """Attempt to get the time variable for a datatree by applying all method 1 first, then 2, etc."""
 
-    def find_time_in_dataset(dataset: xr.Dataset, lat_var: xr.Variable, total_time_vars: Set[str]) -> Optional[str]:  # pylint: disable=too-many-branches
-        """
-        Find the time variable name in a dataset using various criteria.
+    def get_all_datasets(node, path=""):
+        """Recursively collect all datasets in the tree with their paths."""
+        datasets = []
+        if node.ds is not None:
+            datasets.append((path, node.ds))
+        for child_name, child_node in node.children.items():
+            child_path = f"{path}/{child_name}" if path else child_name
+            datasets.extend(get_all_datasets(child_node, child_path))
+        return datasets
 
-        The search is performed in order of reliability:
-        1. Coordinates with 'time' in name
-        2. Variables with explicit time metadata
-        3. Variables with 'time' in name matching lat dimensions
-        4. Variables with specific time-related names
+    def method_1(path, ds):
+        for coord_name in ds.coords:
+            if 'time' == coord_name.lower() and coord_name not in total_time_vars:
+                if ds[coord_name].squeeze().dims == lat_var.squeeze().dims:
+                    return f"{path}/{coord_name}"
+        return None
 
-        Parameters
-        ----------
-        dataset : xr.Dataset
-            xarray dataset to search
-        lat_var : xr.Variable
-            Latitude variable for dimension matching
-        total_time_vars : Set[str]
-            Set of previously found time variables to exclude
-
-        Returns
-        -------
-        Optional[str]
-            Name of found time variable or None if not found
-        """
-        lat_dims = lat_var.squeeze().dims
-
-        # Cache squeezed dimensions to avoid repeated computations
-        dim_cache = {}
-
-        def get_squeezed_dims(var_name: str) -> tuple:
-            if var_name not in dim_cache:
-                dim_cache[var_name] = dataset[var_name].squeeze().dims
-            return dim_cache[var_name]
-
-        # Check coordinates first (most likely location)
-        for coord_name in dataset.coords:
-            if 'time' in coord_name.lower() and coord_name not in total_time_vars:
-                if get_squeezed_dims(coord_name) == lat_dims:
-                    return coord_name
-
-        # Compile regex pattern once
-        time_units_pattern = re.compile(
+    def method_2(path, ds):
+        pattern = re.compile(
             r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?",
             re.IGNORECASE
         )
-
-        # Check variables with time-related metadata
-        for var_name, var in dataset.variables.items():
+        for var_name, var in ds.variables.items():
             if var_name in total_time_vars:
                 continue
-
-            # Check metadata indicators
             if any([
-                var.attrs.get('standard_name') == 'time',
-                var.attrs.get('axis') == 'T',
-                ('units' in var.attrs and time_units_pattern.match(var.attrs['units']))
+                var.attrs.get("standard_name") == "time",
+                var.attrs.get("axis") == "T",
+                ("units" in var.attrs and pattern.match(var.attrs["units"]))
             ]):
                 if var.size > 1:
-                    return var_name
-
-        # Check variables with 'time' in name and matching dimensions
-        for var_name in dataset.variables:
-
-            if var_name in total_time_vars:
-                continue
-
-            dims = get_squeezed_dims(var_name)
-            if not dims:  # Skip dimensionless variables
-                continue
-
-            var_basename = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1].lower()
-
-            # Check for exact time variable names first
-            if var_basename in {'time', 'timemidscan'} and dims[0] in lat_dims:
-                return var_name
-
-            # Then check for 'time' in name
-            if 'time' in var_basename and dims[0] in lat_dims:
-                return var_name
-
+                    return f"{path}/{var_name}"
         return None
 
-    def traverse_tree(node, path):
-        """Recursively search through the tree for latitude and longitude coordinates."""
-        if node.ds is not None:
-            return_time = find_time_in_dataset(node.ds, lat_var, total_time_vars)
-            if return_time:
-                time_var = f"{path}/{return_time}"
-                return time_var
+    def method_3(path, ds):
+        lat_dims = lat_var.squeeze().dims
+        for var_name in ds.variables:
+            if var_name in total_time_vars:
+                continue
+            dims = ds[var_name].squeeze().dims
+            if not dims:
+                continue
+            if 'time' == var_name.lower() and dims[0] in lat_dims:
+                return f"{path}/{var_name}"
+        return None
 
-        for child_name, child_node in node.children.items():
-            new_path = f"{path}/{child_name}" if path else child_name
-            traverse_tree(child_node, new_path)
+    def method_4(path, ds):
+        lat_dims = lat_var.squeeze().dims
+        for var_name in ds.variables:
+            if var_name in total_time_vars:
+                continue
+            dims = ds[var_name].squeeze().dims
+            if not dims:
+                continue
+            if 'time' in var_name.lower() and dims[0] in lat_dims:
+                return f"{path}/{var_name}"
+        return None
 
-    # Start recursive tree traversal
+    def method_5(path, ds):
+        lat_dims = lat_var.squeeze().dims
+        for var_name in ds.variables:
+            if var_name in total_time_vars:
+                continue
+            dims = ds[var_name].squeeze().dims
+            if not dims:
+                continue
+            var_basename = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1].lower()
+            if var_basename in {'time', 'timemidscan'} and dims[0] in lat_dims:
+                return f"{path}/{var_name}"
+        return None
+
+    # Start
     if isinstance(tree, xr.Dataset):
         tree = DataTree(dataset=tree)
 
-    return traverse_tree(tree, "")
+    all_datasets = get_all_datasets(tree)
+
+    # Try each method across the entire tree, in priority order
+    for method in [method_1, method_2, method_3, method_4, method_5]:
+        for path, ds in all_datasets:
+            result = method(path, ds)
+            if result:
+                return result
+
+    return None
 
 
 def remove_scale_offset(value: float, scale: float, offset: float) -> float:

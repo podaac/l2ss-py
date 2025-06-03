@@ -1216,6 +1216,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
+        print(time_var_names)
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
