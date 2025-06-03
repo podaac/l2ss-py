@@ -128,6 +128,10 @@ def convert_to_datetime(data_tree: xr.Dataset, time_vars: list, instrument_type:
                 date_time_array = np.full(group[var_name].shape, start_date)
                 # add seconds since the start time to the start time to get the time at the data point
                 new_values = date_time_array.astype("datetime64[ns]") + group[var_name].astype('timedelta64[s]').values
+                try:
+                    group[var_name].values = date_time_array.astype("datetime64[ns]") + group[var_name].astype('timedelta64[s]').values
+                except ValueError:
+                    pass
                 update_coord_everywhere(data_tree, var_name, new_values)
                 continue
 
