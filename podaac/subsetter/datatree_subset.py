@@ -60,7 +60,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         Indexer dictionary for the provided condition.
     """
     # check if the lat/lon coordinate numpy array has 2 or more dimensions
-    transpose = dim_grid = False
+    transpose = dim_grid = ges_disc_phony = False
     ndim = cond.values.squeeze().ndim
 
     # Determine axes and flags
@@ -73,6 +73,9 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         elif 'xdim_grid' in cond.dims and 'ydim_grid' in cond.dims:
             x_axis, y_axis = cond.dims.index('xdim_grid'), cond.dims.index('ydim_grid')
             dim_grid = x_axis == 1 and y_axis == 0
+        elif all('phony_dim' in dim for dim in cond.dims):
+            x_axis, y_axis = 2, 1
+            ges_disc_phony = True
         else:
             x_axis, y_axis = 2, 1
 
@@ -100,11 +103,17 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
             rows, cols = rows[0], cols[0]
 
     # Generate indexers
-    indexers = {
-        cond_dims[y_axis]: np.where(rows)[0],
-        cond_dims[x_axis]: np.where(cols)[0]
-    }
-
+    if ges_disc_phony:
+        indexers = {
+            cond_dims[y_axis]: np.where(rows)[0],
+            cond_dims[x_axis]: np.where(cols)[0],
+            cond_dims[0]: np.where(cols)[0]
+        }
+    else:
+        indexers = {
+            cond_dims[y_axis]: np.where(rows)[0],
+            cond_dims[x_axis]: np.where(cols)[0]
+        }
     return indexers
 
 
@@ -206,7 +215,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             Processed dataset and dictionary of processed child nodes
         """
         cond = get_sibling_or_parent_condition(condition_dict, path)
-
         # if only one condition in dictionary then get the one condition
         if cond is None:
             if len(condition_dict) == 1:
@@ -242,6 +250,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             else:
                 # Get variables with and without indexers
                 subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
+
                 new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
 
                 # data with variables that shouldn't be subsetted
@@ -261,7 +270,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
                         indexers.keys()).intersection(dataset[variable_name].dims):
 
-                    missing_dim = (indexers.keys() - dataset[variable_name].dims).pop()  # Assume only 1
+                    missing_dim = sorted(indexers.keys() - dataset[variable_name].dims)[0]
                     var_indexers = {
                         dim_name: dim_value for dim_name, dim_value in indexers.items()
                         if dim_name in dataset[variable_name].dims
@@ -1029,6 +1038,8 @@ def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
         if "ScanTime" in (group_path or ""):
             time_unit_out = "seconds since 1980-01-06 00:00:00"
             new_time_list = []
+            new_time_list_dt = []
+
             for i, _ in enumerate(ds["Year"].values):
                 ms = int(ds["MilliSecond"].values[i])
                 if not 0 <= ms < 1000:
@@ -1044,8 +1055,11 @@ def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
                     microsecond=microsecond
                 )
                 new_time_list.append(date2num(dt, time_unit_out))
+                new_time_list_dt.append(dt)  # keep actual datetime
 
             ds[time_name] = (ds["Year"].dims, np.array(new_time_list))
             ds[time_name].attrs["unit"] = time_unit_out
+
+            ds[time_name + "_datetime"] = (ds["Year"].dims, np.array(new_time_list_dt))
 
     return ds

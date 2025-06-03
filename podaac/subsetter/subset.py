@@ -820,7 +820,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         lon_data = dataset[lon_var_name]
         lat_data = dataset[lat_var_name]
-
         operation = (
             oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
             (lat_data >= lat_bounds[0]) &
@@ -828,7 +827,9 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             temporal_cond
         )
 
-        if lat_path == lon_path and lat_path == time_path and lon_path == time_path:
+        # We want the lon lat time path to be the same
+        # timeMidScan_datetime is a time made for ges disc collection in a ScanTime group
+        if lat_path == lon_path == time_path or 'timeMidScan_datetime' in time_var_name:
             subset_dictionary[lat_path] = operation
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
@@ -1205,10 +1206,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             raise ValueError('Could not determine time variable')
 
         if '.HDF5' == file_extension:
+            time_var_names = []
             for group in dataset.groups:
                 if "ScanTime" in group:
                     group_dataset = dataset[group].ds
                     dataset[group].ds = datatree_subset.update_dataset_with_time(group_dataset, group_path=group)
+                    time_var_names.append(group + '/timeMidScan_datetime')
 
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
