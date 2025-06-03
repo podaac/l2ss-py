@@ -185,11 +185,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 subset_params['pixel_subset'] = message.pixelSubset
 
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
-
-            try:
-                subset_params['cut'] = message.extraArgs['cut']
-            except (KeyError, AttributeError, TypeError):
-                pass
+            subset_params['cut'] = True
 
             if source.variables:
                 subset_params['variables'] = [variable.name for variable in source.process('variables')]
