@@ -649,6 +649,9 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
                 timestamp = np.datetime64(timestamp) - epoch_datetime
 
         if getattr(time_data, 'long_name', None) == "reference time of sst file":
+            timestamp = pd.to_datetime(timestamp).to_datetime64()
+            time_data = dataset['time']
+            time_data = time_data.astype('datetime64[s]')
             timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
             time_data = time_data + timedelta_seconds
 

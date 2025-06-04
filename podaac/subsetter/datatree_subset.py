@@ -241,8 +241,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False, te
             partial_dim_in_in_vars = partial_dim_in_vars
 
             indexed_cond = cond.isel(**indexers)
-            # added missing dims to ignore
-            # test to make it pass test_omi_novars_subset
             indexed_ds = dataset.isel(**indexers, missing_dims='ignore')
 
             if pixel_subset:
@@ -653,6 +651,15 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
         return None
 
     def method_3(path, ds):
+        # Only proceed if both 'time' and 'sst_dtime' exist in the dataset variables
+        if 'time' in ds.variables and 'sst_dtime' in ds.variables:
+            time_var = ds['time']
+            # Check the long_name attribute for the 'time' variable
+            if time_var.attrs.get('long_name', None) == "reference time of sst file":
+                return f"{path}/time"
+        return None
+
+    def method_4(path, ds):
         lat_dims = lat_var.squeeze().dims
         for var_name in ds.variables:
             if var_name in total_time_vars:
@@ -664,7 +671,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
                 return f"{path}/{var_name}"
         return None
 
-    def method_4(path, ds):
+    def method_5(path, ds):
         lat_dims = lat_var.squeeze().dims
         for var_name in ds.variables:
             if var_name in total_time_vars:
@@ -676,7 +683,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
                 return f"{path}/{var_name}"
         return None
 
-    def method_5(path, ds):
+    def method_6(path, ds):
         lat_dims = lat_var.squeeze().dims
         for var_name in ds.variables:
             if var_name in total_time_vars:
@@ -696,7 +703,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     all_datasets = get_all_datasets(tree)
 
     # Try each method across the entire tree, in priority order
-    for method in [method_1, method_2, method_3, method_4, method_5]:
+    for method in [method_1, method_2, method_3, method_4, method_5, method_6]:
         for path, ds in all_datasets:
             result = method(path, ds)
             if result:
