@@ -43,7 +43,7 @@ def get_indexers_from_1d(cond: xr.Dataset) -> dict:
     return indexers
 
 
-def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
+def get_indexers_from_nd(cond: xr.Dataset, cut: bool, temporal_subsetting: bool = False) -> dict:
     """
     Get indexers from a dataset with more than one dimension.
 
@@ -103,7 +103,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
             rows, cols = rows[0], cols[0]
 
     # Generate indexers
-    if ges_disc_phony:
+    if ges_disc_phony and temporal_subsetting:
         indexers = {
             cond_dims[y_axis]: np.where(rows)[0],
             cond_dims[x_axis]: np.where(cols)[0],
@@ -176,7 +176,7 @@ def align_by_shared_dims(ds1, ds2):
     return slice_ds(ds1, min_sizes), slice_ds(ds2, min_sizes)
 
 
-def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
+def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False, temporal_subsetting=False) -> DataTree:
     """
     Return a DataTree which meets the given condition, processing all nodes in the tree.
 
@@ -230,7 +230,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             if cond.values.ndim == 1:
                 indexers = get_indexers_from_1d(cond)
             else:
-                indexers = get_indexers_from_nd(cond, cut)
+                indexers = get_indexers_from_nd(cond, cut, temporal_subsetting)
 
             if not all(len(value) > 0 for value in indexers.values()):
                 raise NoDataException("No data in subsetted granule.")

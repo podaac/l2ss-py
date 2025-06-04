@@ -678,7 +678,9 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
                                 lon_var_names: List[str],
                                 shapefile: str,
                                 cut: bool,
-                                chunks) -> Dict[str, np.ndarray]:
+                                chunks,
+                                pixel_subset: bool,
+                                temporal_subsetting: bool) -> Dict[str, np.ndarray]:
     """
     Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
 
@@ -753,7 +755,7 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
         lat_path = get_path(lat_var_name)
         masks[lat_path] = boolean_mask
 
-    return_dataset = datatree_subset.where_tree(dataset, masks, cut)
+    return_dataset = datatree_subset.where_tree(dataset, masks, cut, pixel_subset, temporal_subsetting)
     return return_dataset
 
 
@@ -765,7 +767,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      cut: bool = True,
                      min_time: str = None,
                      max_time: str = None,
-                     pixel_subset: bool = False) -> np.ndarray:
+                     pixel_subset: bool = False,
+                     temporal_subsetting: bool = False) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -832,7 +835,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         if lat_path == lon_path == time_path or 'timeMidScan_datetime' in time_var_name:
             subset_dictionary[lat_path] = operation
 
-    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
+    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset, temporal_subsetting)
     return return_dataset
 
 
@@ -1118,7 +1121,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     file_extension = os.path.splitext(file_to_subset)[1]
     override_decode_cf_datetime()
 
-    hdf_type = False
+    hdf_type = temporal_subsetting = False
 
     args = {
         'decode_coords': False,
@@ -1133,6 +1136,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     hdf_type = 'GPM'
 
     if min_time or max_time:
+        temporal_subsetting = True
         fill_value_f8 = nc.default_fillvals.get('f8')
         float_dtypes = ['float64', 'float32']
         args['decode_times'] = True
@@ -1216,7 +1220,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
-        print(time_var_names)
         chunks = calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
@@ -1236,7 +1239,16 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
 
         if shapefile:
-            subsetted_dataset = subset_with_shapefile_multi(dataset, lat_var_names, lon_var_names, shapefile, cut, chunks)
+            subsetted_dataset = subset_with_shapefile_multi(
+                dataset,
+                lat_var_names,
+                lon_var_names,
+                shapefile,
+                cut,
+                chunks,
+                pixel_subset,
+                temporal_subsetting
+            )
         elif bbox is not None:
             subsetted_dataset = subset_with_bbox(
                 dataset=dataset,
@@ -1247,7 +1259,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 cut=cut,
                 min_time=min_time,
                 max_time=max_time,
-                pixel_subset=pixel_subset
+                pixel_subset=pixel_subset,
+                temporal_subsetting=temporal_subsetting
             )
         else:
             raise ValueError('Either bbox or shapefile must be provided')
