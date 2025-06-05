@@ -806,9 +806,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     TODO - fix this docstring type and the type hint to match code (currently returning a list[xr.Dataset])
     """
     lon_bounds, lat_bounds = convert_bbox(bbox, dataset, lat_var_names[0], lon_var_names[0])
-    # condition should be 'or' instead of 'and' when bbox lon_min > lon_max
-    import numpy as np
 
+    # condition should be 'or' instead of 'and' when bbox lon_min > lon_max
     oper = np.logical_and
 
     if lon_bounds[0] > lon_bounds[1]:
@@ -851,9 +850,9 @@ def align_time_to_lon_dim(time_data, lon_data, temporal_cond):
     Aligns a 1D time_data variable to one of the dimensions of a 2D lon_data array,
     renaming time_data's dimension if it matches the size of one of lon_data's dims.
 
-    This happens because combining a 2D x 2D x 1D bitwise mask with mismatched dimensions 
-    results in a 3D mask, which significantly increases memory usage. In this case, one 
-    of the dimensions is a "phony" dimension, so we need to align the time variable with 
+    This happens because combining a 2D x 2D x 1D bitwise mask with mismatched dimensions
+    results in a 3D mask, which significantly increases memory usage. In this case, one
+    of the dimensions is a "phony" dimension, so we need to align the time variable with
     the correct dimension to produce a proper 2D bitwise mask.
 
     Parameters:
@@ -875,7 +874,7 @@ def align_time_to_lon_dim(time_data, lon_data, temporal_cond):
 
         if time_dim_size == lon_dim_1_size:
             return temporal_cond.rename({time_dim: lon_dim_1})
-        elif time_dim_size == lon_dim_2_size:
+        if time_dim_size == lon_dim_2_size:
             return temporal_cond.rename({time_dim: lon_dim_2})
 
     return temporal_cond  # Return unchanged if no renaming needed
