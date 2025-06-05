@@ -60,7 +60,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         Indexer dictionary for the provided condition.
     """
     # check if the lat/lon coordinate numpy array has 2 or more dimensions
-    transpose = dim_grid = ges_disc_phony = False
+    transpose = dim_grid = False
     ndim = cond.values.squeeze().ndim
 
     # Determine axes and flags
@@ -73,9 +73,6 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         elif 'xdim_grid' in cond.dims and 'ydim_grid' in cond.dims:
             x_axis, y_axis = cond.dims.index('xdim_grid'), cond.dims.index('ydim_grid')
             dim_grid = x_axis == 1 and y_axis == 0
-        elif all('phony_dim' in dim for dim in cond.dims):
-            x_axis, y_axis = 2, 1
-            ges_disc_phony = True
         else:
             x_axis, y_axis = 2, 1
 
