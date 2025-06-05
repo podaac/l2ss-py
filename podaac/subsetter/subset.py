@@ -820,15 +820,13 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         lat_path = get_path(lat_var_name)
         lon_path = get_path(lon_var_name)
         time_path = get_path(time_var_name)
-        print(dataset)
 
         lon_data = dataset[lon_var_name]
         lat_data = dataset[lat_var_name]
-        print(time_var_name)
         time_data = dataset[time_var_name]
 
         temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
-        if time_data.ndim == 1 and lon_data.ndim == 2:
+        if time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
             temporal_cond = align_time_to_lon_dim(time_data, lon_data, temporal_cond)
 
         operation = (
