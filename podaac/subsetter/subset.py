@@ -682,8 +682,7 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
                                 shapefile: str,
                                 cut: bool,
                                 chunks,
-                                pixel_subset: bool,
-                                temporal_subsetting: bool) -> Dict[str, np.ndarray]:
+                                pixel_subset: bool) -> Dict[str, np.ndarray]:
     """
     Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
 
@@ -758,7 +757,7 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
         lat_path = get_path(lat_var_name)
         masks[lat_path] = boolean_mask
 
-    return_dataset = datatree_subset.where_tree(dataset, masks, cut, pixel_subset, temporal_subsetting)
+    return_dataset = datatree_subset.where_tree(dataset, masks, cut, pixel_subset)
     return return_dataset
 
 
@@ -770,8 +769,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      cut: bool = True,
                      min_time: str = None,
                      max_time: str = None,
-                     pixel_subset: bool = False,
-                     temporal_subsetting: bool = False) -> np.ndarray:
+                     pixel_subset: bool = False) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -809,10 +807,12 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     """
     lon_bounds, lat_bounds = convert_bbox(bbox, dataset, lat_var_names[0], lon_var_names[0])
     # condition should be 'or' instead of 'and' when bbox lon_min > lon_max
-    oper = operator.and_
+    import numpy as np
+
+    oper = np.logical_and
 
     if lon_bounds[0] > lon_bounds[1]:
-        oper = operator.or_
+        oper = np.logical_or
 
     subset_dictionary = {}
 
@@ -822,10 +822,14 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         lon_path = get_path(lon_var_name)
         time_path = get_path(time_var_name)
 
-        temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
-
         lon_data = dataset[lon_var_name]
         lat_data = dataset[lat_var_name]
+        time_data = dataset[time_var_name]
+
+        temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
+        if time_data.ndim == 1 and lon_data.ndim == 2:
+            temporal_cond = align_time_to_lon_dim(time_data, lon_data, temporal_cond)
+
         operation = (
             oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
             (lat_data >= lat_bounds[0]) &
@@ -838,8 +842,43 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         if lat_path == lon_path == time_path or 'timeMidScan_datetime' in time_var_name:
             subset_dictionary[lat_path] = operation
 
-    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset, temporal_subsetting)
+    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
     return return_dataset
+
+
+def align_time_to_lon_dim(time_data, lon_data, temporal_cond):
+    """
+    Aligns a 1D time_data variable to one of the dimensions of a 2D lon_data array,
+    renaming time_data's dimension if it matches the size of one of lon_data's dims.
+
+    This happens because combining a 2D x 2D x 1D bitwise mask with mismatched dimensions 
+    results in a 3D mask, which significantly increases memory usage. In this case, one 
+    of the dimensions is a "phony" dimension, so we need to align the time variable with 
+    the correct dimension to produce a proper 2D bitwise mask.
+
+    Parameters:
+        time_data (xr.DataArray): 1D array of time values.
+        lon_data (xr.DataArray): 2D array with two dimensions.
+        temporal_cond (xr.DataArray): 1D boolean mask along the time dimension.
+
+    Returns:
+        xr.DataArray: temporal_cond, potentially renamed to match lon_data's dims.
+    """
+
+    time_dim = time_data.dims[0]
+    if time_dim not in lon_data.dims:
+        time_dim_size = time_data.sizes.get(time_dim)
+
+        lon_dim_1, lon_dim_2 = lon_data.dims
+        lon_dim_1_size = lon_data.sizes.get(lon_dim_1)
+        lon_dim_2_size = lon_data.sizes.get(lon_dim_2)
+
+        if time_dim_size == lon_dim_1_size:
+            return temporal_cond.rename({time_dim: lon_dim_1})
+        elif time_dim_size == lon_dim_2_size:
+            return temporal_cond.rename({time_dim: lon_dim_2})
+
+    return temporal_cond  # Return unchanged if no renaming needed
 
 
 def normalize_paths(paths):
@@ -1124,7 +1163,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     file_extension = os.path.splitext(file_to_subset)[1]
     override_decode_cf_datetime()
 
-    hdf_type = temporal_subsetting = False
+    hdf_type = False
 
     args = {
         'decode_coords': False,
@@ -1139,7 +1178,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     hdf_type = 'GPM'
 
     if min_time or max_time:
-        temporal_subsetting = True
         fill_value_f8 = nc.default_fillvals.get('f8')
         float_dtypes = ['float64', 'float32']
         args['decode_times'] = True
@@ -1249,8 +1287,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 shapefile,
                 cut,
                 chunks,
-                pixel_subset,
-                temporal_subsetting
+                pixel_subset
             )
         elif bbox is not None:
             subsetted_dataset = subset_with_bbox(
@@ -1262,8 +1299,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 cut=cut,
                 min_time=min_time,
                 max_time=max_time,
-                pixel_subset=pixel_subset,
-                temporal_subsetting=temporal_subsetting
+                pixel_subset=pixel_subset
             )
         else:
             raise ValueError('Either bbox or shapefile must be provided')
