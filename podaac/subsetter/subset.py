@@ -820,9 +820,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         lat_path = get_path(lat_var_name)
         lon_path = get_path(lon_var_name)
         time_path = get_path(time_var_name)
+        print(dataset)
 
         lon_data = dataset[lon_var_name]
         lat_data = dataset[lat_var_name]
+        print(time_var_name)
         time_data = dataset[time_var_name]
 
         temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
@@ -961,7 +963,7 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
             time_name = datatree_subset.compute_time_variable_name_tree(subtree,
                                                                         variable,
                                                                         time_var_names)
-            time_var = f"{parent_path}{time_name}"
+            time_var = f"{parent_path}/{time_name}"
             time_var_names.append(time_var)
 
         if not time_var_names:
@@ -1250,12 +1252,16 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             raise ValueError('Could not determine time variable')
 
         if '.HDF5' == file_extension:
-            time_var_names = []
+            new_time_var_names = []
             for group in dataset.groups:
                 if "ScanTime" in group:
                     group_dataset = dataset[group].ds
                     dataset[group].ds = datatree_subset.update_dataset_with_time(group_dataset, group_path=group)
-                    time_var_names.append(group + '/timeMidScan_datetime')
+                    if 'timeMidScan_datetime' in dataset[group].ds:
+                        new_time_var_names.append(group + '/timeMidScan_datetime')
+
+            if new_time_var_names:
+                time_var_names = new_time_var_names
 
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
