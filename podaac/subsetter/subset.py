@@ -23,6 +23,7 @@ import functools
 import json
 import operator
 import os
+from itertools import zip_longest
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import dateutil
@@ -815,19 +816,27 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     subset_dictionary = {}
 
-    for lat_var_name, lon_var_name, time_var_name in zip(lat_var_names, lon_var_names, time_var_names):
+    if not time_var_names:  # time_var_names == [] or evaluates to False
+        iterator = zip_longest(lat_var_names, lon_var_names, [])
+    else:
+        iterator = zip(lat_var_names, lon_var_names, time_var_names)
+
+    for lat_var_name, lon_var_name, time_var_name in iterator:
 
         lat_path = get_path(lat_var_name)
         lon_path = get_path(lon_var_name)
-        time_path = get_path(time_var_name)
 
         lon_data = dataset[lon_var_name]
         lat_data = dataset[lat_var_name]
-        time_data = dataset[time_var_name]
 
         temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
-        if time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
-            temporal_cond = align_time_to_lon_dim(time_data, lon_data, temporal_cond)
+        time_path = None
+        if time_var_name:
+            time_path = get_path(time_var_name)
+            time_data = dataset[time_var_name]
+
+            if time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
+                temporal_cond = align_time_to_lon_dim(time_data, lon_data, temporal_cond)
 
         operation = (
             oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
@@ -838,7 +847,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         # We want the lon lat time path to be the same
         # timeMidScan_datetime is a time made for ges disc collection in a ScanTime group
-        if lat_path == lon_path == time_path or 'timeMidScan_datetime' in time_var_name:
+        if (
+            lat_path == lon_path == time_path
+            or (time_var_name is not None and 'timeMidScan_datetime' in time_var_name)
+            or (lon_path == lat_path and time_var_name is None)
+           ):
             subset_dictionary[lat_path] = operation
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
@@ -961,8 +974,9 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
             time_name = datatree_subset.compute_time_variable_name_tree(subtree,
                                                                         variable,
                                                                         time_var_names)
-            time_var = f"{parent_path}/{time_name}"
-            time_var_names.append(time_var)
+            if time_name:
+                time_var = f"{parent_path}/{time_name}"
+                time_var_names.append(time_var)
 
         if not time_var_names:
             time_var_names.append(compute_utc_name(dataset))

@@ -214,6 +214,8 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         dataset = node.ds
         dataset = dc.remove_duplicate_dims_xarray(dataset)
 
+        indexers = None
+
         if dataset.variables and cond is not None:  # Only process if node has data
             # Create indexers from condition
 
@@ -314,10 +316,13 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         processed_children = {}
         for child_name, child_node in node.children.items():
             # Process the child node
-            child_ds, child_children = process_node(child_node, f"{path}/{child_name}")
+            child_ds, child_children, child_indexers = process_node(child_node, f"{path}/{child_name}")
 
             # --- Align parent and child datasets before attaching child ---
-            processed_ds, child_ds = align_by_shared_dims(processed_ds, child_ds)
+            if indexers is None and child_indexers:
+                indexers = child_indexers
+                processed_ds = processed_ds.isel(**child_indexers, missing_dims='ignore')
+            # processed_ds, child_ds = align_by_shared_dims(processed_ds, child_ds)
 
             # Create new DataTree for the processed child
             child_tree = DataTree(name=child_name, dataset=child_ds)
@@ -328,10 +333,10 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
             processed_children[child_name] = child_tree
 
-        return processed_ds, processed_children
+        return processed_ds, processed_children, indexers
 
     # Start processing from root
-    root_ds, children = process_node(tree, '')
+    root_ds, children, _ = process_node(tree, '')
 
     # Create new root tree preserving the original name and attributes
     result_tree = DataTree(name=tree.name, dataset=root_ds)
