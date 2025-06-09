@@ -110,12 +110,13 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
 def get_sibling_or_parent_condition(condition_dict, path):
     """
     Retrieve a condition from a dictionary based on a given path, prioritizing
-    parent paths first, then sibling paths, and finally the root condition.
+    parent paths first, then sibling paths with the same immediate parent,
+    then other siblings, and finally the root condition.
 
     The function first attempts to find the closest parent match by walking up
     the directory-like hierarchy. If no parent is found, it looks for a sibling
-    at the same depth that shares a common structure. If neither is found, it
-    returns the condition for the root ("/") if available.
+    at the same depth that shares the same immediate parent. If neither is found,
+    it returns the condition for the root ("/") if available.
 
     Args:
         condition_dict (dict): A dictionary mapping paths (keys) to conditions (values).
@@ -133,18 +134,26 @@ def get_sibling_or_parent_condition(condition_dict, path):
         if current_path in condition_dict:
             return condition_dict[current_path]
         current_path = "/".join(current_path.split("/")[:-1])
+        if not current_path or current_path == "":
+            break
 
-    # If no parent found, look for sibling match
+    # If no parent found, look for sibling match with same immediate parent
     path_parts = path.split("/")
     for potential_path in condition_dict:
-        potential_path = potential_path.rstrip('/')
-        potential_parts = potential_path.split("/")
-
-        # Check if paths have the same depth
+        potential_path_clean = potential_path.rstrip('/')
+        potential_parts = potential_path_clean.split("/")
         if len(path_parts) == len(potential_parts):
-            # Check if they share the same structure up to parent
-            common_parent = all(p1 == p2 for p1, p2 in zip(path_parts[:-2], potential_parts[:-2]))
-            if common_parent and potential_path != path:
+            # Check if immediate parent matches
+            if path_parts[:-1] == potential_parts[:-1] and potential_path_clean != path:
+                return condition_dict[potential_path]
+
+    # If no such sibling found, fall back to original sibling logic (common grandparent)
+    for potential_path in condition_dict:
+        potential_path_clean = potential_path.rstrip('/')
+        potential_parts = potential_path_clean.split("/")
+        if len(path_parts) == len(potential_parts):
+            # Check if they share the same structure up to grandparent
+            if all(p1 == p2 for p1, p2 in zip(path_parts[:-2], potential_parts[:-2])) and potential_path_clean != path:
                 return condition_dict[potential_path]
 
     # If no parent or sibling found, return root condition if it exists
@@ -187,7 +196,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
-
     def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
@@ -205,6 +213,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             Processed dataset and dictionary of processed child nodes
         """
         cond = get_sibling_or_parent_condition(condition_dict, path)
+
         # if only one condition in dictionary then get the one condition
         if cond is None:
             if len(condition_dict) == 1:
@@ -223,7 +232,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 indexers = get_indexers_from_1d(cond)
             else:
                 indexers = get_indexers_from_nd(cond, cut)
-
             if not all(len(value) > 0 for value in indexers.values()):
                 raise NoDataException("No data in subsetted granule.")
                 # return copy_empty_dataset(dataset), {}
