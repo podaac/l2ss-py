@@ -25,6 +25,7 @@ import operator
 import os
 from itertools import zip_longest
 from typing import Any, Dict, List, Optional, Tuple, Union
+import re
 
 import dateutil
 from dateutil import parser
@@ -603,6 +604,41 @@ def get_variable_data(dtree, var_path):
         return None
 
 
+def extract_epoch(description: str) -> str:
+    """
+    Extracts the ISO 8601 epoch from a description string.
+    Example: "seconds since 1 January 1990" → "1990-01-01T00:00:00"
+    """
+    match = re.search(r'seconds since (.+)', description, re.IGNORECASE)
+    if not match:
+        raise ValueError("Epoch not found in description.")
+
+    date_str = match.group(1).strip(" )")
+    parsed_date = parser.parse(date_str)
+    return parsed_date.isoformat()  # e.g. '1990-01-01T00:00:00'
+
+
+def convert_time_from_description(seconds_since, description: str):
+    """
+    Convert time array from seconds-since format using the description.
+
+    Parameters:
+        seconds_since: xarray.DataArray or np.ndarray of float64 seconds
+        description: str containing "seconds since <date>"
+
+    Returns:
+        np.ndarray or xarray.DataArray with np.datetime64[ns]
+    """
+    epoch = extract_epoch(description)
+    epoch_dt64 = np.datetime64(epoch, 's')
+    delta = np.array(seconds_since) * np.timedelta64(1, 's')
+    result = epoch_dt64 + delta
+
+    if isinstance(seconds_since, xr.DataArray):
+        return xr.DataArray(result, coords=seconds_since.coords, dims=seconds_since.dims, attrs=seconds_since.attrs)
+    return result
+
+
 def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str
                             ) -> Union[np.ndarray, bool]:
     """
@@ -648,6 +684,11 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
                 epoch_time_var_name = get_time_epoch_var(dataset, time_var_name)
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
+        elif np.issubdtype(time_data.dtype, np.float64):
+            description = time_data.attrs.get('description')
+            epoch_datetime = extract_epoch(description)
+            time_data = convert_time_from_description(time_data, description)
+            timestamp = pd.to_datetime(timestamp).to_datetime64()
 
         if getattr(time_data, 'long_name', None) == "reference time of sst file":
             timestamp = pd.to_datetime(timestamp).to_datetime64()
@@ -1260,9 +1301,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
 
-        if not time_var_names and (min_time or max_time):
-            raise ValueError('Could not determine time variable')
-
         if '.HDF5' == file_extension:
             new_time_var_names = []
             for group in dataset.groups:
@@ -1274,6 +1312,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
             if new_time_var_names:
                 time_var_names = new_time_var_names
+
+        if not time_var_names and (min_time or max_time):
+            raise ValueError('Could not determine time variable')
 
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
