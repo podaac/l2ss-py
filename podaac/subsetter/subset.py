@@ -1396,6 +1396,25 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         subsetted_dataset.to_netcdf(output_file, encoding=encoding)
 
+        # ensure all the dimensions are on the root node when we pixel subset
+        if pixel_subset:
+            def add_all_group_dims_to_root_inplace(nc_path):
+                def collect_dims(group, dims):
+                    for dimname, dim in group.dimensions.items():
+                        if dimname not in dims:
+                            dims[dimname] = len(dim) if not dim.isunlimited() else None
+                    for subgrp in group.groups.values():
+                        collect_dims(subgrp, dims)
+
+                with nc.Dataset(nc_path, 'r+') as ds:
+                    all_dims = {}
+                    collect_dims(ds, all_dims)
+                    for dimname, size in all_dims.items():
+                        if dimname not in ds.dimensions:
+                            ds.createDimension(dimname, size)
+
+            add_all_group_dims_to_root_inplace(output_file)
+
         return spatial_bounds_array
 
 
