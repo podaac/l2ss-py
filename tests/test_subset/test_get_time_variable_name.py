@@ -10,34 +10,10 @@ import pytest
 import xarray as xr
 
 from podaac.subsetter import subset
+from podaac.subsetter import datatree_subset
+from conftest import data_files 
 
-
-@pytest.fixture(scope='class')
-def data_dir():
-    """Gets the directory containing data files used for tests."""
-    test_dir = dirname(realpath(__file__))
-    return join(test_dir, '..', 'data')
-
-
-@pytest.fixture(scope='class')
-def subset_output_dir(data_dir):
-    """Makes a new temporary directory to hold the subset results while tests are running."""
-    subset_output_dir = tempfile.mkdtemp(dir=data_dir)
-    yield subset_output_dir
-    shutil.rmtree(subset_output_dir)
-
-
-def data_files():
-    """Get all the netCDF files from the test data directory."""
-    test_dir = dirname(realpath(__file__))
-    test_data_dir = join(test_dir, '..' , 'data')
-    return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")]
-
-
-TEST_DATA_FILES = data_files()
-
-
-@pytest.mark.parametrize('test_file', TEST_DATA_FILES)
+@pytest.mark.parametrize("test_file", data_files())
 def test_get_time_variable_name(test_file, data_dir):
     """Ensures that the name of the time variable can be retrieved."""
     args = {
@@ -49,7 +25,7 @@ def test_get_time_variable_name(test_file, data_dir):
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
-    time_var_name = subset.compute_time_variable_name(ds, ds[lat_var_name], [])
+    time_var_name = datatree_subset.compute_time_variable_name_tree(ds, ds[lat_var_name], [])
 
     assert time_var_name is not None
     assert 'time' in time_var_name

@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [3.0.0]
+### Added
+- [issue/314](https://github.com/podaac/l2ss-py/pull/324):
+	- Update python libraries
+	- Update harmony service library version
+	- Add in feature pixel subsetting
+- [issue/322] Fix a time conversion bug with tempo data
+- [issue/308] l2ss-py should handle no data results in a manner consistent with other harmony services
+- [issue/295] Rewrite l2ss-py to use xarray DataTree instead of flattening the arrays
+- [issue/318] Retain file extension from input file instead of hardcoding .nc4
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
 ## [2.14.0]
 ### Added
 - [issue/314](https://github.com/podaac/l2ss-py/pull/324):

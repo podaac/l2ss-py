@@ -15,21 +15,6 @@ import xarray as xr
 from podaac.subsetter import subset
 
 
-@pytest.fixture(scope='class')
-def data_dir():
-    """Gets the directory containing data files used for tests."""
-    test_dir = dirname(realpath(__file__))
-    return join(test_dir, '..', 'data')
-
-
-@pytest.fixture(scope='class')
-def subset_output_dir(data_dir):
-    """Makes a new temporary directory to hold the subset results while tests are running."""
-    subset_output_dir = tempfile.mkdtemp(dir=data_dir)
-    yield subset_output_dir
-    shutil.rmtree(subset_output_dir)
-
-
 def compare_python(test_file, cut, data_dir, subset_output_dir, request):
     """
     Run the L2 subsetter and compare the result to the equivelant

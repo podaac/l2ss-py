@@ -8,36 +8,14 @@ import netCDF4 as nc
 import numpy as np
 import pytest
 import xarray as xr
+import gc as garbage_collection
 
 from podaac.subsetter import subset
+from podaac.subsetter import datatree_subset
+from conftest import data_files 
 
 
-@pytest.fixture(scope='class')
-def data_dir():
-    """Gets the directory containing data files used for tests."""
-    test_dir = dirname(realpath(__file__))
-    return join(test_dir, '..', 'data')
-
-
-@pytest.fixture(scope='class')
-def subset_output_dir(data_dir):
-    """Makes a new temporary directory to hold the subset results while tests are running."""
-    subset_output_dir = tempfile.mkdtemp(dir=data_dir)
-    yield subset_output_dir
-    shutil.rmtree(subset_output_dir)
-
-
-def data_files():
-    """Get all the netCDF files from the test data directory."""
-    test_dir = dirname(realpath(__file__))
-    test_data_dir = join(test_dir, '..' , 'data')
-    return [f for f in listdir(test_data_dir) if isfile(join(test_data_dir, f)) and f.endswith(".nc")]
-
-
-TEST_DATA_FILES = data_files()
-
-
-@pytest.mark.parametrize("test_file", TEST_DATA_FILES)
+@pytest.mark.parametrize("test_file", data_files())
 def test_subset_variables(test_file, data_dir, subset_output_dir, request):
     """
     Test that all variables present in the original NetCDF file
@@ -67,7 +45,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
     time_var_name = None
     try:
         lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
-        time_var_name = subset.compute_time_variable_name(in_ds, in_ds[lat_var_name], [])
+        time_var_name = datatree_subset.compute_time_variable_name_tree(in_ds, in_ds[lat_var_name], [])
     except ValueError:
         # unable to determine lon lat vars
         pass
@@ -82,7 +60,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
         # compare names
         assert in_var[0] == out_var[0]
 
-        # compare attributes
+        # compare attributes    
         np.testing.assert_equal(in_var[1].attrs, out_var[1].attrs)
 
         # compare type and dimension names
