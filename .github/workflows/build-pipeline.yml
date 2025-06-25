@@ -233,16 +233,27 @@ jobs:
           LAUNCHPAD_TOKEN_SIT: ${{ steps.lambda.outputs.result }}
           LAUNCHPAD_TOKEN_UAT: ${{ steps.lambda.outputs.result }}
           LAUNCHPAD_TOKEN_OPS: ${{ steps.lambda.outputs.result }}
+          
       - name: Build Docs
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
       - name: Publish Docs
         uses: JamesIves/github-pages-deploy-action@v4
+
+
+      - name: Prepare combined folder for deploy
+        run: |
+          mkdir -p deploy_dir/${{ env.software_version }}
+          cp -r docs/_build/* deploy_dir/${{ env.software_version }}/
+          cp -r docs/_build/* deploy_dir/
+
+      - name: Deploy combined docs
         if: ${{ github.actor != 'dependabot[bot]' }}
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          branch: gh-pages # The branch the action should deploy to.
-          folder: docs/_build/ # The folder the action should deploy.
-          target-folder: ${{ env.software_version }}
+          branch: gh-pages
+          folder: deploy_dir
+
       - name: Build Python Artifact
         run: |
           poetry build
