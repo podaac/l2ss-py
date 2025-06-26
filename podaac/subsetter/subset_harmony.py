@@ -187,9 +187,13 @@ class L2SubsetterService(BaseHarmonyAdapter):
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
 
             try:
-                subset_params['cut'] = message.extraArgs['cut']
+                value = message.extraArgs['cut']
+                if value is None:
+                    subset_params['cut'] = True
+                else:
+                    subset_params['cut'] = value
             except (KeyError, AttributeError, TypeError):
-                pass
+                subset_params['cut'] = True
 
             if source.variables:
                 subset_params['variables'] = [variable.name for variable in source.process('variables')]

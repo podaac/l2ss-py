@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Fixed
 - [issue/290] Fix doc generation so the latest version of l2ss-py docs are deployed
+- Set default subset_params['cut'] to True if missing or None 
 ### Security
 
 
