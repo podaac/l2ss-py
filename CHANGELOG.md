@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/290] Fix doc generation so the latest version of l2ss-py docs are deployed
 ### Security
 
 
