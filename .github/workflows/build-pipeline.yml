@@ -325,17 +325,21 @@ jobs:
           git push origin "${{ env.software_version }}"
 
       - name: Build Docs
+        if: |
+          github.ref == 'refs/heads/main'
         run: |
           poetry run sphinx-build -b html ./docs docs/_build/
 
       - name: Prepare combined folder for deploy
+        if: |
+          github.ref == 'refs/heads/main'
         run: |
           mkdir -p deploy_dir/${{ env.software_version }}
           cp -r docs/_build/* deploy_dir/${{ env.software_version }}/
           cp -r docs/_build/* deploy_dir/
 
       - name: Deploy combined docs
-        if: ${{ github.actor != 'dependabot[bot]' }}
+        if: ${{ github.actor != 'dependabot[bot]' }} && github.ref == 'refs/heads/main'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
