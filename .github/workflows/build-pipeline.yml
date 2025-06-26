@@ -339,7 +339,7 @@ jobs:
           cp -r docs/_build/* deploy_dir/
 
       - name: Deploy combined docs
-        if: ${{ github.actor != 'dependabot[bot]' }} && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main'
         uses: JamesIves/github-pages-deploy-action@v4
         with:
           branch: gh-pages
