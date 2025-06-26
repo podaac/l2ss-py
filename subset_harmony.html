@@ -1,0 +1,264 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Subset Harmony Module &mdash; l2ss-py 3.1.0a1+0ea9118 documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=e59714d7" />
+
+  
+      <script src="_static/jquery.js?v=5d32c60e"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=eba8aa49"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Run Subsetter Module" href="run_subsetter.html" />
+    <link rel="prev" title="Subset Module" href="subset.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            l2ss-py
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="subset.html">Subset Module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Subset Harmony Module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#subset-harmony-py">subset_harmony.py</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#podaac.subsetter.subset_harmony.L2SSException"><code class="docutils literal notranslate"><span class="pre">L2SSException</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#podaac.subsetter.subset_harmony.L2SSException.__init__"><code class="docutils literal notranslate"><span class="pre">L2SSException.__init__()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#podaac.subsetter.subset_harmony.L2SubsetterService"><code class="docutils literal notranslate"><span class="pre">L2SubsetterService</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#podaac.subsetter.subset_harmony.L2SubsetterService.__init__"><code class="docutils literal notranslate"><span class="pre">L2SubsetterService.__init__()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#podaac.subsetter.subset_harmony.L2SubsetterService.cmd"><code class="docutils literal notranslate"><span class="pre">L2SubsetterService.cmd()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#podaac.subsetter.subset_harmony.L2SubsetterService.prepare_output_dir"><code class="docutils literal notranslate"><span class="pre">L2SubsetterService.prepare_output_dir()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="#podaac.subsetter.subset_harmony.L2SubsetterService.process_item"><code class="docutils literal notranslate"><span class="pre">L2SubsetterService.process_item()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#podaac.subsetter.subset_harmony.harmony_to_podaac_bbox"><code class="docutils literal notranslate"><span class="pre">harmony_to_podaac_bbox()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#podaac.subsetter.subset_harmony.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#podaac.subsetter.subset_harmony.podaac_to_harmony_bbox"><code class="docutils literal notranslate"><span class="pre">podaac_to_harmony_bbox()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="run_subsetter.html">Run Subsetter Module</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">l2ss-py</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Subset Harmony Module</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/subset_harmony.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-podaac.subsetter.subset_harmony">
+<span id="subset-harmony-module"></span><h1>Subset Harmony Module<a class="headerlink" href="#module-podaac.subsetter.subset_harmony" title="Link to this heading"></a></h1>
+<section id="subset-harmony-py">
+<h2>subset_harmony.py<a class="headerlink" href="#subset-harmony-py" title="Link to this heading"></a></h2>
+<p>Implementation of harmony-service-lib that invokes the Level 2 subsetter.</p>
+</section>
+<dl class="py exception">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.L2SSException">
+<em class="property"><span class="pre">exception</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset_harmony.</span></span><span class="sig-name descname"><span class="pre">L2SSException</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_exception</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#L2SSException"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.L2SSException" title="Link to this definition"></a></dt>
+<dd><p>L2SS Exception class for custom error messages to see in harmony api calls.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.L2SSException.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_exception</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#L2SSException.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.L2SSException.__init__" title="Link to this definition"></a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.L2SubsetterService">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset_harmony.</span></span><span class="sig-name descname"><span class="pre">L2SubsetterService</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">catalog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#L2SubsetterService"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.L2SubsetterService" title="Link to this definition"></a></dt>
+<dd><p>See <a class="reference external" href="https://github.com/nasa/harmony-service-lib-py">https://github.com/nasa/harmony-service-lib-py</a>
+for documentation and examples.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.L2SubsetterService.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">message</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">catalog</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#L2SubsetterService.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.L2SubsetterService.__init__" title="Link to this definition"></a></dt>
+<dd><p>Constructs the adapter</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>message</strong> (<em>harmony_service_lib.Message</em>) – The Harmony input which needs acting upon</p></li>
+<li><p><strong>catalog</strong> (<em>pystac.Catalog</em>) – A STAC catalog containing the files on which to act</p></li>
+<li><p><strong>config</strong> (<em>harmony_service_lib.util.Config</em>) – The configuration values for this runtime environment.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.L2SubsetterService.cmd">
+<span class="sig-name descname"><span class="pre">cmd</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">*</span></span><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#L2SubsetterService.cmd"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.L2SubsetterService.cmd" title="Link to this definition"></a></dt>
+<dd><p>Logs and then runs command.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>run</strong> (<em>args Command and args to</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>Command output</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.L2SubsetterService.prepare_output_dir">
+<span class="sig-name descname"><span class="pre">prepare_output_dir</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">output_dir</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#L2SubsetterService.prepare_output_dir"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.L2SubsetterService.prepare_output_dir" title="Link to this definition"></a></dt>
+<dd><p>Deletes (if present) and recreates the given output_dir, ensuring it exists
+and is empty</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>output_dir</strong> (<em>string</em>) – the directory to delete and recreate</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.L2SubsetterService.process_item">
+<span class="sig-name descname"><span class="pre">process_item</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">item</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Item</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">source</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Source</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Item</span></span></span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#L2SubsetterService.process_item"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.L2SubsetterService.process_item" title="Link to this definition"></a></dt>
+<dd><p>Performs variable and bounding box subsetting on the input STAC Item’s data, returning
+an output STAC item</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>item</strong> (<em>pystac.Item</em>) – the item that should be subset</p></li>
+<li><p><strong>source</strong> (<em>harmony.message.Source</em>) – the input source defining the variables, if any, to subset from the item</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a STAC item describing the output of the subsetter</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>pystac.Item</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.harmony_to_podaac_bbox">
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset_harmony.</span></span><span class="sig-name descname"><span class="pre">harmony_to_podaac_bbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bbox</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#harmony_to_podaac_bbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.harmony_to_podaac_bbox" title="Link to this definition"></a></dt>
+<dd><p>Convert Harmony bbox (west, south, east, north)
+to PO.DAAC bbox ((west, east), (south, north))</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>bbox</strong> (<em>list</em>) – Harmony bbox</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>PO.DAAC bbox</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.array</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.main">
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset_harmony.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Config</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#main"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.main" title="Link to this definition"></a></dt>
+<dd><p>Parse command line arguments and invoke the service to respond to
+them.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>config</strong> (<em>harmony.util.Config</em>)</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="podaac.subsetter.subset_harmony.podaac_to_harmony_bbox">
+<span class="sig-prename descclassname"><span class="pre">podaac.subsetter.subset_harmony.</span></span><span class="sig-name descname"><span class="pre">podaac_to_harmony_bbox</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bbox</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">float</span></span></span><a class="reference internal" href="_modules/podaac/subsetter/subset_harmony.html#podaac_to_harmony_bbox"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#podaac.subsetter.subset_harmony.podaac_to_harmony_bbox" title="Link to this definition"></a></dt>
+<dd><p>Convert PO.DAAC bbox ((west, east), (south, north))
+to Harmony bbox (west, south, east, north)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>bbox</strong> (<em>np.array</em>) – Podaac bbox</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p><em>array, int or float</em> – Harmony bbox</p></li>
+<li><p><em>TODO - fix this docstring type, type hint, and code to match (code currently returns a list)</em></p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="subset.html" class="btn btn-neutral float-left" title="Subset Module" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="run_subsetter.html" class="btn btn-neutral float-right" title="Run Subsetter Module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
