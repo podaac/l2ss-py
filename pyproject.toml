@@ -54,6 +54,7 @@ m2r2 = "^0.3.2"
 sphinx-rtd-theme = "^3.0.2"
 pytest-rerunfailures = "^15.0"
 pytest-xdist = "^3.6.1"
+myst-parser = "^4.0.1"
 
 [tool.pytest.ini_options]
 junit_family = "xunit2"
