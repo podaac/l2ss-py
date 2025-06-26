@@ -250,6 +250,7 @@ jobs:
         with:
           branch: gh-pages
           folder: deploy_dir
+          clean: false
 
       - name: Build Python Artifact
         run: |
