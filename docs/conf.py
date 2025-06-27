@@ -47,7 +47,8 @@ extensions = [
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
     'sphinx.ext.napoleon',
-    'sphinx_rtd_theme'
+    'sphinx_rtd_theme',
+    'myst_parser'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -77,3 +78,9 @@ html_theme = 'sphinx_rtd_theme'
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
 
+
+rst_epilog = f"""
+.. |version_badge| image:: https://img.shields.io/badge/version-{release}-blue.svg
+   :alt: version badge
+   :target: https://github.com/podaac/l2ss-py/tree/{release}
+"""

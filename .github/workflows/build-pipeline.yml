@@ -233,16 +233,6 @@ jobs:
           LAUNCHPAD_TOKEN_SIT: ${{ steps.lambda.outputs.result }}
           LAUNCHPAD_TOKEN_UAT: ${{ steps.lambda.outputs.result }}
           LAUNCHPAD_TOKEN_OPS: ${{ steps.lambda.outputs.result }}
-      - name: Build Docs
-        run: |
-          poetry run sphinx-build -b html ./docs docs/_build/
-      - name: Publish Docs
-        uses: JamesIves/github-pages-deploy-action@v4
-        if: ${{ github.actor != 'dependabot[bot]' }}
-        with:
-          branch: gh-pages # The branch the action should deploy to.
-          folder: docs/_build/ # The folder the action should deploy.
-          target-folder: ${{ env.software_version }}
       - name: Build Python Artifact
         run: |
           poetry build
@@ -322,6 +312,7 @@ jobs:
           image: ${{ steps.meta.outputs.tags[0] }}
           args: >
             --severity-threshold=high
+            
       - name: Push Tag
         if: |
           github.ref == 'refs/heads/develop' ||
@@ -332,6 +323,28 @@ jobs:
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
           git tag -a "${{ env.software_version }}" -m "Version ${{ env.software_version }}"
           git push origin "${{ env.software_version }}"
+
+      - name: Build Docs
+        if: |
+          github.ref == 'refs/heads/main'
+        run: |
+          poetry run sphinx-build -b html ./docs docs/_build/
+
+      - name: Prepare combined folder for deploy
+        if: |
+          github.ref == 'refs/heads/main'
+        run: |
+          mkdir -p deploy_dir/${{ env.software_version }}
+          cp -r docs/_build/* deploy_dir/${{ env.software_version }}/
+          cp -r docs/_build/* deploy_dir/
+
+      - name: Deploy combined docs
+        if: github.ref == 'refs/heads/main'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: deploy_dir
+          clean: false
 
       - name: Deploy Harmony
         env:

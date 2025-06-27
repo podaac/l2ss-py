@@ -123,7 +123,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
         self.data_dir = os.getenv(DATA_DIRECTORY_ENV, '/home/dockeruser/data')
 
-    def process_item(self, item: pystac.Item, source: harmony_service_lib.message.Source) -> pystac.Item:
+    def process_item(self, item: pystac.Item, source: harmony_service_lib.message.Source) -> pystac.Item:  # pylint: disable=too-many-branches
         """
         Performs variable and bounding box subsetting on the input STAC Item's data, returning
         an output STAC item
@@ -185,7 +185,15 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 subset_params['pixel_subset'] = message.pixelSubset
 
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
-            subset_params['cut'] = True
+
+            try:
+                harmony_cut = message.extraArgs['cut']
+                if harmony_cut is None:
+                    subset_params['cut'] = True
+                else:
+                    subset_params['cut'] = harmony_cut
+            except (KeyError, AttributeError, TypeError):
+                subset_params['cut'] = True
 
             if source.variables:
                 subset_params['variables'] = [variable.name for variable in source.process('variables')]
