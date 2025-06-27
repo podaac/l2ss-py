@@ -1,6 +1,9 @@
 Reference Guide for l2ss-py
 ===========================
 
+|version_badge|
+
+
 .. include:: ../README.md
    :parser: myst_parser.sphinx_
 
