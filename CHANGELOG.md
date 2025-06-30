@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [3.0.1]
+### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+- [issue/290] Fix doc generation so the latest version of l2ss-py docs are deployed
+- Set default subset_params['cut'] to True if missing or None 
+### Security
+
+
 ## [3.0.0]
 ### Added
 - [issue/314](https://github.com/podaac/l2ss-py/pull/324):
