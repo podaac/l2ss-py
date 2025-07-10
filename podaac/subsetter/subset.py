@@ -1235,6 +1235,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         fill_value_f8 = nc.default_fillvals.get('f8')
         float_dtypes = ['float64', 'float32']
         args['decode_times'] = True
+        args['use_cftime'] = True
         # try to open file to see if we can access the time variable
         try:
             with nc.Dataset(file_to_subset, 'r') as nc_dataset:
@@ -1285,7 +1286,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 if units:
                     time_encoding[group_path][var_name]['units'] = units
                 time_encoding[group_path][var_name]['dtype'] = dtype
-
                 if calendar:
                     time_calendar_attributes[time] = calendar
 
@@ -1379,7 +1379,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
         encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
-
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
             subsetted_dataset,
             lat_var_names,
@@ -1395,6 +1394,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                             stage_file_name_subsetted_false)
 
         subsetted_dataset.to_netcdf(output_file, encoding=encoding)
+
+        ensure_time_units(output_file, time_encoding)
 
         # ensure all the dimensions are on the root node when we pixel subset
         if pixel_subset:
@@ -1412,10 +1413,29 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     for dimname, size in all_dims.items():
                         if dimname not in ds.dimensions:
                             ds.createDimension(dimname, size)
-
             add_all_group_dims_to_root_inplace(output_file)
 
         return spatial_bounds_array
+
+
+def ensure_time_units(nc_file, time_encoding):
+    """
+    Update the units attribute for time variables in specified netCDF groups.
+
+    Args:
+        nc_file (str): Path to the netCDF file.
+        time_encoding (dict): Dictionary structure {group: {var_name: {attr: value}}}
+    """
+    with nc.Dataset(nc_file, 'r+') as ds:
+        for group_name, vars_dict in time_encoding.items():
+            group = ds.groups[group_name.lstrip('/')] if group_name.startswith('/') else ds.groups[group_name]
+            for var_name, attr_dict in vars_dict.items():
+                var = group.variables[var_name]
+                if 'units' in attr_dict:
+                    current_units = getattr(var, 'units', None)
+                    correct_units = attr_dict['units']
+                    if current_units != correct_units:
+                        var.units = correct_units
 
 
 def update_netcdf_attrs(output_file: str,
