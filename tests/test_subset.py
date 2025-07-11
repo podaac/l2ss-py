@@ -1997,7 +1997,7 @@ def test_temporal_subset_tempo(data_dir, subset_output_dir, request):
     dtree = xr.open_datatree(subset_output_file, decode_times=False)
 
     assert dtree['/geolocation/time'].attrs['calendar'] == "gregorian"
-    assert dtree['/geolocation/time'].attrs['units'] == "seconds since 1980-01-06T00:00:00+00:00"
+    assert dtree['/geolocation/time'].attrs['units'] == "seconds since 1980-01-06T00:00:00Z"
     assert dtree['/geolocation/time'].dtype == np.float64
 
     assert dtree['/geolocation/time'].values[0] == 1388941375.536457

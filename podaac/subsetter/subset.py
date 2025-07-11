@@ -1235,7 +1235,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         fill_value_f8 = nc.default_fillvals.get('f8')
         float_dtypes = ['float64', 'float32']
         args['decode_times'] = True
-        args['use_cftime'] = True
         # try to open file to see if we can access the time variable
         try:
             with nc.Dataset(file_to_subset, 'r') as nc_dataset:
@@ -1418,6 +1417,16 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         return spatial_bounds_array
 
 
+def get_group(ds, group_path):
+    """Traverse the group path and return the final group."""
+    if group_path in ('', '/'):
+        return ds
+    group = ds
+    for part in group_path.strip('/').split('/'):
+        group = group.groups[part]
+    return group
+
+
 def ensure_time_units(nc_file, time_encoding):
     """
     Update the units attribute for time variables in specified netCDF groups.
@@ -1428,8 +1437,14 @@ def ensure_time_units(nc_file, time_encoding):
     """
     with nc.Dataset(nc_file, 'r+') as ds:
         for group_name, vars_dict in time_encoding.items():
-            group = ds.groups[group_name.lstrip('/')] if group_name.startswith('/') else ds.groups[group_name]
+            try:
+                group = get_group(ds, group_name)
+            except KeyError:
+                continue
+
             for var_name, attr_dict in vars_dict.items():
+                if var_name not in group.variables:
+                    continue
                 var = group.variables[var_name]
                 if 'units' in attr_dict:
                     current_units = getattr(var, 'units', None)
