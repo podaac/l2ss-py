@@ -24,7 +24,7 @@ import json
 import operator
 import os
 from itertools import zip_longest
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 import re
 
 import dateutil
@@ -41,7 +41,6 @@ import pandas as pd
 import xarray as xr
 import xarray.coding.times
 from shapely.geometry import MultiPolygon, Point, Polygon
-from shapely.ops import transform
 
 from xarray import DataTree
 
@@ -723,82 +722,65 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
                                 lon_var_names: List[str],
                                 shapefile: str,
                                 cut: bool,
-                                chunks,
-                                pixel_subset: bool) -> Dict[str, np.ndarray]:
+                                pixel_subset: bool) -> xr.Dataset:
     """
     Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
 
-    Parameters
-    ----------
-    dataset : xr.Dataset
-        Dataset to subset
-    lat_var_names : List[str]
-        List of latitude variable names in the given dataset
-    lon_var_names : List[str]
-        List of longitude variable names in the given dataset
-    shapefile : str
-        Absolute path to the shapefile used to subset the given dataset
-    cut : bool
-        True if scanline should be cut
-    chunks : Union[Dict, None]
-        Chunking specification for dask arrays
-
     Returns
     -------
-    Dict[str, np.ndarray]
-        Dictionary mapping variable names to their respective boolean masks
-        Keys are formatted as "{lat_var_name}_{lon_var_name}"
+    xr.Dataset
+        The subsetted dataset
     """
     if len(lat_var_names) != len(lon_var_names):
         raise ValueError("Number of latitude variables must match number of longitude variables")
 
-    shapefile_df = gpd.read_file(shapefile)
+    shapefile_df = gpd.read_file(shapefile).to_crs("EPSG:4326")
     masks = {}
 
-    # Mask and scale shapefile
-    def scale(lon, lat, extra=None):  # pylint: disable=unused-argument
-        lon = tuple(map(functools.partial(apply_scale_offset, lon_scale, lon_offset), lon))
-        lat = tuple(map(functools.partial(apply_scale_offset, lat_scale, lat_offset), lat))
-        return lon, lat
-
-    def in_shape(data_lon, data_lat):
-        point = Point(data_lon, data_lat)
-        point_in_shapefile = current_shapefile_df.contains(point)
-        return point_in_shapefile.array[0]
-
     for lat_var_name, lon_var_name in zip(lat_var_names, lon_var_names):
-        # Get scaling factors and offsets for this pair
-        lat_scale = dataset[lat_var_name].attrs.get('scale_factor', 1.0)
-        lon_scale = dataset[lon_var_name].attrs.get('scale_factor', 1.0)
-        lat_offset = dataset[lat_var_name].attrs.get('add_offset', 0.0)
-        lon_offset = dataset[lon_var_name].attrs.get('add_offset', 0.0)
+        lat = dataset[lat_var_name]
+        lon = dataset[lon_var_name]
 
-        # Create a copy of shapefile_df for this pair
+        lat_scale = lat.attrs.get("scale_factor", 1.0)
+        lon_scale = lon.attrs.get("scale_factor", 1.0)
+        lat_offset = lat.attrs.get("add_offset", 0.0)
+        lon_offset = lon.attrs.get("add_offset", 0.0)
+
+        # Apply scale and offset
+        lat_vals = lat.values * lat_scale + lat_offset
+        lon_vals = lon.values * lon_scale + lon_offset
+
+        # Handle 2D or 1D lat/lon
+        if lat_vals.ndim == 1 and lon_vals.ndim == 1:
+            lon2d, lat2d = np.meshgrid(lon_vals, lat_vals)
+        else:
+            lat2d = lat_vals
+            lon2d = lon_vals
+
+        # Convert shapefile to 0-360 if needed
         current_shapefile_df = shapefile_df.copy()
+        if is_360(lon, lon_scale, lon_offset):
+            current_shapefile_df["geometry"] = current_shapefile_df["geometry"].apply(translate_longitude)
 
-        # If data is '360', convert shapefile to '360' as well
-        if is_360(dataset[lon_var_name], lon_scale, lon_offset):
-            current_shapefile_df.geometry = current_shapefile_df['geometry'].apply(translate_longitude)
-
-        geometries = [transform(scale, geometry) for geometry in current_shapefile_df.geometry]
-        current_shapefile_df.geometry = geometries
-
-        dask = "forbidden"
-        if chunks:
-            dask = "allowed"
-
-        in_shape_vec = np.vectorize(in_shape)
-        boolean_mask = xr.apply_ufunc(
-            in_shape_vec,
-            dataset[lon_var_name],
-            dataset[lat_var_name],
-            dask=dask
+        # Flatten points and convert to GeoDataFrame
+        flat_points = np.column_stack((lon2d.ravel(), lat2d.ravel()))
+        point_gdf = gpd.GeoDataFrame(
+            geometry=[Point(xy) for xy in flat_points],
+            crs="EPSG:4326"
         )
 
-        # Store mask with a key that combines both variable names
-        lat_path = get_path(lat_var_name)
-        masks[lat_path] = boolean_mask
+        # Spatial join to find points inside shapefile
+        joined = gpd.sjoin(point_gdf, current_shapefile_df, how="left", predicate="intersects")
+        inside_mask_flat = ~joined.index_right.isna().to_numpy()
+        inside_mask = inside_mask_flat.reshape(lat2d.shape)
 
+        # Create DataArray aligned with original dims
+        mask_da = xr.DataArray(inside_mask, dims=lat.dims, coords=lat.coords)
+
+        lat_path = get_path(lat_var_name)
+        masks[lat_path] = mask_da
+
+    # Apply your datatree-aware masking logic
     return_dataset = datatree_subset.where_tree(dataset, masks, cut, pixel_subset)
     return return_dataset
 
@@ -1343,7 +1325,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 lon_var_names,
                 shapefile,
                 cut,
-                chunks,
                 pixel_subset
             )
         elif bbox is not None:
