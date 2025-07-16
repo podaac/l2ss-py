@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 - [issue/245] Update l2ss-py to use python 3.12
+- [issue/342] Preserve Time format from original file to subset file
+- [issue/45] SMAP_JPL_L2B_NRT_SSS_CAP_V5 time calculation issues
+
 ### Deprecated 
 ### Removed
 ### Fixed

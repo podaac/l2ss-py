@@ -683,11 +683,20 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
                 epoch_time_var_name = get_time_epoch_var(dataset, time_var_name)
                 epoch_datetime = dataset[epoch_time_var_name].values[0]
                 timestamp = np.datetime64(timestamp) - epoch_datetime
-        elif np.issubdtype(time_data.dtype, np.float64):
+        elif np.issubdtype(time_data.dtype, np.float64) or np.issubdtype(time_data.dtype, np.float32):
             description = time_data.attrs.get('description')
-            epoch_datetime = extract_epoch(description)
-            time_data = convert_time_from_description(time_data, description)
-            timestamp = pd.to_datetime(timestamp).to_datetime64()
+            if description:
+                epoch_datetime = extract_epoch(description)
+                time_data = convert_time_from_description(time_data, description)
+                timestamp = pd.to_datetime(timestamp).to_datetime64()
+            else:
+                long_name = time_data.attrs.get('long_name')
+                if long_name == "Approximate observation time for each row":
+                    start_time = dataset.attrs.get('REV_START_TIME')
+                    date_str = start_time.split("T")[0]
+                    start_date = pd.to_datetime(date_str, format="%Y-%j")
+                    row_time_seconds = time_data.values
+                    time_data = np.datetime64(start_date) + row_time_seconds.astype('timedelta64[s]')
 
         if getattr(time_data, 'long_name', None) == "reference time of sst file":
             timestamp = pd.to_datetime(timestamp).to_datetime64()
@@ -1262,9 +1271,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
                 time_encoding[group_path][var_name] = {}
 
-                if calendar:
+                if calendar and units:
                     time_encoding[group_path][var_name]['calendar'] = calendar
-                if units:
                     time_encoding[group_path][var_name]['units'] = units
                 time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
