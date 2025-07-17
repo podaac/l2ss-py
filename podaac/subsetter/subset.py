@@ -638,8 +638,7 @@ def convert_time_from_description(seconds_since, description: str):
     return result
 
 
-def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str
-                            ) -> Union[np.ndarray, bool]:
+def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str) -> Union[np.ndarray, bool]:
     """
     Build the temporal condition used in the xarray 'where' call which
     drops data not in the given bounds. If the data in the time var is
@@ -668,56 +667,56 @@ def new_build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, t
     """
 
     def build_cond(str_timestamp, compare):
-        timestamp = translate_timestamp(str_timestamp)
+        timestamp = pd.to_datetime(translate_timestamp(str_timestamp)).to_datetime64()
         time_data = dataset[time_var_name]
+        dtype = time_data.dtype
 
-        if np.issubdtype(time_data.dtype, np.datetime64):
-            timestamp = pd.to_datetime(timestamp).to_datetime64()
-        elif np.issubdtype(time_data.dtype, np.timedelta64):
+        # datetime64 time variable
+        if np.issubdtype(dtype, np.datetime64):
+            pass  # already in correct format
+
+        # timedelta64 time variable
+        elif np.issubdtype(dtype, np.timedelta64):
             if is_time_mjd(dataset, time_var_name):
                 mjd_datetime = datetime_from_mjd(dataset, time_var_name)
                 if mjd_datetime is None:
                     raise ValueError('Unable to get datetime from dataset to calculate time delta')
-                timestamp = np.datetime64(timestamp) - np.datetime64(mjd_datetime)
+                timestamp -= np.datetime64(mjd_datetime)
             else:
-                epoch_time_var_name = get_time_epoch_var(dataset, time_var_name)
-                epoch_datetime = dataset[epoch_time_var_name].values[0]
-                timestamp = np.datetime64(timestamp) - epoch_datetime
-        elif np.issubdtype(time_data.dtype, np.float64) or np.issubdtype(time_data.dtype, np.float32):
+                epoch_var = get_time_epoch_var(dataset, time_var_name)
+                epoch_datetime = dataset[epoch_var].values[0]
+                timestamp -= epoch_datetime
+
+        # float-based time variable
+        elif np.issubdtype(dtype, np.floating):
             description = time_data.attrs.get('description')
+            long_name = time_data.attrs.get('long_name')
+
             if description:
                 epoch_datetime = extract_epoch(description)
                 time_data = convert_time_from_description(time_data, description)
-                timestamp = pd.to_datetime(timestamp).to_datetime64()
-            else:
-                long_name = time_data.attrs.get('long_name')
-                if long_name == "Approximate observation time for each row":
-                    start_time = dataset.attrs.get('REV_START_TIME')
-                    date_str = start_time.split("T")[0]
-                    start_date = pd.to_datetime(date_str, format="%Y-%j")
-                    row_time_seconds = time_data.values
-                    time_data = np.datetime64(start_date) + row_time_seconds.astype('timedelta64[s]')
+                # `timestamp` already in datetime64
+            elif long_name == "Approximate observation time for each row":
+                start_time = dataset.attrs.get('REV_START_TIME')
+                date_str = start_time.split("T")[0]
+                start_date = pd.to_datetime(date_str, format="%Y-%j")
+                time_data = np.datetime64(start_date) + time_data.values.astype('timedelta64[s]')
 
+        # Special long_name case
         if getattr(time_data, 'long_name', None) == "reference time of sst file":
-            timestamp = pd.to_datetime(timestamp).to_datetime64()
-            time_data = dataset['time']
-            time_data = time_data.astype('datetime64[s]')
-            timedelta_seconds = dataset['sst_dtime'].astype('timedelta64[s]')
-            time_data = time_data + timedelta_seconds
+            base_time = dataset['time'].astype('datetime64[s]')
+            offset = dataset['sst_dtime'].astype('timedelta64[s]')
+            time_data = base_time + offset
 
         return compare(time_data, timestamp)
 
     temporal_conds = []
     if min_time:
-        comparison_op = operator.ge
-        temporal_conds.append(build_cond(min_time, comparison_op))
+        temporal_conds.append(build_cond(min_time, operator.ge))
     if max_time:
-        comparison_op = operator.le
-        temporal_conds.append(build_cond(max_time, comparison_op))
-    temporal_cond = True
-    if min_time or max_time:
-        temporal_cond = functools.reduce(lambda cond_a, cond_b: cond_a & cond_b, temporal_conds)
-    return temporal_cond
+        temporal_conds.append(build_cond(max_time, operator.le))
+
+    return functools.reduce(operator.and_, temporal_conds, True)
 
 
 def get_path(s):
@@ -861,7 +860,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         lon_data = dataset[lon_var_name]
         lat_data = dataset[lat_var_name]
 
-        temporal_cond = new_build_temporal_cond(min_time, max_time, dataset, time_var_name)
+        temporal_cond = build_temporal_cond(min_time, max_time, dataset, time_var_name)
         time_path = None
         if time_var_name:
             time_path = get_path(time_var_name)

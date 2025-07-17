@@ -3,11 +3,11 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 from unittest.mock import patch, MagicMock
-from podaac.subsetter.subset import new_build_temporal_cond
+from podaac.subsetter.subset import build_temporal_cond
 
 
 class TestNewBuildTemporalCond:
-    """Test cases for new_build_temporal_cond function."""
+    """Test cases for build_temporal_cond function."""
 
     def test_float64_with_description_attribute(self):
         """
@@ -32,7 +32,7 @@ class TestNewBuildTemporalCond:
         max_time = '1990-01-01T02:00:00Z'
         
         # Test with both min and max time
-        result = new_build_temporal_cond(min_time, max_time, dataset, 'time_var')
+        result = build_temporal_cond(min_time, max_time, dataset, 'time_var')
         
         # The result should be a DataArray with boolean values
         assert isinstance(result, xr.DataArray)
@@ -71,7 +71,7 @@ class TestNewBuildTemporalCond:
         min_time = '2020-01-01T00:01:00Z'  # 1 minute after start
         max_time = '2020-01-01T00:02:00Z'  # 2 minutes after start
         
-        result = new_build_temporal_cond(min_time, max_time, dataset, 'time_var')
+        result = build_temporal_cond(min_time, max_time, dataset, 'time_var')
         
         # The result should be a numpy array with boolean values
         assert isinstance(result, np.ndarray)
@@ -105,7 +105,7 @@ class TestNewBuildTemporalCond:
         min_time = '2000-01-01T01:00:00Z'
         max_time = '2000-01-01T02:00:00Z'
         
-        result = new_build_temporal_cond(min_time, max_time, dataset, 'time_var')
+        result = build_temporal_cond(min_time, max_time, dataset, 'time_var')
         
         assert isinstance(result, xr.DataArray)
         assert result.dtype == bool
@@ -138,7 +138,7 @@ class TestNewBuildTemporalCond:
         
         # This should raise a TypeError when trying to compare float with datetime
         with pytest.raises(TypeError):
-            new_build_temporal_cond(min_time, max_time, dataset, 'time_var')
+            build_temporal_cond(min_time, max_time, dataset, 'time_var')
 
     def test_float64_with_description_and_long_name(self):
         """
@@ -162,7 +162,7 @@ class TestNewBuildTemporalCond:
         min_time = '1990-01-01T01:00:00Z'
         max_time = '1990-01-01T02:00:00Z'
         
-        result = new_build_temporal_cond(min_time, max_time, dataset, 'time_var')
+        result = build_temporal_cond(min_time, max_time, dataset, 'time_var')
         
         # Should use description (1990 epoch), not REV_START_TIME (2020 epoch)
         assert isinstance(result, xr.DataArray)
@@ -190,7 +190,7 @@ class TestNewBuildTemporalCond:
         })
         
         # No temporal bounds
-        result = new_build_temporal_cond(None, None, dataset, 'time_var')
+        result = build_temporal_cond(None, None, dataset, 'time_var')
         
         assert result is True
 
@@ -213,7 +213,7 @@ class TestNewBuildTemporalCond:
         
         min_time = '1990-01-01T01:00:00Z'
         
-        result = new_build_temporal_cond(min_time, None, dataset, 'time_var')
+        result = build_temporal_cond(min_time, None, dataset, 'time_var')
         
         assert isinstance(result, xr.DataArray)
         assert result.dtype == bool
@@ -242,7 +242,7 @@ class TestNewBuildTemporalCond:
         
         max_time = '1990-01-01T01:00:00Z'
         
-        result = new_build_temporal_cond(None, max_time, dataset, 'time_var')
+        result = build_temporal_cond(None, max_time, dataset, 'time_var')
         
         assert isinstance(result, xr.DataArray)
         assert result.dtype == bool
@@ -275,7 +275,7 @@ class TestNewBuildTemporalCond:
         
         # This should raise a ValueError when trying to parse the date
         with pytest.raises(ValueError):
-            new_build_temporal_cond(min_time, max_time, dataset, 'time_var')
+            build_temporal_cond(min_time, max_time, dataset, 'time_var')
 
     def test_missing_rev_start_time(self):
         """
@@ -300,7 +300,7 @@ class TestNewBuildTemporalCond:
         
         # This should raise an AttributeError when trying to access REV_START_TIME
         with pytest.raises(AttributeError):
-            new_build_temporal_cond(min_time, max_time, dataset, 'time_var')
+            build_temporal_cond(min_time, max_time, dataset, 'time_var')
 
     def test_malformed_description(self):
         """
@@ -324,4 +324,4 @@ class TestNewBuildTemporalCond:
         
         # This should raise a ValueError when trying to extract epoch
         with pytest.raises(ValueError):
-            new_build_temporal_cond(min_time, max_time, dataset, 'time_var') 
+            build_temporal_cond(min_time, max_time, dataset, 'time_var') 
