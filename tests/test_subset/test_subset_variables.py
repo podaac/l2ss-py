@@ -12,6 +12,7 @@ import gc as garbage_collection
 
 from podaac.subsetter import subset
 from podaac.subsetter import datatree_subset
+from podaac.subsetter.utils.coordinate_utils import compute_coordinate_variable_names
 from conftest import data_files 
 
 
@@ -44,7 +45,7 @@ def test_subset_variables(test_file, data_dir, subset_output_dir, request):
 
     time_var_name = None
     try:
-        lat_var_name = subset.compute_coordinate_variable_names(in_ds)[0][0]
+        lat_var_name = compute_coordinate_variable_names(in_ds)[0][0]
         time_var_name = datatree_subset.compute_time_variable_name_tree(in_ds, in_ds[lat_var_name], [])
     except ValueError:
         # unable to determine lon lat vars

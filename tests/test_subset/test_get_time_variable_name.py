@@ -11,6 +11,7 @@ import xarray as xr
 
 from podaac.subsetter import subset
 from podaac.subsetter import datatree_subset
+from podaac.subsetter.utils.coordinate_utils import compute_coordinate_variable_names
 from conftest import data_files 
 
 @pytest.mark.parametrize("test_file", data_files())
@@ -24,7 +25,7 @@ def test_get_time_variable_name(test_file, data_dir):
     ds, _, file_ext = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
-    lat_var_name = subset.compute_coordinate_variable_names(ds)[0][0]
+    lat_var_name = compute_coordinate_variable_names(ds)[0][0]
     time_var_name = datatree_subset.compute_time_variable_name_tree(ds, ds[lat_var_name], [])
 
     assert time_var_name is not None

@@ -15,6 +15,7 @@ import xarray as xr
 
 from podaac.subsetter import subset
 from podaac.subsetter.group_handling import GROUP_DELIM
+from podaac.subsetter.utils.coordinate_utils import get_coordinate_variable_names
 from conftest import data_files 
 
  
@@ -58,7 +59,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     non_data_vars = set(in_ds.variables.keys()) - set(in_ds.data_vars.keys())
 
     # Coordinate variables are always included in the result
-    lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(in_ds)
+    lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(in_ds)
 
     coordinate_variables = lat_var_names + lon_var_names + time_var_names
     

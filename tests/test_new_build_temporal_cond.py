@@ -3,7 +3,7 @@ import numpy as np
 import xarray as xr
 import pandas as pd
 from unittest.mock import patch, MagicMock
-from podaac.subsetter.subset import build_temporal_cond
+from podaac.subsetter.utils.time_utils import build_temporal_cond
 
 
 class TestNewBuildTemporalCond:

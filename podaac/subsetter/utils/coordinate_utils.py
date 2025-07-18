@@ -1,0 +1,341 @@
+"""
+===============
+coordinate_utils.py
+===============
+
+Utility functions for coordinate operations and transformations.
+"""
+
+from typing import List, Tuple, Union
+import numpy as np
+import xarray as xr
+import cf_xarray as cfxr
+
+from podaac.subsetter import datatree_subset
+from podaac.subsetter.group_handling import GROUP_DELIM
+
+
+def apply_scale_offset(scale: float, offset: float, value: float) -> float:
+    """Apply scale and offset to the given value"""
+    return (value + offset) / scale
+
+
+def remove_scale_offset(value: float, scale: float, offset: float) -> float:
+    """Remove scale and offset from the given value"""
+    return (value * scale) - offset
+
+
+def convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -> np.ndarray:
+    """
+    This function will return a converted bound, which matches the
+    range of the given input file.
+
+    Parameters
+    ----------
+    bound : np.array
+        1-dimensional 2-element numpy array which represent the lower
+        and upper bounding box on this coordinate, respectively.
+    coord_max : integer
+        The max value which is possible given this coordinate. For
+        example, the max for longitude is 360.
+    coord_var : xarray.DataArray
+        The xarray variable for some coordinate.
+
+    Returns
+    -------
+    np.array
+        1-dimensional 2-element number array which represents the lower
+        and upper bounding box on this coordinate and has been converted
+        based on the valid bounds coordinate range of the dataset.
+
+    Notes
+    -----
+    Assumption that 0 is always on the prime meridian/equator.
+    """
+
+    scale = coord_var.attrs.get('scale_factor', 1.0)
+    offset = coord_var.attrs.get('add_offset', 0.0)
+    valid_min = coord_var.attrs.get('valid_min', None)
+
+    if valid_min is None or valid_min > 0:
+        # If coord var doesn't contain valid min, attempt to find
+        # manually. Note: Given the perfect storm, this could still fail
+        # to find the actual bounds.
+
+        # Filter out _FillValue from data before calculating min and max
+        fill_value = coord_var.attrs.get('_FillValue', None)
+        var_values = coord_var.values
+        if fill_value:
+            var_values = np.where(var_values != fill_value, var_values, np.nan)
+        var_min = np.nanmin(var_values)
+        var_max = np.nanmax(var_values)
+
+        if 0 <= var_min <= var_max <= (coord_max / scale):
+            valid_min = 0
+
+    # If the file coords are 0 --> max
+    if valid_min == 0:
+        bound = (bound + coord_max) % coord_max
+
+        # If the right/top bound is 0, set to max.
+        if bound[1] == 0:
+            bound[1] = coord_max
+
+        # If edges are the same, assume it wraps and return all
+        if bound[0] == bound[1]:
+            bound = np.array([0, coord_max])
+
+    # If the file longitude is -coord_max/2 --> coord_max/2
+    if valid_min != 0:
+        # If edges are the same, assume it wraps and return all
+        if bound[0] == bound[1]:
+            bound = np.array([-(coord_max / 2), coord_max / 2])
+
+    # Calculate scale and offset so the bounds match the coord data
+    return apply_scale_offset(scale, offset, bound)
+
+
+def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_var_name: str) -> np.ndarray:
+    """
+    This function will return a converted bbox which matches the range
+    of the given input file. This will convert both the latitude and
+    longitude range. For example, an input dataset can have a valid
+    longitude range of -180 --> 180 or of 0 --> 360.
+
+    Parameters
+    ----------
+    bbox : np.array
+        The bounding box
+    dataset : xarray.Dataset
+        The dataset which is being subset.
+    lat_var_name : str
+        Name of the lat variable in the given dataset
+    lon_var_name : str
+        Name of the lon variable in the given dataset
+
+    Returns
+    -------
+    bbox : np.array
+        The new bbox which matches latitude and longitude ranges of the
+        input file.
+
+    Notes
+    -----
+    Assumption that the provided bounding box is always between
+    -180 --> 180 for longitude and -90, 90 for latitude.
+    """
+
+    lon_data = dataset[lon_var_name]
+    lat_data = dataset[lat_var_name]
+
+    return np.array([convert_bound(bbox[0], 360, lon_data),
+                     convert_bound(bbox[1], 180, lat_data)])
+
+
+def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
+    """
+    Determine if given dataset is a '360' dataset or not.
+
+    Parameters
+    ----------
+    lon_var : xr.DataArray
+        The lon variable from the xarray Dataset
+    scale : float
+        Used to remove scale and offset for easier calculation
+    offset : float
+        Used to remove scale and offset for easier calculation
+
+    Returns
+    -------
+    bool
+        True if dataset is 360, False if not. Defaults to False.
+    """
+    valid_min = lon_var.attrs.get('valid_min', None)
+
+    if valid_min is None or valid_min > 0:
+        var_min = remove_scale_offset(np.amin(lon_var.values), scale, offset)
+        var_max = remove_scale_offset(np.amax(lon_var.values), scale, offset)
+
+        if var_min < 0:
+            return False
+        if var_max > 180:
+            return True
+
+    if valid_min == 0:
+        return True
+    if valid_min < 0:
+        return False
+
+    return False
+
+
+def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[str], str], Union[List[str], str]]:
+    """
+    Given a dataset, determine the coordinate variable from a list
+    of options
+
+    Parameters
+    ----------
+    dataset: xr.Dataset
+        The dataset to find the coordinate variables for
+
+    Returns
+    -------
+    tuple, str
+        Tuple of strings (or list of strings), where the first element is the lat coordinate
+        name and the second element is the lon coordinate name
+    """
+
+    dataset = xr.decode_cf(dataset)
+
+    # look for lon and lat using standard name in coordinates and axes
+    custom_criteria = {
+        "latitude": {
+            "standard_name": "latitude|projection_y_coordinate",
+        },
+        "longitude": {
+            "standard_name": "longitude|projection_x_coordinate",
+        }
+    }
+
+    possible_lat_coord_names = ['lat', 'latitude', 'y']
+    possible_lon_coord_names = ['lon', 'longitude', 'x']
+
+    def var_is_coord(var_name, possible_coord_names):
+        var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
+        return var_name.lower() in possible_coord_names
+
+    lat_coord_names = list(filter(
+        lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
+    lon_coord_names = list(filter(
+        lambda var_name: var_is_coord(var_name, possible_lon_coord_names), dataset.variables))
+
+    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+        lat_coord_names = datatree_subset.find_matching_coords(dataset, possible_lat_coord_names)
+        lon_coord_names = datatree_subset.find_matching_coords(dataset, possible_lon_coord_names)
+
+    # Couldn't find lon lat in data variables look in coordinates
+    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+        with cfxr.set_options(custom_criteria=custom_criteria):
+            lat_coord_names = dataset.cf.coordinates.get('latitude', [])
+            lon_coord_names = dataset.cf.coordinates.get('longitude', [])
+
+        if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+            try:
+                lat_coord_names = [dataset.cf["latitude"].name]
+                lon_coord_names = [dataset.cf["longitude"].name]
+            except KeyError:
+                pass
+
+    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
+        raise ValueError('Could not determine coordinate variables')
+
+    return lat_coord_names, lon_coord_names
+
+
+def get_coordinate_variable_names(dataset: xr.Dataset,
+                                  lat_var_names: list = None,
+                                  lon_var_names: list = None,
+                                  time_var_names: list = None):
+    """
+    Retrieve coordinate variables for this dataset. If coordinate
+    variables are provided, use those, Otherwise, attempt to determine
+    coordinate variables manually.
+
+    Parameters
+    ----------
+    dataset : xr.Dataset
+        xarray Dataset used to compute coordinate variables manually.
+        Only used if lat, lon, or time vars are not provided.
+    lat_var_names : list
+        List of latitude coordinate variables.
+    lon_var_names : list
+        List of longitude coordinate variables.
+    time_var_names : list
+        List of time coordinate variables.
+
+    Returns
+    -------
+    TODO: add return type docstring and type hint.
+    """
+
+    if isinstance(dataset, xr.Dataset):
+        tree = xr.DataTree(dataset=dataset)
+    else:
+        tree = dataset
+
+    dataset = tree
+
+    if not lat_var_names or not lon_var_names:
+        lon_var_names, lat_var_names = datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
+    if not time_var_names:
+        time_var_names = []
+        for lat_var_name in lat_var_names:
+
+            parent_path = '/'.join(lat_var_name.split('/')[:-1])  # gives "data_20/c"
+
+            subtree = dataset[parent_path]  # Gets the subtree at data_20/c
+            variable = dataset[lat_var_name]  # Gets the latitude variable
+            time_name = datatree_subset.compute_time_variable_name_tree(subtree,
+                                                                        variable,
+                                                                        time_var_names)
+            if time_name:
+                time_var = f"{parent_path}/{time_name}"
+                time_var_names.append(time_var)
+
+        if not time_var_names:
+            time_var_names.append(compute_utc_name(dataset))
+
+        seen = set()
+        time_var_names = [x for x in time_var_names if x is not None and not (x in seen or seen.add(x))]
+
+    lat_var_names = normalize_paths(lat_var_names)
+    lon_var_names = normalize_paths(lon_var_names)
+    time_var_names = normalize_paths(time_var_names)
+    return lat_var_names, lon_var_names, time_var_names
+
+
+def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
+    """
+    Get the name of the utc variable if it is there to determine origine time
+    """
+    for var_name in list(dataset.data_vars.keys()):
+        if 'utc' in var_name.lower() and 'time' in var_name.lower():
+            return var_name
+
+    return None
+
+
+def normalize_paths(paths):
+    """
+    Convert paths with __ notation to normal group paths, removing leading /
+    and converting __ to /
+
+    Parameters
+    ----------
+    paths : list of str
+        List of paths with __ notation
+
+    Returns
+    -------
+    list of str
+        Normalized paths
+
+    Examples
+    --------
+    >>> paths = ['/__geolocation__latitude', '/__geolocation__longitude']
+    >>> normalize_paths(paths)
+    ['/geolocation/latitude', '/geolocation/longitude']
+    """
+    normalized = []
+    for path in paths:
+        # Replace double underscore with slash
+        path = path.replace('__', '/')
+        # Remove any double slashes
+        while '//' in path:
+            path = path.replace('//', '/')
+        # Ensure path starts with /
+        if not path.startswith('/'):
+            path = '/' + path
+        normalized.append(path)
+    return normalized

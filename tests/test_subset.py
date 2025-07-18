@@ -56,6 +56,11 @@ from podaac.subsetter.datatree_subset import get_indexers_from_nd
 from podaac.subsetter import gpm_cleanup as gc
 from harmony_service_lib.exceptions import NoDataException
 
+from podaac.subsetter.utils import mask_utils
+from podaac.subsetter.utils import coordinate_utils
+from podaac.subsetter.utils import metadata_utils
+from podaac.subsetter.utils import time_utils
+
 import gc as garbage_collection
 
 @pytest.fixture(autouse=True)
@@ -199,7 +204,7 @@ def test_bbox_conversion(data_dir):
         dataset = test_bbox[0]
         lon_range = test_bbox[1]
         expected_result = test_bbox[2]
-        actual_result, _ = subset.convert_bbox(np.array([lon_range, [0, 0]]),
+        actual_result, _ = coordinate_utils.convert_bbox(np.array([lon_range, [0, 0]]),
                                                dataset, lat_var, lon_var)
 
         np.testing.assert_equal(actual_result, expected_result)
@@ -345,7 +350,7 @@ def test_get_coord_variable_names(data_dir):
     old_lat_var_name = 'lat'
     old_lon_var_name = 'lon'
 
-    lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(ds)
+    lat_var_name, lon_var_name = coordinate_utils.compute_coordinate_variable_names(ds)
 
     assert lat_var_name[0] == old_lat_var_name
     assert lon_var_name[0] == old_lon_var_name
@@ -355,7 +360,7 @@ def test_get_coord_variable_names(data_dir):
     ds = ds.rename({old_lat_var_name: new_lat_var_name,
                     old_lon_var_name: new_lon_var_name})
 
-    lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(ds)
+    lat_var_name, lon_var_name = coordinate_utils.compute_coordinate_variable_names(ds)
 
     assert lat_var_name[0] == new_lat_var_name
     assert lon_var_name[0] == new_lon_var_name
@@ -377,7 +382,7 @@ def test_cannot_get_coord_variable_names(data_dir):
             del var.attrs['coordinates']
 
     with pytest.raises(ValueError):
-        subset.compute_coordinate_variable_names(ds)
+        coordinate_utils.compute_coordinate_variable_names(ds)
 
 
 def test_get_spatial_bounds(data_dir):
@@ -794,8 +799,8 @@ def test_temporal_subset_ascat(data_dir, subset_output_dir, request):
     out_ds = xr.open_dataset(join(subset_output_dir, output_file),
                              decode_coords=False)
 
-    start_dt = subset.translate_timestamp(min_time)
-    end_dt = subset.translate_timestamp(max_time)
+    start_dt = time_utils.translate_timestamp(min_time)
+    end_dt = time_utils.translate_timestamp(max_time)
 
     # All dates should be within the given temporal bounds.
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()
@@ -844,8 +849,8 @@ def test_temporal_subset_modis_a(data_dir, subset_output_dir, request):
     out_ds = xr.open_dataset(join(subset_output_dir, output_file),
                              decode_coords=False)
 
-    start_dt = subset.translate_timestamp(min_time)
-    end_dt = subset.translate_timestamp(max_time)
+    start_dt = time_utils.translate_timestamp(min_time)
+    end_dt = time_utils.translate_timestamp(max_time)
 
     epoch_dt = out_ds['time'].values[0]
 
@@ -889,8 +894,8 @@ def test_temporal_subset_s6(data_dir, subset_output_dir, request):
         group='data_01'
     )
 
-    start_dt = subset.translate_timestamp(min_time)
-    end_dt = subset.translate_timestamp(max_time)
+    start_dt = time_utils.translate_timestamp(min_time)
+    end_dt = time_utils.translate_timestamp(max_time)
 
     # All dates should be within the given temporal bounds.
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()
@@ -1154,7 +1159,7 @@ def test_get_time_squeeze(data_dir, subset_output_dir):
         lat_var_names = []
         lon_var_names = []
         time_var_names = ['/PRODUCT/time']
-        lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+        lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=tree,
             lat_var_names=lat_var_names,
             lon_var_names=lon_var_names,
@@ -1189,8 +1194,8 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        lat_var_name = subset.compute_coordinate_variable_names(dataset)[0][0]
-        lon_var_name = subset.compute_coordinate_variable_names(dataset)[1][0]
+        lat_var_name = coordinate_utils.compute_coordinate_variable_names(dataset)[0][0]
+        lon_var_name = coordinate_utils.compute_coordinate_variable_names(dataset)[1][0]
         time_var_name = datatree_subset.compute_time_variable_name_tree(dataset, dataset[lat_var_name], [])
         oper = operator.and_
 
@@ -1345,8 +1350,8 @@ def test_temporal_merged_topex(data_dir, subset_output_dir, request):
         decode_coords=False
     )
 
-    start_dt = subset.translate_timestamp(min_time)
-    end_dt = subset.translate_timestamp(max_time)
+    start_dt = time_utils.translate_timestamp(min_time)
+    end_dt = time_utils.translate_timestamp(max_time)
 
     # delta time from the MJD of this data collection
     mjd_dt = np.datetime64("1992-01-01")
@@ -1377,7 +1382,7 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
 
     with xr.open_datatree(file, **args) as dataset:
 
-        lat_var_names, lon_var_names, time_var_names = subset.get_coordinate_variable_names(
+        lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset
         )
         epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
@@ -1429,8 +1434,8 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
     out_ds = xr.open_dataset(join(subset_output_dir, output_file),
                              decode_coords=False)
 
-    start_dt = subset.translate_timestamp(min_time)
-    end_dt = subset.translate_timestamp(max_time)
+    start_dt = time_utils.translate_timestamp(min_time)
+    end_dt = time_utils.translate_timestamp(max_time)
 
     # All dates should be within the given temporal bounds.
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()
@@ -1472,7 +1477,7 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
                 xr.backends.NetCDF4DataStore(nc_dataset),
                 **args
         ) as dataset:
-            _, _, time_var_names = subset.get_coordinate_variable_names(
+            _, _, time_var_names = coordinate_utils.get_coordinate_variable_names(
                 dataset=dataset,
                 lat_var_names=None,
                 lon_var_names=None,
@@ -1668,7 +1673,7 @@ def test_get_time_OMI(data_dir, subset_output_dir):
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
-        lat_var_names, _ = subset.compute_coordinate_variable_names(dataset)
+        lat_var_names, _ =  coordinate_utils.compute_coordinate_variable_names(dataset)
         time_var_names = []
         for lat_var_name in lat_var_names:
             time_var_names.append(datatree_subset.compute_time_variable_name_tree(
@@ -1733,7 +1738,7 @@ def test_passed_coords(data_dir):
 
     # coordinates now come with a leading / for groups
     # When none are passed in, variables are computed manually
-    lats, lons, times = subset.get_coordinate_variable_names(
+    lats, lons, times = coordinate_utils.get_coordinate_variable_names(
         dataset,
         lat_var_names=None,
         lon_var_names=None,
@@ -1748,7 +1753,7 @@ def test_passed_coords(data_dir):
     # This case is a bit different because the lat values are used to
     # compute the time variable so we can't pass in dummy values.
 
-    lats, lons, times = subset.get_coordinate_variable_names(
+    lats, lons, times = coordinate_utils.get_coordinate_variable_names(
         dataset,
         lat_var_names=actual_lats,
         lon_var_names=dummy_lons,
@@ -1759,7 +1764,7 @@ def test_passed_coords(data_dir):
     assert lons == dummy_lons
     assert times == actual_times
     # When only time is passed in, lats and lons are computed manually
-    lats, lons, times = subset.get_coordinate_variable_names(
+    lats, lons, times = coordinate_utils.get_coordinate_variable_names(
         dataset,
         lat_var_names=None,
         lon_var_names=None,
@@ -1770,7 +1775,7 @@ def test_passed_coords(data_dir):
     assert times == dummy_times
 
     # When time, lats, and lons are passed in, nothing is computed manually
-    lats, lons, times = subset.get_coordinate_variable_names(
+    lats, lons, times = coordinate_utils.get_coordinate_variable_names(
         dataset,
         lat_var_names=dummy_lats,
         lon_var_names=dummy_lons,

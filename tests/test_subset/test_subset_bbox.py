@@ -13,7 +13,7 @@ import xarray as xr
 
 from podaac.subsetter import subset
 from conftest import data_files 
-
+from podaac.subsetter.utils.coordinate_utils import compute_coordinate_variable_names, convert_bbox
 
 @pytest.mark.parametrize("test_file", data_files())
 def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
@@ -39,12 +39,12 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
                              decode_coords=False,
                              mask_and_scale=False)
 
-    lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(out_ds)
+    lat_var_name, lon_var_name = compute_coordinate_variable_names(out_ds)
 
     lat_var_name = lat_var_name[0]
     lon_var_name = lon_var_name[0]
 
-    lon_bounds, lat_bounds = subset.convert_bbox(bbox, out_ds, lat_var_name, lon_var_name)
+    lon_bounds, lat_bounds = convert_bbox(bbox, out_ds, lat_var_name, lon_var_name)
 
     lats = out_ds[lat_var_name].values
     lons = out_ds[lon_var_name].values
