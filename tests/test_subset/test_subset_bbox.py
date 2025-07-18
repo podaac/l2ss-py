@@ -14,6 +14,7 @@ import xarray as xr
 from podaac.subsetter import subset
 from conftest import data_files 
 from podaac.subsetter.utils.coordinate_utils import compute_coordinate_variable_names, convert_bbox
+from podaac.subsetter.utils.file_utils import open_as_nc_dataset
 
 @pytest.mark.parametrize("test_file", data_files())
 def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
@@ -33,7 +34,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         output_file=subset_output_file
     )
 
-    out_ds, _, file_ext = subset.open_as_nc_dataset(subset_output_file)
+    out_ds, _, file_ext = open_as_nc_dataset(subset_output_file)
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False,

@@ -16,6 +16,7 @@ import xarray as xr
 from podaac.subsetter import subset
 from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.utils.coordinate_utils import get_coordinate_variable_names
+from podaac.subsetter.utils.file_utils import open_as_nc_dataset
 from conftest import data_files 
 
  
@@ -50,7 +51,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
         # Handle specific errors (file not found, group not found, etc.)
         has_group = False
 
-    in_ds, _, file_ext = subset.open_as_nc_dataset(nc_copy_for_expected_results)
+    in_ds, _, file_ext = open_as_nc_dataset(nc_copy_for_expected_results)
     in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
                             decode_times=False,
                             decode_coords=False)
@@ -83,7 +84,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
         variables=[var.replace(GROUP_DELIM, '/') for var in included_variables]
     )
 
-    out_ds, _, file_ext = subset.open_as_nc_dataset(join(subset_output_dir, output_file))
+    out_ds, _, file_ext = open_as_nc_dataset(join(subset_output_dir, output_file))
     out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
                              decode_times=False,
                              decode_coords=False)

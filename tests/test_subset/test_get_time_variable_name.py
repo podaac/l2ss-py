@@ -12,6 +12,7 @@ import xarray as xr
 from podaac.subsetter import subset
 from podaac.subsetter import datatree_subset
 from podaac.subsetter.utils.coordinate_utils import compute_coordinate_variable_names
+from podaac.subsetter.utils.file_utils import open_as_nc_dataset
 from conftest import data_files 
 
 @pytest.mark.parametrize("test_file", data_files())
@@ -22,7 +23,7 @@ def test_get_time_variable_name(test_file, data_dir):
         'mask_and_scale': False,
         'decode_times': True
     }
-    ds, _, file_ext = subset.open_as_nc_dataset(os.path.join(data_dir, test_file))
+    ds, _, file_ext = open_as_nc_dataset(os.path.join(data_dir, test_file))
     ds = xr.open_dataset(xr.backends.NetCDF4DataStore(ds), **args)
 
     lat_var_name = compute_coordinate_variable_names(ds)[0][0]

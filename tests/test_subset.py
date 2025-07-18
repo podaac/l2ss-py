@@ -60,6 +60,7 @@ from podaac.subsetter.utils import mask_utils
 from podaac.subsetter.utils import coordinate_utils
 from podaac.subsetter.utils import metadata_utils
 from podaac.subsetter.utils import time_utils
+from podaac.subsetter.utils import file_utils
 
 import gc as garbage_collection
 
@@ -286,7 +287,7 @@ def test_calculate_chunks():
         dims=['x', 'y', 'z']
     ).to_dataset(name='foo')
 
-    chunk_dict = subset.calculate_chunks(dataset)
+    chunk_dict = file_utils.calculate_chunks(dataset)
 
     assert chunk_dict.get('x') is None
     assert chunk_dict.get('y') is None
@@ -570,7 +571,7 @@ def test_transform_grouped_dataset(data_dir, subset_output_dir):
                     os.path.join(subset_output_dir, s6_file_name))
 
     nc_ds = nc.Dataset(os.path.join(data_dir, 'sentinel_6', s6_file_name))
-    nc_ds_transformed = subset.transform_grouped_dataset(
+    nc_ds_transformed = file_utils.transform_grouped_dataset(
         nc.Dataset(os.path.join(subset_output_dir, s6_file_name), 'r'),
         os.path.join(subset_output_dir, s6_file_name)
     )
@@ -1121,16 +1122,16 @@ def test_root_group(data_dir, subset_output_dir):
         'mask_and_scale': False,
         'decode_times': False
     }
-    nc_dataset = subset.transform_grouped_dataset(nc_dataset, os.path.join(subset_output_dir, sndr_file_name))
+    nc_dataset = file_utils.transform_grouped_dataset(nc_dataset, os.path.join(subset_output_dir, sndr_file_name))
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
             **args
     ) as dataset:
         var_list = list(dataset.variables)
-        assert var_list[0][0:2] == subset.GROUP_DELIM
+        assert var_list[0][0:2] == GROUP_DELIM
         group_lst = []
         for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
-            group_lst.append('/'.join(var_name.split(subset.GROUP_DELIM)[:-1]))
+            group_lst.append('/'.join(var_name.split(GROUP_DELIM)[:-1]))
         group_lst = ['/' if group == '' else group for group in group_lst]
         groups = set(group_lst)
         expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
@@ -1188,7 +1189,7 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
         'mask_and_scale': False,
         'decode_times': False
     }
-    nc_dataset = subset.transform_grouped_dataset(nc_dataset,
+    nc_dataset = file_utils.transform_grouped_dataset(nc_dataset,
                                                   os.path.join(subset_output_dir, tropomi_file_name))
     with xr.open_dataset(
             xr.backends.NetCDF4DataStore(nc_dataset),
@@ -1257,7 +1258,7 @@ def test_transform_h5py_dataset(data_dir, subset_output_dir):
                     entry_lst.append(entry_str + "/" + group_keys)
                 key_lst.append(entry_str + "/" + group_keys)
 
-    nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
+    nc_dataset, has_groups, hdf_type = file_utils.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
     assert 'OMI' == hdf_type
     nc_vars_flattened = list(nc_dataset.variables.keys())
     for i, entry in enumerate(entry_lst):  # go through all the datasets in h5py file
@@ -1283,33 +1284,33 @@ def test_variable_dims_matched_tropomi(data_dir, subset_output_dir):
 
     # Get variable dimensions from input dataset
     in_var_dims = {
-        var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+        var_name: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
         for var_name, var in in_nc.groups['PRODUCT'].variables.items()
     }
 
     # Get variables from METADATA group
     in_var_dims.update(
         {
-            var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            var_name: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
             for var_name, var in in_nc.groups['METADATA'].groups['QA_STATISTICS'].variables.items()
         }
     )
     # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
     in_var_dims.update(
         {
-            var_name: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+            var_name: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
             for var_name, var in
             in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
         }
     )
 
-    out_nc = subset.transform_grouped_dataset(
+    out_nc = file_utils.transform_grouped_dataset(
         in_nc, os.path.join(subset_output_dir, tropomi_file_name)
     )
 
     # Get variable dimensions from output dataset
     out_var_dims = {
-        var_name.split(subset.GROUP_DELIM)[-1]: [dim.split(subset.GROUP_DELIM)[-1] for dim in var.dimensions]
+        var_name.split(GROUP_DELIM)[-1]: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
         for var_name, var in out_nc.variables.items()
     }
 
@@ -1385,7 +1386,7 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset
         )
-        epoch_time_var = subset.get_time_epoch_var(dataset, time_var_names[0])
+        epoch_time_var = time_utils.get_time_epoch_var(dataset, time_var_names[0])
         assert epoch_time_var.split('/')[-1] == 'time'
 
 
@@ -1461,7 +1462,7 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
         min_time = '2020-01-16T12:30:00Z'
         max_time = '2020-01-16T12:40:00Z'
 
-        nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
+        nc_dataset, has_groups, hdf_type = file_utils.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
         assert has_groups == True
         assert i[0] == hdf_type
         args = {
@@ -1661,7 +1662,7 @@ def test_get_time_OMI(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'OMI', omi_file),
                     os.path.join(subset_output_dir, omi_file))
 
-    nc_dataset, has_groups, hdf_type = subset.h5file_transform(os.path.join(subset_output_dir, omi_file))
+    nc_dataset, has_groups, hdf_type = file_utils.h5file_transform(os.path.join(subset_output_dir, omi_file))
 
     args = {
         'decode_coords': False,
@@ -1880,7 +1881,7 @@ def test_bad_time_unit(subset_output_dir):
     nc_out_location = join(subset_output_dir, "bad_time.nc")
     ds.to_netcdf(nc_out_location)
 
-    subset.override_decode_cf_datetime()
+    file_utils.override_decode_cf_datetime()
 
     ds_test = xr.open_dataset(nc_out_location)
     ds_test.close()
@@ -1935,7 +1936,7 @@ def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
         os.path.join(subset_output_dir, gpm_file)
     )
 
-    nc_dataset, has_groups, file_extension = subset.open_as_nc_dataset(join(subset_output_dir, gpm_file))
+    nc_dataset, has_groups, file_extension = file_utils.open_as_nc_dataset(join(subset_output_dir, gpm_file))
 
     nc_dataset_new = gc.change_var_dims(nc_dataset, variables=None, time_name='__test_time')
     assert int(nc_dataset_new.variables["__FS__ScanTime__test_time"][:][0]) == 1306403820

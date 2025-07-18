@@ -20,63 +20,26 @@ Functions related to subsetting a NetCDF file.
 
 import os
 from itertools import zip_longest
-from typing import List, Optional, Tuple, Union
+from typing import List, Union
 
-import dateutil
-from dateutil import parser
-
-import cftime
 import geopandas as gpd
 import netCDF4 as nc
 import numpy as np
 import xarray as xr
-import xarray.coding.times
 from shapely.geometry import MultiPolygon, Point, Polygon
 
 from podaac.subsetter import (
-    dimension_cleanup as dc,
     datatree_subset,
     tree_time_converting as tree_time_converting
-)
-from podaac.subsetter.group_handling import (
-    h5file_transform,
-    transform_grouped_dataset,
 )
 from podaac.subsetter.utils import mask_utils
 from podaac.subsetter.utils import coordinate_utils
 from podaac.subsetter.utils import metadata_utils
 from podaac.subsetter.utils import time_utils
+from podaac.subsetter.utils import file_utils
 
 
 SERVICE_NAME = 'l2ss-py'
-
-
-def calculate_chunks(dataset: xr.Dataset) -> dict:
-    """
-    For the given dataset, calculate if the size on any dimension is
-    worth chunking. Any dimension larger than 4000 will be chunked. This
-    is done to ensure that the variable can fit in memory.
-
-    Parameters
-    ----------
-    dataset : xarray.Dataset
-        The dataset to calculate chunks for.
-
-    Returns
-    -------
-    dict
-        The chunk dictionary, where the key is the dimension and the
-        value is 4000 or 500 depending on how many dimensions.
-    """
-    if len(dataset.dims) <= 3:
-        chunk = {dim: 4000 for dim in dataset.dims
-                 if dataset.sizes[dim] > 4000
-                 and len(dataset.dims) > 1}
-    else:
-        chunk = {dim: 500 for dim in dataset.dims
-                 if dataset.sizes[dim] > 500}
-
-    return chunk
 
 
 def translate_longitude(geometry):
@@ -124,12 +87,6 @@ def translate_longitude(geometry):
     else:
         # Handle other geometry types as needed
         return geometry
-
-
-def get_path(s):
-    """Extracts the path by removing the last part after the final '/'."""
-    path = s.rsplit('/', 1)[0] if '/' in s else s
-    return path if path.startswith('/') else f'/{path}'
 
 
 def subset_with_shapefile_multi(dataset: xr.Dataset,
@@ -192,7 +149,7 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
         # Create DataArray aligned with original dims
         mask_da = xr.DataArray(inside_mask, dims=lat.dims, coords=lat.coords)
 
-        lat_path = get_path(lat_var_name)
+        lat_path = file_utils.get_path(lat_var_name)
         masks[lat_path] = mask_da
 
     # Apply your datatree-aware masking logic
@@ -261,8 +218,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     for lat_var_name, lon_var_name, time_var_name in iterator:
 
-        lat_path = get_path(lat_var_name)
-        lon_path = get_path(lon_var_name)
+        lat_path = file_utils.get_path(lat_var_name)
+        lon_path = file_utils.get_path(lon_var_name)
 
         lon_data = dataset[lon_var_name]
         lat_data = dataset[lat_var_name]
@@ -270,7 +227,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         temporal_cond = time_utils.build_temporal_cond(min_time, max_time, dataset, time_var_name)
         time_path = None
         if time_var_name:
-            time_path = get_path(time_var_name)
+            time_path = file_utils.get_path(time_var_name)
             time_data = dataset[time_var_name]
 
             if time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
@@ -294,113 +251,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
     return return_dataset
-
-
-def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool]:
-    """Open netcdf file, and flatten groups if they exist."""
-    hdf_type = None
-    # Open dataset with netCDF4 first, so we can get group info
-    try:
-        nc_dataset = nc.Dataset(filepath, mode='r')
-        has_groups = bool(nc_dataset.groups)
-        # If dataset has groups, transform to work with xarray
-        if has_groups:
-            nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
-
-    except OSError:
-        nc_dataset, has_groups, hdf_type = h5file_transform(filepath)
-
-    nc_dataset = dc.remove_duplicate_dims(nc_dataset)
-
-    return nc_dataset, has_groups, hdf_type
-
-
-def override_decode_cf_datetime() -> None:
-    """
-    WARNING !!! REMOVE AT EARLIEST XARRAY FIX, this is a override to xarray override_decode_cf_datetime function.
-    xarray has problems decoding time units with format `seconds since 2000-1-1 0:0:0 0`, this solves by testing
-    the unit to see if its parsable, if it is use original function, if not format unit into a parsable format.
-
-    https://github.com/pydata/xarray/issues/7210
-    """
-
-    orig_decode_cf_datetime = xarray.coding.times.decode_cf_datetime
-
-    def decode_cf_datetime(num_dates, units, calendar=None, use_cftime=None):
-        try:
-            parser.parse(units.split('since')[-1])
-            return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
-        except dateutil.parser.ParserError:
-            reference_time = cftime.num2date(0, units, calendar)
-            units = f"{units.split('since')[0]} since {reference_time}"
-            return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
-
-    xarray.coding.times.decode_cf_datetime = decode_cf_datetime
-
-
-def test_access_sst_dtime_values(nc_dataset):
-    """
-    Test accessing values of 'sst_dtime' variable in a NetCDF file.
-
-    Parameters
-    ----------
-    nc_dataset (netCDF4.Dataset): An open NetCDF dataset.
-
-    Returns
-    -------
-    access_successful (bool): True if 'sst_dtime' values are accessible, False otherwise.
-    """
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': True,
-        'decode_times': True
-    }
-    try:
-        with xr.open_dataset(
-                xr.backends.NetCDF4DataStore(nc_dataset),
-                **args
-        ) as dataset:
-            for var_name in dataset.variables:
-                dataset[var_name].values  # pylint: disable=pointless-statement
-    except (TypeError, ValueError, KeyError):
-        return False
-    return True
-
-
-def get_hdf_type(tree: xr.DataTree) -> Optional[str]:
-    """
-    Determine the HDF type (OMI or MLS) from a DataTree object.
-
-    Parameters
-    ----------
-    tree : DataTree
-        DataTree object containing the HDF data
-
-    Returns
-    -------
-    Optional[str]
-        'OMI', 'MLS', or None if type cannot be determined
-    """
-    try:
-        # Try to get instrument information from FILE_ATTRIBUTES
-        additional_attrs = tree['/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES']
-        if additional_attrs is not None and 'InstrumentName' in additional_attrs.attrs:
-            instrument = additional_attrs.attrs['InstrumentName']
-            if isinstance(instrument, bytes):
-                instrument = instrument.decode("utf-8")
-        else:
-            return None
-
-        # Determine HDF type based on instrument name
-        if 'OMI' in instrument:
-            return 'OMI'
-        if 'MLS' in instrument:
-            return 'MLS'
-
-    except (KeyError, AttributeError):
-        pass
-
-    return None
 
 
 def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
@@ -480,7 +330,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     """
 
     file_extension = os.path.splitext(file_to_subset)[1]
-    override_decode_cf_datetime()
+    file_utils.override_decode_cf_datetime()
 
     hdf_type = False
 
@@ -509,7 +359,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                        (getattr(time_var, 'long_name', None) == "reference time of sst file"):
                         args['mask_and_scale'] = True
                         if getattr(time_var, 'long_name', None) == "reference time of sst file":
-                            args['mask_and_scale'] = test_access_sst_dtime_values(nc_dataset)
+                            args['mask_and_scale'] = file_utils.test_access_sst_dtime_values(nc_dataset)
                         break
         except Exception:  # pylint: disable=broad-exception-caught
             pass
@@ -554,8 +404,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
-        if hdf_type is False:
-            hdf_type = get_hdf_type(dataset)
+        hdf_type = file_utils.get_hdf_type(dataset)
 
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset,
@@ -582,7 +431,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
-        chunks = calculate_chunks(dataset)
+        chunks = file_utils.calculate_chunks(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
         if variables:
