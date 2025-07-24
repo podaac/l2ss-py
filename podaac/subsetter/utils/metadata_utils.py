@@ -9,6 +9,7 @@ Utility functions for metadata operations and history management.
 import datetime
 import json
 import os
+import re
 from typing import Any, List, Optional
 
 import importlib_metadata
@@ -96,7 +97,6 @@ def set_version_history(dataset: xr.Dataset, cut: bool, bbox: np.ndarray = None,
         Name of the shapefile to include in the version history
 
     """
-
     version = importlib_metadata.distribution(SERVICE_NAME).version
     history = dataset.attrs.get('history', "")
     timestamp = datetime.datetime.utcnow()
@@ -249,3 +249,74 @@ def update_netcdf_attrs(output_file: str,
 def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     """Remove scale and offset from the given value"""
     return (value * scale) - offset
+
+
+def legalize_attr_name(attr):
+    """
+    make sure attr name is legal
+    """
+    # Only allow ASCII letters, digits, underscore, hyphen; no spaces, no leading digit
+    if not isinstance(attr, str):
+        return attr
+    name = attr.replace(" ", "_")
+    name = re.sub(r'[^A-Za-z0-9_\-]', '', name)
+    if re.match(r'^\d', name):
+        name = '_' + name
+    return name
+
+
+def check_illegal_datatree_attrs(dt):
+    """
+    Checks for illegal attribute names in a DataTree and returns True if any are found.
+    Does not modify anything.
+    """
+    def is_illegal(name):
+        if not isinstance(name, str):
+            return True
+        if re.match(r'^\d', name):
+            return True
+        if re.search(r'[^A-Za-z0-9_\-]', name):
+            return True
+        return False
+
+    found_illegal = False
+    for node in dt.subtree:
+        ds = node.ds
+        if ds is not None:
+            # Check global attributes
+            for k in ds.attrs:
+                if is_illegal(k):
+                    found_illegal = True
+                    break
+            # Check variable attributes
+            for var_name in ds.variables:
+                var = ds[var_name]
+                for k in var.attrs:
+                    if is_illegal(k):
+                        found_illegal = True
+                        break
+    return found_illegal
+
+
+def fix_illegal_datatree_attrs(dt):
+    """
+    Fixes illegal attribute names in a DataTree (in-place).
+    """
+    for node in dt.subtree:
+        ds = node.ds
+        if ds is not None:
+            # Fix global attrs
+            new_attrs = {}
+            for k, v in ds.attrs.items():
+                new_k = legalize_attr_name(k)
+                new_attrs[new_k] = v
+            ds.attrs = new_attrs
+
+            # Fix variable attrs
+            for var_name in ds.variables:
+                var = ds[var_name]
+                new_var_attrs = {}
+                for k, v in var.attrs.items():
+                    new_k = legalize_attr_name(k)
+                    new_var_attrs[new_k] = v
+                var.attrs = new_var_attrs

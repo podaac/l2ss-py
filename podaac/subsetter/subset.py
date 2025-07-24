@@ -38,7 +38,7 @@ from podaac.subsetter.utils import metadata_utils
 from podaac.subsetter.utils import spatial_utils
 from podaac.subsetter.utils import time_utils
 from podaac.subsetter.utils import file_utils
-
+from podaac.subsetter.utils import variables_utils
 
 SERVICE_NAME = 'l2ss-py'
 
@@ -386,6 +386,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
         chunks = file_utils.calculate_chunks(dataset)
+        all_vars = variables_utils.get_all_variable_names_from_dtree(dataset)
         if chunks:
             dataset = dataset.chunk(chunks)
         if variables:
@@ -394,6 +395,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
 
             keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
+            keep_variables = variables_utils.normalize_candidate_paths_against_dtree(keep_variables, all_vars)
 
             all_data_variables = datatree_subset.get_vars_with_paths(dataset)
             drop_variables = [
@@ -402,6 +404,10 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             ]
 
             dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
+
+        lon_var_names = variables_utils.normalize_candidate_paths_against_dtree(lon_var_names, all_vars)
+        lat_var_names = variables_utils.normalize_candidate_paths_against_dtree(lat_var_names, all_vars)
+        time_var_names = variables_utils.normalize_candidate_paths_against_dtree(time_var_names, all_vars)
 
         if shapefile:
             subsetted_dataset = subset_with_shapefile_multi(
@@ -458,7 +464,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                                            stage_file_name_subsetted_true,
                                            stage_file_name_subsetted_false)
 
-        subsetted_dataset.to_netcdf(output_file, encoding=encoding)
+        try:
+            subsetted_dataset.to_netcdf(output_file, encoding=encoding)
+        except AttributeError as e:
+            if "NetCDF: Name contains illegal characters" in str(e):
+                metadata_utils.fix_illegal_datatree_attrs(subsetted_dataset)
+                subsetted_dataset.to_netcdf(output_file, encoding=encoding)
+            else:
+                raise
 
         metadata_utils.ensure_time_units(output_file, time_encoding)
 

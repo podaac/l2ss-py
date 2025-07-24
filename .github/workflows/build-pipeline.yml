@@ -172,7 +172,7 @@ jobs:
           aws-region: us-west-2
 
       - name: Get Lauchpad Token
-        id: lambda
+        id: launchpad_token_generator
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
@@ -206,9 +206,9 @@ jobs:
           umm_type: 'umm-s'
           use_associations: 'false'        
         env:
-          LAUNCHPAD_TOKEN_SIT: ${{ steps.lambda.outputs.result }}
-          LAUNCHPAD_TOKEN_UAT: ${{ steps.lambda.outputs.result }}
-          LAUNCHPAD_TOKEN_OPS: ${{ steps.lambda.outputs.result }}
+          LAUNCHPAD_TOKEN_SIT: ${{ steps.launchpad_token_generator.outputs.result }}
+          LAUNCHPAD_TOKEN_UAT: ${{ steps.launchpad_token_generator.outputs.result }}
+          LAUNCHPAD_TOKEN_OPS: ${{ steps.launchpad_token_generator.outputs.result }}
 
         continue-on-error: true
       - name: Wait to retry publishing umm-s
@@ -230,9 +230,9 @@ jobs:
           umm_type: 'umm-s'
           use_associations: 'false'        
         env:
-          LAUNCHPAD_TOKEN_SIT: ${{ steps.lambda.outputs.result }}
-          LAUNCHPAD_TOKEN_UAT: ${{ steps.lambda.outputs.result }}
-          LAUNCHPAD_TOKEN_OPS: ${{ steps.lambda.outputs.result }}
+          LAUNCHPAD_TOKEN_SIT: ${{ steps.launchpad_token_generator.outputs.result }}
+          LAUNCHPAD_TOKEN_UAT: ${{ steps.launchpad_token_generator.outputs.result }}
+          LAUNCHPAD_TOKEN_OPS: ${{ steps.launchpad_token_generator.outputs.result }}
       - name: Build Python Artifact
         run: |
           poetry build
