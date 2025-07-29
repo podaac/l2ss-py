@@ -322,6 +322,6 @@ def test_harmony_exception_raised(mock_environ,
         "--harmony-metadata-dir", temp_dir,
         "--harmony-service-id", "l2ss-py"
     ]
-    with patch.dict(os.environ, test_env_vars),  patch.object(sys, 'argv', test_args), patch('podaac.subsetter.subset.subset', return_value=None):
-        with pytest.raises(NoDataException) as exc_info:
+    with patch.dict(os.environ, test_env_vars), patch.object(sys, 'argv', test_args), patch('podaac.subsetter.subset.subset', return_value=None):
+        with pytest.raises(NoDataException):
             service.invoke()
