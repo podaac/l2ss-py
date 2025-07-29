@@ -261,9 +261,9 @@ class L2SubsetterService(BaseHarmonyAdapter):
                         result.bbox = podaac_to_harmony_bbox(result_bbox)
                         result.geometry = bbox_to_geometry(result.bbox)
                     else:
-                        raise NoDataException()
+                        raise NoDataException("No data found after subset operation - all bounding box values are NaN.")
             else:
-                raise NoDataException()
+                raise NoDataException("No data found after subset operation - result_bbox is None.")
 
             # Return the STAC record
             return result
