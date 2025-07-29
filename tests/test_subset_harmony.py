@@ -25,16 +25,18 @@ import sys
 import tempfile
 from datetime import datetime
 from typing import Dict, Any, List
+from unittest.mock import patch
 
 # Third-party imports
 import numpy as np
-import pytest
 import pystac
-from unittest.mock import patch
-
+import pytest
+from harmony_service_lib.exceptions import NoDataException
 # Local/Project imports
 from harmony_service_lib.message import Message
+
 from podaac.subsetter.subset_harmony import L2SubsetterService
+
 
 @pytest.fixture
 def temp_dir(request):
@@ -43,6 +45,7 @@ def temp_dir(request):
     temp_dir = tempfile.mkdtemp(dir=test_data_dir)
     yield temp_dir
     shutil.rmtree(temp_dir)
+
 
 @pytest.fixture
 def test_env_vars(temp_dir: str) -> Dict[str, str]:
@@ -57,6 +60,7 @@ def test_env_vars(temp_dir: str) -> Dict[str, str]:
         'AWS_REGION': 'us-west-2',
         'ENV': 'test'
     }
+
 
 @pytest.fixture
 def harmony_message_base() -> Dict[str, Any]:
@@ -76,6 +80,7 @@ def harmony_message_base() -> Dict[str, Any]:
         }
     }
 
+
 def create_test_stac_item(test_dir: str, bbox: List[float]) -> pystac.Item:
     """Create a STAC item for testing."""
     test_granule = os.path.join(
@@ -83,10 +88,10 @@ def create_test_stac_item(test_dir: str, bbox: List[float]) -> pystac.Item:
         'data',
         'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
     )
-    
+
     # Ensure test data directory exists
     os.makedirs(os.path.dirname(test_granule), exist_ok=True)
-    
+
     item = pystac.Item(
         id="test-granule",
         geometry={
@@ -103,7 +108,7 @@ def create_test_stac_item(test_dir: str, bbox: List[float]) -> pystac.Item:
         datetime=datetime.strptime("2025-03-06T00:48:19Z", "%Y-%m-%dT%H:%M:%SZ"),
         properties={}
     )
-    
+
     item.add_asset(
         "data",
         pystac.Asset(
@@ -112,8 +117,9 @@ def create_test_stac_item(test_dir: str, bbox: List[float]) -> pystac.Item:
             roles=["data"]
         )
     )
-    
+
     return item
+
 
 def create_test_catalog(item: pystac.Item) -> pystac.Catalog:
     """Create a test STAC catalog with the given item."""
@@ -124,13 +130,14 @@ def create_test_catalog(item: pystac.Item) -> pystac.Catalog:
     catalog.add_item(item)
     return catalog
 
+
 @pytest.mark.parametrize("with_coord_vars", [True, False])
 def test_service_invoke(
-    mock_environ,
-    temp_dir: str,
-    test_env_vars: Dict[str, str],
-    harmony_message_base: Dict[str, Any],
-    with_coord_vars: bool
+        mock_environ,
+        temp_dir: str,
+        test_env_vars: Dict[str, str],
+        harmony_message_base: Dict[str, Any],
+        with_coord_vars: bool
 ):
     """Test service invoke with and without coordinate variables."""
     test_dir = os.path.dirname(os.path.realpath(__file__))
@@ -142,12 +149,12 @@ def test_service_invoke(
         "name": "bathymetry",
         "type": "SCIENCE"
     }
-    
+
     coord_variables = [] if not with_coord_vars else [
         {
             "id": "V0001-EXAMPLE",
             "name": name,
-            "fullPath": f"example/group/path/ExampleVar{i+2}",
+            "fullPath": f"example/group/path/ExampleVar{i + 2}",
             "type": "COORDINATE",
             "subtype": subtype
         }
@@ -157,7 +164,7 @@ def test_service_invoke(
             ("time", "TIME")
         ])
     ]
-    
+
     # Create input message
     input_json = harmony_message_base.copy()
     input_json["sources"] = [{
@@ -171,7 +178,7 @@ def test_service_invoke(
     catalog = create_test_catalog(item)
     message = Message(input_json)
     service = L2SubsetterService(message, catalog=catalog)
-    
+
     # Create test arguments
     test_args = [
         "podaac.subsetter.subset_harmony",
@@ -182,35 +189,36 @@ def test_service_invoke(
     ]
 
     with patch.dict(os.environ, test_env_vars), \
-         patch.object(sys, 'argv', test_args):
+            patch.object(sys, 'argv', test_args):
         try:
             # Process the item
             source = message.sources[0]
             result_item = service.process_item(item, source)
-            
+
             # Verify results
             assert isinstance(result_item, pystac.Item)
             assert 'data' in result_item.assets
-            
+
             # Verify bbox
             if result_item.bbox:
                 np.testing.assert_almost_equal(harmony_bbox, result_item.bbox, decimal=1)
-            
+
             # Verify output file
             output_asset = result_item.assets['data']
             output_path = output_asset.href.replace('file://', '')
             assert output_path.endswith('.nc')
-            
+
         except Exception as e:
             pytest.fail(f"Test failed: {str(e)}")
 
+
 @pytest.mark.parametrize("with_coord_vars", [True])
 def test_service_invoke_pixel_subset(
-    mock_environ,
-    temp_dir: str,
-    test_env_vars: Dict[str, str],
-    harmony_message_base: Dict[str, Any],
-    with_coord_vars: bool
+        mock_environ,
+        temp_dir: str,
+        test_env_vars: Dict[str, str],
+        harmony_message_base: Dict[str, Any],
+        with_coord_vars: bool
 ):
     """Test service invoke with and without coordinate variables."""
     test_dir = os.path.dirname(os.path.realpath(__file__))
@@ -223,12 +231,12 @@ def test_service_invoke_pixel_subset(
         "name": "bathymetry",
         "type": "SCIENCE"
     }
-    
+
     coord_variables = [] if not with_coord_vars else [
         {
             "id": "V0001-EXAMPLE",
             "name": name,
-            "fullPath": f"example/group/path/ExampleVar{i+2}",
+            "fullPath": f"example/group/path/ExampleVar{i + 2}",
             "type": "COORDINATE",
             "subtype": subtype
         }
@@ -238,7 +246,7 @@ def test_service_invoke_pixel_subset(
             ("time", "TIME")
         ])
     ]
-    
+
     # Create input message
     input_json = harmony_message_base.copy()
     input_json["sources"] = [{
@@ -252,7 +260,7 @@ def test_service_invoke_pixel_subset(
     catalog = create_test_catalog(item)
     message = Message(input_json)
     service = L2SubsetterService(message, catalog=catalog)
-    
+
     # Create test arguments
     test_args = [
         "podaac.subsetter.subset_harmony",
@@ -263,24 +271,57 @@ def test_service_invoke_pixel_subset(
     ]
 
     with patch.dict(os.environ, test_env_vars), \
-         patch.object(sys, 'argv', test_args):
+            patch.object(sys, 'argv', test_args):
         try:
             # Process the item
             source = message.sources[0]
             result_item = service.process_item(item, source)
-            
+
             # Verify results
             assert isinstance(result_item, pystac.Item)
             assert 'data' in result_item.assets
-            
+
             # Verify bbox
             if result_item.bbox:
                 np.testing.assert_almost_equal(harmony_bbox, result_item.bbox, decimal=1)
-            
+
             # Verify output file
             output_asset = result_item.assets['data']
             output_path = output_asset.href.replace('file://', '')
             assert output_path.endswith('.nc')
-            
+
         except Exception as e:
             pytest.fail(f"Test failed: {str(e)}")
+
+
+def test_harmony_exception_raised(mock_environ,
+                                  temp_dir: str,
+                                  test_env_vars: Dict[str, str],
+                                  harmony_message_base: Dict[str, Any]):
+    """Test that a HarmonyException is raised by the subset_harmony module."""
+
+    input_json = harmony_message_base.copy()
+    input_json["sources"] = [{
+        "collection": "test-collection",
+        "variables": [],
+        "coordinateVariables": []
+    }]
+
+    # Create a minimal STAC catalog
+    test_dir = os.path.dirname(os.path.realpath(__file__))
+    item = create_test_stac_item(test_dir, harmony_message_base["subset"]["bbox"])
+    catalog = create_test_catalog(item)
+    message = Message(input_json)
+    service = L2SubsetterService(message, catalog=catalog)
+
+    # Attempt to invoke the service and verify the exception
+    test_args = [
+        "podaac.subsetter.subset_harmony",
+        "--harmony-action", "invoke",
+        "--harmony-input", json.dumps(input_json),
+        "--harmony-metadata-dir", temp_dir,
+        "--harmony-service-id", "l2ss-py"
+    ]
+    with patch.dict(os.environ, test_env_vars),  patch.object(sys, 'argv', test_args), patch('podaac.subsetter.subset.subset', return_value=None):
+        with pytest.raises(NoDataException) as exc_info:
+            service.invoke()

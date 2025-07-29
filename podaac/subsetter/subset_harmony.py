@@ -33,7 +33,7 @@ import harmony_service_lib
 import numpy as np
 from harmony_service_lib import BaseHarmonyAdapter
 from harmony_service_lib.util import download, stage, generate_output_filename, bbox_to_geometry
-from harmony_service_lib.exceptions import HarmonyException
+from harmony_service_lib.exceptions import HarmonyException, NoDataException
 
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
@@ -260,10 +260,19 @@ class L2SubsetterService(BaseHarmonyAdapter):
                     if not np.all(np.isnan(bounding_box_array)):
                         result.bbox = podaac_to_harmony_bbox(result_bbox)
                         result.geometry = bbox_to_geometry(result.bbox)
+                    else:
+                        raise NoDataException()
+            else:
+                raise NoDataException()
 
             # Return the STAC record
             return result
+        except HarmonyException as he:
+            # HarmonyExceptions should be allowed to propagate up so that Harmony can handle them
+            raise he
         except Exception as ex:
+            # Catch all other exceptions, log them, and raise a custom exception
+            self.logger.error("An error occurred while processing the item: %s", str(ex), exc_info=True)
             raise L2SSException(ex) from ex
         finally:
             # Clean up any intermediate resources
