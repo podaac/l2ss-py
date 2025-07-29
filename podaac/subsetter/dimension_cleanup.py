@@ -11,9 +11,6 @@ dimension_cleanup.py
 ======================
 Functions which improve upon existing netCDF4 library existing functions
 """
-import collections
-
-import netCDF4 as nc
 import xarray as xr
 
 

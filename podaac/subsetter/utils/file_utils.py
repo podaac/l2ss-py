@@ -6,15 +6,13 @@ file_utils.py
 Utility functions for file and dataset handling.
 """
 
-from typing import Optional, Tuple
+from typing import Optional
 import dateutil
 from dateutil import parser
 import cftime
-import netCDF4 as nc
 import xarray as xr
 import xarray.coding.times
 from xarray import DataTree
-from podaac.subsetter import dimension_cleanup as dc
 
 
 def calculate_chunks(dataset: xr.Dataset) -> dict:

@@ -6,10 +6,9 @@ coordinate_utils.py
 Utility functions for coordinate operations and transformations.
 """
 
-from typing import List, Tuple, Union
+from typing import Union
 import numpy as np
 import xarray as xr
-import cf_xarray as cfxr
 
 from podaac.subsetter import datatree_subset
 

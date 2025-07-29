@@ -4,7 +4,7 @@
 import datetime
 import logging
 import re
-from typing import Any, Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
 import cf_xarray as cfxr
 import numpy as np
