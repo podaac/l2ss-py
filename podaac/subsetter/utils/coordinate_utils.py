@@ -12,7 +12,6 @@ import xarray as xr
 import cf_xarray as cfxr
 
 from podaac.subsetter import datatree_subset
-from podaac.subsetter.group_handling import GROUP_DELIM
 
 
 def apply_scale_offset(scale: float, offset: float, value: float) -> float:
@@ -169,70 +168,6 @@ def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
     return False
 
 
-def compute_coordinate_variable_names(dataset: xr.Dataset) -> Tuple[Union[List[str], str], Union[List[str], str]]:
-    """
-    Given a dataset, determine the coordinate variable from a list
-    of options
-
-    Parameters
-    ----------
-    dataset: xr.Dataset
-        The dataset to find the coordinate variables for
-
-    Returns
-    -------
-    tuple, str
-        Tuple of strings (or list of strings), where the first element is the lat coordinate
-        name and the second element is the lon coordinate name
-    """
-
-    dataset = xr.decode_cf(dataset)
-
-    # look for lon and lat using standard name in coordinates and axes
-    custom_criteria = {
-        "latitude": {
-            "standard_name": "latitude|projection_y_coordinate",
-        },
-        "longitude": {
-            "standard_name": "longitude|projection_x_coordinate",
-        }
-    }
-
-    possible_lat_coord_names = ['lat', 'latitude', 'y']
-    possible_lon_coord_names = ['lon', 'longitude', 'x']
-
-    def var_is_coord(var_name, possible_coord_names):
-        var_name = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1]
-        return var_name.lower() in possible_coord_names
-
-    lat_coord_names = list(filter(
-        lambda var_name: var_is_coord(var_name, possible_lat_coord_names), dataset.variables))
-    lon_coord_names = list(filter(
-        lambda var_name: var_is_coord(var_name, possible_lon_coord_names), dataset.variables))
-
-    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-        lat_coord_names = datatree_subset.find_matching_coords(dataset, possible_lat_coord_names)
-        lon_coord_names = datatree_subset.find_matching_coords(dataset, possible_lon_coord_names)
-
-    # Couldn't find lon lat in data variables look in coordinates
-    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-        with cfxr.set_options(custom_criteria=custom_criteria):
-            lat_coord_names = dataset.cf.coordinates.get('latitude', [])
-            lon_coord_names = dataset.cf.coordinates.get('longitude', [])
-
-        if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-            try:
-                lat_coord_names = [dataset.cf["latitude"].name]
-                lon_coord_names = [dataset.cf["longitude"].name]
-            except KeyError:
-                pass
-
-    if len(lat_coord_names) < 1 or len(lon_coord_names) < 1:
-        raise ValueError('Could not determine coordinate variables')
-
-    return lat_coord_names, lon_coord_names
-
-
 def get_coordinate_variable_names(dataset: xr.Dataset,
                                   lat_var_names: list = None,
                                   lon_var_names: list = None,
@@ -273,13 +208,13 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
         for lat_var_name in lat_var_names:
 
             parent_path = '/'.join(lat_var_name.split('/')[:-1])  # gives "data_20/c"
-
             subtree = dataset[parent_path]  # Gets the subtree at data_20/c
             variable = dataset[lat_var_name]  # Gets the latitude variable
             time_name = datatree_subset.compute_time_variable_name_tree(subtree,
                                                                         variable,
                                                                         time_var_names)
             if time_name:
+                time_name = time_name.strip('/')
                 time_var = f"{parent_path}/{time_name}"
                 time_var_names.append(time_var)
 

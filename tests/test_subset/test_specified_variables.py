@@ -14,12 +14,53 @@ import pytest
 import xarray as xr
 
 from podaac.subsetter import subset
-from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.utils.coordinate_utils import get_coordinate_variable_names
-from podaac.subsetter.utils.file_utils import open_as_nc_dataset
+from podaac.subsetter.utils.variables_utils import get_all_variable_names_from_dtree
+
 from conftest import data_files 
 
- 
+import xarray as xr
+
+
+
+
+def get_non_variable_names_from_dtree(dtree: xr.DataTree):
+    """
+    Recursively extract all non-variable names (with full paths) from an xarray DataTree.
+    This includes coordinates, dimensions, and other variables that are not data_vars.
+    
+    Parameters
+    ----------
+    dtree : xr.DataTree
+        The root of the DataTree.
+    Returns
+    -------
+    List[str]
+        A list of non-variable full paths (e.g. '/group1/coord').
+    """
+    non_var_names = []
+    
+    def recurse(node: xr.DataTree):
+        group_path = node.path
+        
+        # Get all variables that are NOT data_vars
+        if node.ds is not None:  # Check if node has a dataset
+            for var_name in node.ds.variables:
+                if var_name not in node.ds.data_vars:
+                    if group_path in ("", "/"):
+                        full_path = f"/{var_name}"
+                    else:
+                        full_path = f"{group_path}/{var_name}"
+                    non_var_names.append(full_path)
+        
+        for child in node.children.values():
+            recurse(child)
+    
+    recurse(dtree)
+    return non_var_names
+
+
+
 @pytest.mark.parametrize("test_file", data_files())
 def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     """
@@ -28,71 +69,41 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     and that the variables which are specified are not present.
     """
     nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
-    shutil.copyfile(os.path.join(data_dir, test_file),
-                    nc_copy_for_expected_results)
+    shutil.copyfile(os.path.join(data_dir, test_file), nc_copy_for_expected_results)
 
     bbox = np.array(((-180, 180), (-90, 90)))
     output_file = "{}_{}".format(request.node.name, test_file)
-
-    # Added test case. currently we got rid of the coords when opening group files and becomes part of data var
-    # which is wrong this adds back coords as it shouldn't be dropped and won't be when we use data tree
-    original_coords = []
-    try:
-        # Open with h5py to check for groups
-        with h5py.File(nc_copy_for_expected_results, "r") as f:
-            has_group = any(isinstance(f[key], h5py.Group) for key in f.keys())
-        
-        # If groups exist, open with xarray and rename coordinates
-        if has_group:
-            with xr.open_dataset(nc_copy_for_expected_results) as ds:
-                original_coords = [f"__{coord}" for coord in ds.coords]
-        
-    except (OSError, KeyError) as e:
-        # Handle specific errors (file not found, group not found, etc.)
-        has_group = False
-
-    in_ds, _, file_ext = open_as_nc_dataset(nc_copy_for_expected_results)
-    in_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(in_ds),
-                            decode_times=False,
-                            decode_coords=False)
     
-    # Non-data vars are by default included in the result
-    non_data_vars = set(in_ds.variables.keys()) - set(in_ds.data_vars.keys())
+    in_ds_tree = xr.open_datatree(nc_copy_for_expected_results, decode_times=False, decode_coords=False)
 
     # Coordinate variables are always included in the result
-    lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(in_ds)
+    lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(in_ds_tree)
 
     coordinate_variables = lat_var_names + lon_var_names + time_var_names
-    
-    delimiter_coordinate_variables = [
-        var.replace('/', '__') if '/' in var[1:] else var.lstrip('/')
-        for var in coordinate_variables
+    all_variables = get_all_variable_names_from_dtree(in_ds_tree)
+    non_coordinate_vars = [
+        var for var in all_variables if var not in coordinate_variables
     ]
 
-    # Pick some variables to include in the result (every other variable: first, third, fifth, etc.)
-    included_variables = set([variable[0] for variable in in_ds.data_vars.items()][::2])
-    included_variables = list(included_variables) + original_coords
+    included_variables = non_coordinate_vars[::2] + coordinate_variables
 
-    # All other data variables should be dropped
-    expected_excluded_variables = list(set(variable[0] for variable in in_ds.data_vars.items())
-                                       - set(included_variables) - set(delimiter_coordinate_variables))
+    non_vars = get_non_variable_names_from_dtree(in_ds_tree)
 
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=bbox,
         output_file=join(subset_output_dir, output_file),
-        variables=[var.replace(GROUP_DELIM, '/') for var in included_variables]
+        variables=included_variables
     )
 
-    out_ds, _, file_ext = open_as_nc_dataset(join(subset_output_dir, output_file))
-    out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
-                             decode_times=False,
-                             decode_coords=False)
+    out_ds_tree = xr.open_datatree(join(subset_output_dir, output_file), decode_times=False, decode_coords=False)
+    out_lat_var_names, out_lon_var_names, out_time_var_names = get_coordinate_variable_names(out_ds_tree)
+    out_coordinate_variables = out_lat_var_names + out_lon_var_names + out_time_var_names
 
-    out_vars = list(out_ds.variables.keys())
+    subsetted_vars = get_all_variable_names_from_dtree(out_ds_tree)
+    subsetted_non_vars = get_non_variable_names_from_dtree(out_ds_tree) 
 
-    assert set(out_vars) == set(included_variables + delimiter_coordinate_variables).union(non_data_vars)
-    assert set(out_vars).isdisjoint(expected_excluded_variables)
+    assert set(subsetted_vars + subsetted_non_vars) == set(included_variables + non_vars)
 
-    in_ds.close()
-    out_ds.close()
+    in_ds_tree.close()
+    out_ds_tree.close()

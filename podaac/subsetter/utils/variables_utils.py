@@ -28,7 +28,10 @@ def get_all_variable_names_from_dtree(dtree: xr.DataTree) -> List[str]:
     def recurse(node: xr.DataTree):
         group_path = node.path
         for var_name in node.data_vars:
-            full_path = f"{group_path}/{var_name}" if group_path else f"/{var_name}"
+            if group_path in ("", "/"):
+                full_path = f"/{var_name}"
+            else:
+                full_path = f"{group_path}/{var_name}"
             var_names.append(full_path)
         for child in node.children.values():
             recurse(child)

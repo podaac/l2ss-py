@@ -50,10 +50,8 @@ from unittest.mock import patch
 
 from podaac.subsetter import subset
 from podaac.subsetter import datatree_subset
-from podaac.subsetter.group_handling import GROUP_DELIM
 from podaac.subsetter.subset import SERVICE_NAME
 from podaac.subsetter.datatree_subset import get_indexers_from_nd
-from podaac.subsetter import gpm_cleanup as gc
 from harmony_service_lib.exceptions import NoDataException
 
 from podaac.subsetter.utils import mask_utils
@@ -63,6 +61,8 @@ from podaac.subsetter.utils import time_utils
 from podaac.subsetter.utils import file_utils
 
 import gc as garbage_collection
+
+GROUP_DELIM = '__'
 
 @pytest.fixture(autouse=True)
 def close_all_datasets():
@@ -337,13 +337,18 @@ def test_data_1D(data_dir, subset_output_dir, request):
 
     xr.open_dataset(join(subset_output_dir, output_file))
 
+def rename_variables_in_dtree(dtree: xr.DataTree, rename_dict: dict) -> xr.DataTree:
+    for node in dtree.subtree:
+        if node.ds is not None:
+            node.ds = node.ds.rename(rename_dict)
+    return dtree
 
 def test_get_coord_variable_names(data_dir):
     """
     Test that the expected coord variable names are returned
     """
     file = 'MODIS_T-JPL-L2P-v2014.0.nc'
-    ds = xr.open_dataset(join(data_dir, file),
+    ds = xr.open_datatree(join(data_dir, file),
                          decode_times=False,
                          decode_coords=False,
                          mask_and_scale=False)
@@ -351,20 +356,21 @@ def test_get_coord_variable_names(data_dir):
     old_lat_var_name = 'lat'
     old_lon_var_name = 'lon'
 
-    lat_var_name, lon_var_name = coordinate_utils.compute_coordinate_variable_names(ds)
+    lon_var_name, lat_var_name = datatree_subset.compute_coordinate_variable_names_from_tree(ds)
 
-    assert lat_var_name[0] == old_lat_var_name
-    assert lon_var_name[0] == old_lon_var_name
+    assert lat_var_name[0].strip('/') == old_lat_var_name
+    assert lon_var_name[0].strip('/') == old_lon_var_name
 
     new_lat_var_name = 'latitude'
     new_lon_var_name = 'x'
-    ds = ds.rename({old_lat_var_name: new_lat_var_name,
-                    old_lon_var_name: new_lon_var_name})
 
-    lat_var_name, lon_var_name = coordinate_utils.compute_coordinate_variable_names(ds)
+    # Rename in all nodes
+    rename_dict = {'lat': 'latitude', 'lon': 'x'}
+    ds = rename_variables_in_dtree(ds, rename_dict)
+    lon_var_name, lat_var_name = datatree_subset.compute_coordinate_variable_names_from_tree(ds)
 
-    assert lat_var_name[0] == new_lat_var_name
-    assert lon_var_name[0] == new_lon_var_name
+    assert lat_var_name[0].strip('/') == new_lat_var_name
+    assert lon_var_name[0].strip('/') == new_lon_var_name
 
 def test_cannot_get_coord_variable_names(data_dir):
     """
@@ -382,8 +388,10 @@ def test_cannot_get_coord_variable_names(data_dir):
         if 'coordinates' in var.attrs:
             del var.attrs['coordinates']
 
+    dtree = xr.DataTree(dataset=ds)
+
     with pytest.raises(ValueError):
-        coordinate_utils.compute_coordinate_variable_names(ds)
+        datatree_subset.compute_coordinate_variable_names_from_tree(dtree)
 
 
 def test_get_spatial_bounds(data_dir):
@@ -559,43 +567,6 @@ def test_variable_subset_s6(data_dir, subset_output_dir):
     var_listout.extend(list(out_nc.groups['data_20'].groups['ku'].variables.keys()))
     assert 'range_ocean_mle3_rms' in var_listout
     assert 'range_ocean' in var_listout
-
-
-def test_transform_grouped_dataset(data_dir, subset_output_dir):
-    """
-    Test that the transformation function results in a correctly
-    formatted dataset.
-    """
-    s6_file_name = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
-    shutil.copyfile(os.path.join(data_dir, 'sentinel_6', s6_file_name),
-                    os.path.join(subset_output_dir, s6_file_name))
-
-    nc_ds = nc.Dataset(os.path.join(data_dir, 'sentinel_6', s6_file_name))
-    nc_ds_transformed = file_utils.transform_grouped_dataset(
-        nc.Dataset(os.path.join(subset_output_dir, s6_file_name), 'r'),
-        os.path.join(subset_output_dir, s6_file_name)
-    )
-
-    # The original ds has groups
-    assert nc_ds.groups
-
-    # There should be no groups in the new ds
-    assert not nc_ds_transformed.groups
-
-    # The original ds has no variables in the root group
-    assert not nc_ds.variables
-
-    # The new ds has variables in the root group
-    assert nc_ds_transformed.variables
-
-    # Each var in the new ds should map to a variable in the old ds
-    for var_name, _ in nc_ds_transformed.variables.items():
-        path = var_name.strip('__').split('__')
-
-        group = nc_ds[path[0]]
-        for g in path[1:-1]:
-            group = group[g]
-        assert var_name.strip('__').split('__')[-1] in group.variables.keys()
 
 
 def test_group_subset(data_dir, subset_output_dir):
@@ -1108,35 +1079,6 @@ def test_omi_novars_subset(data_dir, subset_output_dir, request):
                    'Geolocation Fields'].variables[var_name].shape
 
 
-def test_root_group(data_dir, subset_output_dir):
-    """test that the GROUP_DELIM string, '__', is added to variables in the root group"""
-
-    sndr_file_name = 'SNDR.SNPP.CRIMSS.20200118T0024.m06.g005.L2_CLIMCAPS_RET.std.v02_28.G.200314032326_subset.nc'
-    shutil.copyfile(os.path.join(data_dir, 'SNDR', sndr_file_name),
-                    os.path.join(subset_output_dir, sndr_file_name))
-
-    nc_dataset = nc.Dataset(os.path.join(subset_output_dir, sndr_file_name))
-
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': False,
-        'decode_times': False
-    }
-    nc_dataset = file_utils.transform_grouped_dataset(nc_dataset, os.path.join(subset_output_dir, sndr_file_name))
-    with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
-            **args
-    ) as dataset:
-        var_list = list(dataset.variables)
-        assert var_list[0][0:2] == GROUP_DELIM
-        group_lst = []
-        for var_name in dataset.variables.keys():  # need logic if there is data in the top level not in a group
-            group_lst.append('/'.join(var_name.split(GROUP_DELIM)[:-1]))
-        group_lst = ['/' if group == '' else group for group in group_lst]
-        groups = set(group_lst)
-        expected_group = {'/mw', '/ave_kern', '/', '/mol_lay', '/aux'}
-        assert groups == expected_group
-
 @pytest.mark.skip(reason='We no longer flatten groups but do we want to have same function copying the dims')
 def test_get_time_squeeze(data_dir, subset_output_dir):
     """test builtin squeeze method on the lat and time variables so
@@ -1182,28 +1124,27 @@ def test_get_indexers_nd(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'tropomi', tropomi_file_name),
                     os.path.join(subset_output_dir, tropomi_file_name))
 
-    nc_dataset = nc.Dataset(os.path.join(subset_output_dir, tropomi_file_name))
-
+    file = os.path.join(subset_output_dir, tropomi_file_name)
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
         'decode_times': False
     }
-    nc_dataset = file_utils.transform_grouped_dataset(nc_dataset,
-                                                  os.path.join(subset_output_dir, tropomi_file_name))
-    with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
+
+    with xr.open_datatree(
+            file,
             **args
-    ) as dataset:
-        lat_var_name = coordinate_utils.compute_coordinate_variable_names(dataset)[0][0]
-        lon_var_name = coordinate_utils.compute_coordinate_variable_names(dataset)[1][0]
-        time_var_name = datatree_subset.compute_time_variable_name_tree(dataset, dataset[lat_var_name], [])
+    ) as datatree:
+        lat_var_name = datatree_subset.compute_coordinate_variable_names_from_tree(datatree)[1][0]
+        lon_var_name = datatree_subset.compute_coordinate_variable_names_from_tree(datatree)[0][0]
+        time_var_name = datatree_subset.compute_time_variable_name_tree(datatree, datatree[lat_var_name], [])
         oper = operator.and_
 
+        dataset = datatree['/PRODUCT'].ds
         cond = oper(
-            (dataset[lon_var_name] >= -180),
-            (dataset[lon_var_name] <= 180)
-        ) & (dataset[lat_var_name] >= -90) & (dataset[lat_var_name] <= 90) & True
+            (datatree[lon_var_name] >= -180),
+            (datatree[lon_var_name] <= 180)
+        ) & (datatree[lat_var_name] >= -90) & (datatree[lat_var_name] <= 90) & True
 
         indexers = get_indexers_from_nd(cond, True)
         indexed_cond = cond.isel(**indexers)
@@ -1232,89 +1173,6 @@ def test_variable_type_string_oco2(data_dir, subset_output_dir):
     in_nc = xr.open_dataset(join(data_dir, 'OCO2', oco2_file_name))
     out_nc = xr.open_dataset(join(subset_output_dir, output_file_name))
     assert in_nc.variables['source_files'].dtype == out_nc.variables['source_files'].dtype
-
-
-def test_transform_h5py_dataset(data_dir, subset_output_dir):
-    """
-    Test that the transformation function results in a correctly
-    formatted dataset for h5py files
-    """
-    OMI_file_name = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
-    shutil.copyfile(os.path.join(data_dir, 'OMI', OMI_file_name),
-                    os.path.join(subset_output_dir, OMI_file_name))
-
-    h5_ds = h5py.File(os.path.join(data_dir, 'OMI', OMI_file_name), 'r')
-
-    entry_lst = []
-    # Get root level objects
-    key_lst = list(h5_ds.keys())
-
-    # Go through every level of the file to fill out the remaining objects
-    for entry_str in key_lst:
-        # If object is a group, add it to the loop list
-        if isinstance(h5_ds[entry_str], h5py.Group):
-            for group_keys in list(h5_ds[entry_str].keys()):
-                if isinstance(h5_ds[entry_str + "/" + group_keys], h5py.Dataset):
-                    entry_lst.append(entry_str + "/" + group_keys)
-                key_lst.append(entry_str + "/" + group_keys)
-
-    nc_dataset, has_groups, hdf_type = file_utils.h5file_transform(os.path.join(subset_output_dir, OMI_file_name))
-    assert 'OMI' == hdf_type
-    nc_vars_flattened = list(nc_dataset.variables.keys())
-    for i, entry in enumerate(entry_lst):  # go through all the datasets in h5py file
-        input_variable = '__' + entry.replace('/', '__')
-        output_variable = nc_vars_flattened[i]
-        assert input_variable == output_variable
-
-    nc_dataset.close()
-    h5_ds.close()
-
-
-def test_variable_dims_matched_tropomi(data_dir, subset_output_dir):
-    """
-    Code must match the dimensions for each variable rather than
-    assume all dimensions in a group are the same
-    """
-    tropomi_file_name = 'S5P_OFFL_L2__SO2____20200713T002730_20200713T020900_14239_01_020103_20200721T191355_subset.nc4'
-
-    shutil.copyfile(os.path.join(data_dir, 'tropomi', tropomi_file_name),
-                    os.path.join(subset_output_dir, tropomi_file_name))
-
-    in_nc = nc.Dataset(os.path.join(subset_output_dir, tropomi_file_name))
-
-    # Get variable dimensions from input dataset
-    in_var_dims = {
-        var_name: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
-        for var_name, var in in_nc.groups['PRODUCT'].variables.items()
-    }
-
-    # Get variables from METADATA group
-    in_var_dims.update(
-        {
-            var_name: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
-            for var_name, var in in_nc.groups['METADATA'].groups['QA_STATISTICS'].variables.items()
-        }
-    )
-    # Include PRODUCT>SUPPORT_DATA>GEOLOCATIONS location
-    in_var_dims.update(
-        {
-            var_name: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
-            for var_name, var in
-            in_nc.groups['PRODUCT'].groups['SUPPORT_DATA'].groups['GEOLOCATIONS'].variables.items()
-        }
-    )
-
-    out_nc = file_utils.transform_grouped_dataset(
-        in_nc, os.path.join(subset_output_dir, tropomi_file_name)
-    )
-
-    # Get variable dimensions from output dataset
-    out_var_dims = {
-        var_name.split(GROUP_DELIM)[-1]: [dim.split(GROUP_DELIM)[-1] for dim in var.dimensions]
-        for var_name, var in out_nc.variables.items()
-    }
-
-    TestCase().assertDictEqual(in_var_dims, out_var_dims)
 
 
 def test_temporal_merged_topex(data_dir, subset_output_dir, request):
@@ -1662,19 +1520,18 @@ def test_get_time_OMI(data_dir, subset_output_dir):
     shutil.copyfile(os.path.join(data_dir, 'OMI', omi_file),
                     os.path.join(subset_output_dir, omi_file))
 
-    nc_dataset, has_groups, hdf_type = file_utils.h5file_transform(os.path.join(subset_output_dir, omi_file))
-
+    file = os.path.join(subset_output_dir, omi_file)
     args = {
         'decode_coords': False,
         'mask_and_scale': False,
         'decode_times': False
     }
 
-    with xr.open_dataset(
-            xr.backends.NetCDF4DataStore(nc_dataset),
+    with xr.open_datatree(
+            file,
             **args
     ) as dataset:
-        lat_var_names, _ =  coordinate_utils.compute_coordinate_variable_names(dataset)
+        lon_var_names, lat_var_names =  datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
         time_var_names = []
         for lat_var_name in lat_var_names:
             time_var_names.append(datatree_subset.compute_time_variable_name_tree(
@@ -1923,29 +1780,6 @@ def test_get_unique_groups():
     
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
-
-
-def test_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
-    """Test GPM files that have scantime variable to compute the time for seconds
-    since 1980-01-06"""
-    
-    gpm_dir = join(data_dir, 'GPM')
-    gpm_file = 'GPM_test_file_2.HDF5'
-    shutil.copyfile(
-        os.path.join(gpm_dir, gpm_file),
-        os.path.join(subset_output_dir, gpm_file)
-    )
-
-    nc_dataset, has_groups, file_extension = file_utils.open_as_nc_dataset(join(subset_output_dir, gpm_file))
-
-    nc_dataset_new = gc.change_var_dims(nc_dataset, variables=None, time_name='__test_time')
-    assert int(nc_dataset_new.variables["__FS__ScanTime__test_time"][:][0]) == 1306403820
-
-    for var_name, var in nc_dataset.variables.items():
-        dims = list(var.dimensions)
-        
-        for dim in dims:
-            assert 'phony' not in dim
 
 def test_subset_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     """Test GPM files that have scantime variable to compute the time for seconds

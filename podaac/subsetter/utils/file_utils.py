@@ -15,7 +15,6 @@ import xarray as xr
 import xarray.coding.times
 from xarray import DataTree
 from podaac.subsetter import dimension_cleanup as dc
-from podaac.subsetter.group_handling import h5file_transform, transform_grouped_dataset
 
 
 def calculate_chunks(dataset: xr.Dataset) -> dict:
@@ -32,20 +31,6 @@ def calculate_chunks(dataset: xr.Dataset) -> dict:
         chunk = {dim: 500 for dim in dataset.dims
                  if dataset.sizes[dim] > 500}
     return chunk
-
-
-def open_as_nc_dataset(filepath: str) -> Tuple[nc.Dataset, bool, Optional[str]]:
-    """Open netcdf file, and flatten groups if they exist."""
-    hdf_type = None
-    try:
-        nc_dataset = nc.Dataset(filepath, mode='r')
-        has_groups = bool(nc_dataset.groups)
-        if has_groups:
-            nc_dataset = transform_grouped_dataset(nc_dataset, filepath)
-    except OSError:
-        nc_dataset, has_groups, hdf_type = h5file_transform(filepath)
-    nc_dataset = dc.remove_duplicate_dims(nc_dataset)
-    return nc_dataset, has_groups, hdf_type
 
 
 def override_decode_cf_datetime() -> None:
