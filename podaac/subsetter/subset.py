@@ -894,6 +894,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             or (lon_path == lat_path and time_var_name is None)
            ):
             subset_dictionary[lat_path] = operation
+        elif lat_path == lon_path and len(time_var_names) == 1:
+            subset_dictionary[lat_path] = operation
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
     return return_dataset
@@ -1009,15 +1011,21 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
         for lat_var_name in lat_var_names:
 
             parent_path = '/'.join(lat_var_name.split('/')[:-1])  # gives "data_20/c"
-
             subtree = dataset[parent_path]  # Gets the subtree at data_20/c
             variable = dataset[lat_var_name]  # Gets the latitude variable
             time_name = datatree_subset.compute_time_variable_name_tree(subtree,
                                                                         variable,
                                                                         time_var_names)
+
             if time_name:
                 time_var = f"{parent_path}/{time_name}"
                 time_var_names.append(time_var)
+
+            if time_name is None:
+                time_name = datatree_subset.compute_time_variable_name_tree(dataset,
+                                                                            variable,
+                                                                            time_var_names)
+                time_var_names.append(time_name)
 
         if not time_var_names:
             time_var_names.append(compute_utc_name(dataset))
