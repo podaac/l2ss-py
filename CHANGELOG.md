@@ -16,8 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Deprecated 
 ### Removed
 ### Fixed
+### Security
+
+
+## [3.1.0]
+### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
 - [issue/347](https://github.com/podaac/l2ss-py/pull/347): Fixed bug causing jobs resulting in no data to be marked as failure instead of warning by allowing HarmonyExceptions to be raised instead of wrapped in a custom exception.
-- Quick fix on getting time variable when not in same subtree as lon and lat variable
+- Fix for getting time variable when not in same subtree as lon and lat variable
 ### Security
 
 
