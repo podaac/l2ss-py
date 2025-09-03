@@ -220,6 +220,13 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
         if not time_var_names:
             time_var_names.append(compute_utc_name(dataset))
 
+        if time_name is None:
+            global_time_name = datatree_subset.compute_time_variable_name_tree(dataset,
+                                                                               variable,
+                                                                               time_var_names)
+            if global_time_name:
+                time_var_names.append(global_time_name)
+
         seen = set()
         time_var_names = [x for x in time_var_names if x is not None and not (x in seen or seen.add(x))]
 

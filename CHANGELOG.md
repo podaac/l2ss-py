@@ -11,10 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/342] (https://github.com/podaac/l2ss-py/pull/342): Preserve Time format from original file to subset file
 - [issue/45] (https://github.com/podaac/l2ss-py/pull/45): SMAP_JPL_L2B_NRT_SSS_CAP_V5 time calculation issues
 - [issue/335] (https://github.com/podaac/l2ss-py/pull/335): Code Organization
-- [issue/316] (https://github.com/podaac/l2ss-py/pull/335): Improve performance when subsetting, including shapefile subsetting
+- [issue/316] (https://github.com/podaac/l2ss-py/pull/316): Improve performance when subsetting, including shapefile subsetting
+- [issue/333] (https://github.com/podaac/l2ss-py/pull/333): Fix AQUARIUS_L2_SSS_V5 and HAWKEYE_L2_OC
 ### Deprecated 
 ### Removed
 ### Fixed
+- [issue/347](https://github.com/podaac/l2ss-py/pull/347): Fixed bug causing jobs resulting in no data to be marked as failure instead of warning by allowing HarmonyExceptions to be raised instead of wrapped in a custom exception.
+- Quick fix on getting time variable when not in same subtree as lon and lat variable
 ### Security
 
 

@@ -202,6 +202,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             or (lon_path == lat_path and time_var_name is None)
            ):
             subset_dictionary[lat_path] = operation
+        elif lat_path == lon_path and len(time_var_names) == 1:
+            subset_dictionary[lat_path] = operation
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
     return return_dataset
