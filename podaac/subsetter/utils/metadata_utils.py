@@ -300,23 +300,31 @@ def check_illegal_datatree_attrs(dt):
 
 def fix_illegal_datatree_attrs(dt):
     """
-    Fixes illegal attribute names in a DataTree (in-place).
+    Fix illegal attribute names in a DataTree (in-place).
     """
     for node in dt.subtree:
         ds = node.ds
-        if ds is not None:
-            # Fix global attrs
-            new_attrs = {}
-            for k, v in ds.attrs.items():
-                new_k = legalize_attr_name(k)
-                new_attrs[new_k] = v
-            ds.attrs = new_attrs
+        if ds is None:
+            continue
 
-            # Fix variable attrs
-            for var_name in ds.variables:
-                var = ds[var_name]
-                new_var_attrs = {}
-                for k, v in var.attrs.items():
-                    new_k = legalize_attr_name(k)
-                    new_var_attrs[new_k] = v
-                var.attrs = new_var_attrs
+        # Fix global attrs
+        new_attrs = {}
+        for k, v in ds.attrs.items():
+            new_k = legalize_attr_name(k)
+            if new_k in new_attrs:
+                raise ValueError(f"Collision after legalization: {k} -> {new_k}")
+            new_attrs[new_k] = v
+        ds.attrs.clear()
+        ds.attrs.update(new_attrs)
+
+        # Fix variable attrs
+        for var_name, var in ds.variables.items():
+            new_var_attrs = {}
+            for k, v in var.attrs.items():
+                new_k = legalize_attr_name(k)
+                if new_k in new_var_attrs:
+                    raise ValueError(f"Collision in {var_name} attrs: {k} -> {new_k}")
+                new_var_attrs[new_k] = v
+            var.attrs.clear()
+            var.attrs.update(new_var_attrs)
+
