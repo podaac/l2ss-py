@@ -327,4 +327,3 @@ def fix_illegal_datatree_attrs(dt):
                 new_var_attrs[new_k] = v
             var.attrs.clear()
             var.attrs.update(new_var_attrs)
-
