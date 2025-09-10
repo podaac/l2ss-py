@@ -163,6 +163,98 @@ def get_sibling_or_parent_condition(condition_dict, path):
     # If no parent or sibling found, return root condition if it exists
     return condition_dict.get("/", None)
 
+def is_empty(dt: xr.DataTree):
+    """Check if a DataTree node has no variables and no coords (ds is None or empty)."""
+    ds = dt.ds
+    if ds is None:
+        return True
+    return len(ds.data_vars) == 0 and len(ds.coords) == 0
+
+def subtree_is_empty(dt: xr.DataTree):
+    """Returns True if the node and all its descendants are empty."""
+    if not is_empty(dt):
+        return False
+    return all(subtree_is_empty(child) for child in dt.children.values())
+
+def find_fully_empty_paths(dt: xr.DataTree):
+    """
+    Returns a list of paths in the DataTree where the node and all descendants are empty.
+    """
+    results = []
+    if subtree_is_empty(dt):
+        results.append(dt.path)  # dt.path is typically a tuple like ("root", "child1", ...)
+    else:
+        for child in dt.children.values():
+            results.extend(find_fully_empty_paths(child))
+    return results
+
+def safe_name(name: str) -> str:
+    """Replace illegal NetCDF characters with underscores and prevent names starting with digits."""
+    name = re.sub(r'[^A-Za-z0-9_]', '_', name)
+    if re.match(r'^\d', name):
+        name = '_' + name
+    return name
+
+def safe_attr_value(val):
+    """Convert attribute values to native Python types for NetCDF compatibility."""
+    if isinstance(val, (np.integer, int)):
+        return int(val)
+    if isinstance(val, (np.floating, float)):
+        return float(val)
+    if isinstance(val, (np.ndarray, list, tuple)):
+        return [safe_attr_value(v) for v in val]
+    if isinstance(val, str):
+        return val
+    return str(val)  # fallback
+
+def collect_subtree_attrs_flat(node: DataTree) -> dict:
+    """
+    Recursively collects all attributes in a DataTree subtree and returns
+    a flat dictionary with fully-qualified attribute names as keys.
+    Example key: "group1__subgroup2__attr_name"
+    """
+    flat_attrs = {}
+
+    def _collect(n, prefix=""):
+        node_prefix = "__".join([prefix, safe_name(n.name)]) if prefix else safe_name(n.name)
+        for k, v in n.attrs.items():
+            attr_name = f"{node_prefix}__{safe_name(k)}"
+            flat_attrs[attr_name] = safe_attr_value(v)
+        for child in n.children.values():
+            _collect(child, node_prefix)
+
+    _collect(node)
+    return flat_attrs
+
+def sanitize_node_attrs(node: DataTree):
+    """Sanitize all attribute names and values of a single node."""
+    new_attrs = {}
+    for k, v in node.attrs.items():
+        new_k = safe_name(str(k))
+        new_v = safe_attr_value(v)
+        new_attrs[new_k] = new_v
+    node.attrs.clear()
+    node.attrs.update(new_attrs)
+
+def sanitize_node_variables(node: DataTree):
+    """Sanitize variable names of a single node."""
+    if node.ds is not None:
+        for var in list(node.ds.data_vars):
+            new_var = safe_name(var)
+            if new_var != var:
+                node.ds = node.ds.rename({var: new_var})
+
+def sanitize_datatree(node: DataTree):
+    """Recursively sanitize attributes and variable names for a DataTree."""
+    sanitize_node_attrs(node)
+    sanitize_node_variables(node)
+    for child in node.children.values():
+        sanitize_datatree(child)
+
+def set_subtree_attrs_on_node(node: DataTree, aggregated_attrs: dict):
+    """Assigns aggregated attributes to a DataTree node safely for NetCDF."""
+    for attr_name, attr_value in aggregated_attrs.items():
+        node.attrs[attr_name] = attr_value
 
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
@@ -185,7 +277,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
-    def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
+    def process_node(node: DataTree, path: str, empty_paths) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
 
@@ -201,6 +293,19 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         Tuple[xr.Dataset, Dict[str, DataTree]]
             Processed dataset and dictionary of processed child nodes
         """
+        if path in empty_paths:
+
+            aggregated_attrs = collect_subtree_attrs_flat(node)
+            set_subtree_attrs_on_node(node, aggregated_attrs)
+            return node.ds, {}, None
+
+            #return None, {}, None
+            #import json
+            #aggregated_attrs = collect_subtree_attrs(node)
+            #node.attrs['aggregated_empty_subtree_attrs'] = json.dumps(aggregated_attrs, default=numpy_encoder)
+            #return node.ds, {}, None
+
+
         cond = get_sibling_or_parent_condition(condition_dict, path)
 
         # if only one condition in dictionary then get the one condition
@@ -312,7 +417,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         processed_children = {}
         for child_name, child_node in node.children.items():
             # Process the child node
-            child_ds, child_children, child_indexers = process_node(child_node, f"{path}/{child_name}")
+            child_ds, child_children, child_indexers = process_node(child_node, f"{path}/{child_name}", empty_paths)
 
             # --- Align parent and child datasets before attaching child ---
             if indexers is None and child_indexers:
@@ -326,12 +431,14 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             for grandchild_name, grandchild_tree in child_children.items():
                 child_tree[grandchild_name] = grandchild_tree
 
-            processed_children[child_name] = child_tree
+            if child_ds is not None:
+                processed_children[child_name] = child_tree
 
         return processed_ds, processed_children, indexers
 
+    empty_paths = find_fully_empty_paths(tree)
     # Start processing from root
-    root_ds, children, _ = process_node(tree, '')
+    root_ds, children, _ = process_node(tree, '', empty_paths)
 
     # Create new root tree preserving the original name and attributes
     result_tree = DataTree(name=tree.name, dataset=root_ds)
