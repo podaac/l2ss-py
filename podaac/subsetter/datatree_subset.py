@@ -163,6 +163,7 @@ def get_sibling_or_parent_condition(condition_dict, path):
     # If no parent or sibling found, return root condition if it exists
     return condition_dict.get("/", None)
 
+
 def is_empty(dt: xr.DataTree):
     """Check if a DataTree node has no variables and no coords (ds is None or empty)."""
     ds = dt.ds
@@ -170,11 +171,13 @@ def is_empty(dt: xr.DataTree):
         return True
     return len(ds.data_vars) == 0 and len(ds.coords) == 0
 
+
 def subtree_is_empty(dt: xr.DataTree):
     """Returns True if the node and all its descendants are empty."""
     if not is_empty(dt):
         return False
     return all(subtree_is_empty(child) for child in dt.children.values())
+
 
 def find_fully_empty_paths(dt: xr.DataTree):
     """
@@ -188,12 +191,14 @@ def find_fully_empty_paths(dt: xr.DataTree):
             results.extend(find_fully_empty_paths(child))
     return results
 
+
 def safe_name(name: str) -> str:
     """Replace illegal NetCDF characters with underscores and prevent names starting with digits."""
     name = re.sub(r'[^A-Za-z0-9_]', '_', name)
     if re.match(r'^\d', name):
         name = '_' + name
     return name
+
 
 def safe_attr_value(val):
     """Convert attribute values to native Python types for NetCDF compatibility."""
@@ -206,6 +211,7 @@ def safe_attr_value(val):
     if isinstance(val, str):
         return val
     return str(val)  # fallback
+
 
 def collect_subtree_attrs_flat(node: DataTree) -> dict:
     """
@@ -226,6 +232,7 @@ def collect_subtree_attrs_flat(node: DataTree) -> dict:
     _collect(node)
     return flat_attrs
 
+
 def sanitize_node_attrs(node: DataTree):
     """Sanitize all attribute names and values of a single node."""
     new_attrs = {}
@@ -236,6 +243,7 @@ def sanitize_node_attrs(node: DataTree):
     node.attrs.clear()
     node.attrs.update(new_attrs)
 
+
 def sanitize_node_variables(node: DataTree):
     """Sanitize variable names of a single node."""
     if node.ds is not None:
@@ -244,6 +252,7 @@ def sanitize_node_variables(node: DataTree):
             if new_var != var:
                 node.ds = node.ds.rename({var: new_var})
 
+
 def sanitize_datatree(node: DataTree):
     """Recursively sanitize attributes and variable names for a DataTree."""
     sanitize_node_attrs(node)
@@ -251,10 +260,12 @@ def sanitize_datatree(node: DataTree):
     for child in node.children.values():
         sanitize_datatree(child)
 
+
 def set_subtree_attrs_on_node(node: DataTree, aggregated_attrs: dict):
     """Assigns aggregated attributes to a DataTree node safely for NetCDF."""
     for attr_name, attr_value in aggregated_attrs.items():
         node.attrs[attr_name] = attr_value
+
 
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
@@ -298,13 +309,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             aggregated_attrs = collect_subtree_attrs_flat(node)
             set_subtree_attrs_on_node(node, aggregated_attrs)
             return node.ds, {}, None
-
-            #return None, {}, None
-            #import json
-            #aggregated_attrs = collect_subtree_attrs(node)
-            #node.attrs['aggregated_empty_subtree_attrs'] = json.dumps(aggregated_attrs, default=numpy_encoder)
-            #return node.ds, {}, None
-
 
         cond = get_sibling_or_parent_condition(condition_dict, path)
 
