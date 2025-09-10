@@ -12,6 +12,7 @@ import xarray as xr
 from xarray import DataTree
 from netCDF4 import date2num  # pylint: disable=no-name-in-module
 from podaac.subsetter import dimension_cleanup as dc
+from podaac.subsetter.utils import mask_utils
 try:
     from harmony_service_lib.exceptions import NoDataException
 except ImportError:
@@ -216,6 +217,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
         if dataset.variables and cond is not None:  # Only process if node has data
             # Create indexers from condition
+            cond = mask_utils.align_dims_cond_only(dataset, cond)
 
             if cond.values.ndim == 1:
                 indexers = get_indexers_from_1d(cond)
