@@ -205,17 +205,15 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     else:
         tree = dataset
 
-    dataset = tree
-
     if not lat_var_names or not lon_var_names:
-        lon_var_names, lat_var_names = datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
+        lon_var_names, lat_var_names = datatree_subset.compute_coordinate_variable_names_from_tree(tree)
     if not time_var_names:
         time_var_names = []
         for lat_var_name in lat_var_names:
 
             parent_path = '/'.join(lat_var_name.split('/')[:-1])  # gives "data_20/c"
-            subtree = dataset[parent_path]  # Gets the subtree at data_20/c
-            variable = dataset[lat_var_name]  # Gets the latitude variable
+            subtree = tree[parent_path]  # Gets the subtree at data_20/c
+            variable = tree[lat_var_name]  # Gets the latitude variable
             time_name = datatree_subset.compute_time_variable_name_tree(subtree,
                                                                         variable,
                                                                         time_var_names)
@@ -225,10 +223,10 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
                 time_var_names.append(time_var)
 
         if not time_var_names:
-            time_var_names.append(_compute_utc_name(dataset))
+            time_var_names.append(_compute_utc_name(tree))
 
         if time_name is None:
-            global_time_name = datatree_subset.compute_time_variable_name_tree(dataset,
+            global_time_name = datatree_subset.compute_time_variable_name_tree(tree,
                                                                                variable,
                                                                                time_var_names)
             if global_time_name:
