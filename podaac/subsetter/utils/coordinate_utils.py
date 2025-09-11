@@ -6,7 +6,7 @@ coordinate_utils.py
 Utility functions for coordinate operations and transformations.
 """
 
-from typing import Union
+from typing import Tuple, Union
 import numpy as np
 import xarray as xr
 
@@ -23,7 +23,7 @@ def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     return (value * scale) - offset
 
 
-def convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -> np.ndarray:
+def _convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -> np.ndarray:
     """
     This function will return a converted bound, which matches the
     range of the given input file.
@@ -126,8 +126,8 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
     lon_data = dataset[lon_var_name]
     lat_data = dataset[lat_var_name]
 
-    return np.array([convert_bound(bbox[0], 360, lon_data),
-                     convert_bound(bbox[1], 180, lat_data)])
+    return np.array([_convert_bound(bbox[0], 360, lon_data),
+                     _convert_bound(bbox[1], 180, lat_data)])
 
 
 def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
@@ -170,7 +170,7 @@ def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
 def get_coordinate_variable_names(dataset: xr.Dataset,
                                   lat_var_names: list = None,
                                   lon_var_names: list = None,
-                                  time_var_names: list = None):
+                                  time_var_names: list = None) -> Tuple[list[str], list[str], list[str]]:
     """
     Retrieve coordinate variables for this dataset. If coordinate
     variables are provided, use those, Otherwise, attempt to determine
@@ -190,7 +190,14 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
 
     Returns
     -------
-    TODO: add return type docstring and type hint.
+    tuple[list[str], list[str], list[str]]
+        A tuple containing three lists:
+        - lat_var_names
+            Normalized latitude coordinate variable names/paths.
+        - lon_var_names
+            Normalized longitude coordinate variable names/paths.
+        - time_var_names
+            Normalized time coordinate variable names/paths.
     """
 
     if isinstance(dataset, xr.Dataset):
@@ -218,7 +225,7 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
                 time_var_names.append(time_var)
 
         if not time_var_names:
-            time_var_names.append(compute_utc_name(dataset))
+            time_var_names.append(_compute_utc_name(dataset))
 
         if time_name is None:
             global_time_name = datatree_subset.compute_time_variable_name_tree(dataset,
@@ -230,13 +237,13 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
         seen = set()
         time_var_names = [x for x in time_var_names if x is not None and not (x in seen or seen.add(x))]
 
-    lat_var_names = normalize_paths(lat_var_names)
-    lon_var_names = normalize_paths(lon_var_names)
-    time_var_names = normalize_paths(time_var_names)
+    lat_var_names = _normalize_paths(lat_var_names)
+    lon_var_names = _normalize_paths(lon_var_names)
+    time_var_names = _normalize_paths(time_var_names)
     return lat_var_names, lon_var_names, time_var_names
 
 
-def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
+def _compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
     """
     Get the name of the utc variable if it is there to determine origine time
     """
@@ -247,7 +254,7 @@ def compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
     return None
 
 
-def normalize_paths(paths):
+def _normalize_paths(paths):
     """
     Convert paths with __ notation to normal group paths, removing leading /
     and converting __ to /
@@ -265,7 +272,7 @@ def normalize_paths(paths):
     Examples
     --------
     >>> paths = ['/__geolocation__latitude', '/__geolocation__longitude']
-    >>> normalize_paths(paths)
+    >>> _normalize_paths(paths)
     ['/geolocation/latitude', '/geolocation/longitude']
     """
     normalized = []
