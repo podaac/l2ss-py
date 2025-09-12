@@ -40,7 +40,7 @@ def get_all_variable_names_from_dtree(dtree: xr.DataTree) -> List[str]:
     return var_names
 
 
-def normalize_for_matching(path: str) -> str:
+def _normalize_for_matching(path: str) -> str:
     """
     Normalize path for matching:
     - Remove spaces and underscores
@@ -79,12 +79,12 @@ def normalize_candidate_paths_against_dtree(
     """
     # Build normalized lookup: no slashes, underscores/spaces ignored
     norm_to_real = {
-        normalize_for_matching(real_path): real_path for real_path in all_vars
+        _normalize_for_matching(real_path): real_path for real_path in all_vars
     }
 
     resolved = []
     for cand in candidates:
-        norm_cand = normalize_for_matching(cand)
+        norm_cand = _normalize_for_matching(cand)
         match = norm_to_real.get(norm_cand)
 
         if match:

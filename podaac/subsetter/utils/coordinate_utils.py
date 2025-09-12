@@ -13,7 +13,7 @@ import xarray as xr
 from podaac.subsetter import datatree_subset
 
 
-def apply_scale_offset(scale: float, offset: float, value: float) -> float:
+def _apply_scale_offset(scale: float, offset: float, value: float) -> float:
     """Apply scale and offset to the given value"""
     return (value + offset) / scale
 
@@ -90,7 +90,7 @@ def _convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -
             bound = np.array([-(coord_max / 2), coord_max / 2])
 
     # Calculate scale and offset so the bounds match the coord data
-    return apply_scale_offset(scale, offset, bound)
+    return _apply_scale_offset(scale, offset, bound)
 
 
 def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_var_name: str) -> np.ndarray:
