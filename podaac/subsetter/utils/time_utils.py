@@ -17,7 +17,7 @@ import julian
 import xarray as xr
 
 
-def translate_timestamp(str_timestamp: str) -> datetime.datetime:
+def _translate_timestamp(str_timestamp: str) -> datetime.datetime:
     """
     Translate timestamp to datetime object
     """
@@ -36,7 +36,7 @@ def translate_timestamp(str_timestamp: str) -> datetime.datetime:
     return datetime.datetime.fromisoformat(str_timestamp)
 
 
-def datetime_from_mjd(dataset: xr.Dataset, time_var_name: str):
+def _datetime_from_mjd(dataset: xr.Dataset, time_var_name: str):
     """
     Translate the modified julian date from the long name in the time attribute.
     """
@@ -53,7 +53,7 @@ def datetime_from_mjd(dataset: xr.Dataset, time_var_name: str):
     return None
 
 
-def extract_epoch(description: str) -> str:
+def _extract_epoch(description: str) -> str:
     """
     Extracts the ISO 8601 epoch from a description string.
     Example: "seconds since 1 January 1990" → "1990-01-01T00:00:00"
@@ -66,11 +66,11 @@ def extract_epoch(description: str) -> str:
     return parsed_date.isoformat()
 
 
-def convert_time_from_description(seconds_since, description: str):
+def _convert_time_from_description(seconds_since, description: str):
     """
     Convert time array from seconds-since format using the description.
     """
-    epoch = extract_epoch(description)
+    epoch = _extract_epoch(description)
     epoch_dt64 = np.datetime64(epoch, 's')
     delta = np.array(seconds_since) * np.timedelta64(1, 's')
     result = epoch_dt64 + delta
@@ -85,27 +85,27 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     drops data not in the given bounds.
     """
     def build_cond(str_timestamp, compare):
-        timestamp = pd.to_datetime(translate_timestamp(str_timestamp)).to_datetime64()
+        timestamp = pd.to_datetime(_translate_timestamp(str_timestamp)).to_datetime64()
         time_data = dataset[time_var_name]
         dtype = time_data.dtype
         if np.issubdtype(dtype, np.datetime64):
             pass
         elif np.issubdtype(dtype, np.timedelta64):
-            if is_time_mjd(dataset, time_var_name):
-                mjd_datetime = datetime_from_mjd(dataset, time_var_name)
+            if _is_time_mjd(dataset, time_var_name):
+                mjd_datetime = _datetime_from_mjd(dataset, time_var_name)
                 if mjd_datetime is None:
                     raise ValueError('Unable to get datetime from dataset to calculate time delta')
                 timestamp -= np.datetime64(mjd_datetime)
             else:
-                epoch_var = get_time_epoch_var(dataset, time_var_name)
+                epoch_var = _get_time_epoch_var(dataset, time_var_name)
                 epoch_datetime = dataset[epoch_var].values[0]
                 timestamp -= epoch_datetime
         elif np.issubdtype(dtype, np.floating):
             description = time_data.attrs.get('description')
             long_name = time_data.attrs.get('long_name')
             if description:
-                epoch_datetime = extract_epoch(description)
-                time_data = convert_time_from_description(time_data, description)
+                epoch_datetime = _extract_epoch(description)
+                time_data = _convert_time_from_description(time_data, description)
             elif long_name == "Approximate observation time for each row":
                 start_time = dataset.attrs.get('REV_START_TIME')
                 date_str = start_time.split("T")[0]
@@ -124,7 +124,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     return functools.reduce(operator.and_, temporal_conds, True)
 
 
-def get_time_epoch_var(tree, time_var_name: str) -> str:
+def _get_time_epoch_var(tree, time_var_name: str) -> str:
     """
     Get the name of the epoch time var. This is only needed in the case
     where there is a single time var (of size 1) that contains the time
@@ -152,7 +152,7 @@ def get_time_epoch_var(tree, time_var_name: str) -> str:
     return epoch_var_name
 
 
-def is_time_mjd(dataset: xr.Dataset, time_var_name: str) -> bool:
+def _is_time_mjd(dataset: xr.Dataset, time_var_name: str) -> bool:
     """
     Check to see if the time format is a time delta from a modified julian date.
     """

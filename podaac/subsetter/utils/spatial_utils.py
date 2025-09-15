@@ -53,7 +53,7 @@ def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
     ]
     if any(np.isnan(point[0]) or np.isnan(point[1]) or point[0] == lon_fill_value or point[1] == lat_fill_value for point in points):
         return None
-    sorted_points = ensure_counter_clockwise(points)
+    sorted_points = _ensure_counter_clockwise(points)
     wkt_polygon = (
         f"POLYGON(({sorted_points[0][0]:.5f} {sorted_points[0][1]:.5f}, "
         f"{sorted_points[1][0]:.5f} {sorted_points[1][1]:.5f}, "
@@ -64,15 +64,15 @@ def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
     return wkt_polygon
 
 
-def shoelace_area(points):
+def _shoelace_area(points):
     """Computes the signed area of a polygon."""
     x, y = np.array(points)[:, 0], np.array(points)[:, 1]
     return 0.5 * np.sum(x[:-1] * y[1:] - x[1:] * y[:-1])
 
 
-def ensure_counter_clockwise(points):
+def _ensure_counter_clockwise(points):
     """Ensures the points are ordered counterclockwise."""
-    area = shoelace_area(points)
+    area = _shoelace_area(points)
     if area > 0:
         return points[::-1]
     return points
