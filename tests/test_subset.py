@@ -771,8 +771,8 @@ def test_temporal_subset_ascat(data_dir, subset_output_dir, request):
     out_ds = xr.open_dataset(join(subset_output_dir, output_file),
                              decode_coords=False)
 
-    start_dt = time_utils.translate_timestamp(min_time)
-    end_dt = time_utils.translate_timestamp(max_time)
+    start_dt = time_utils._translate_timestamp(min_time)
+    end_dt = time_utils._translate_timestamp(max_time)
 
     # All dates should be within the given temporal bounds.
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()
@@ -821,8 +821,8 @@ def test_temporal_subset_modis_a(data_dir, subset_output_dir, request):
     out_ds = xr.open_dataset(join(subset_output_dir, output_file),
                              decode_coords=False)
 
-    start_dt = time_utils.translate_timestamp(min_time)
-    end_dt = time_utils.translate_timestamp(max_time)
+    start_dt = time_utils._translate_timestamp(min_time)
+    end_dt = time_utils._translate_timestamp(max_time)
 
     epoch_dt = out_ds['time'].values[0]
 
@@ -866,8 +866,8 @@ def test_temporal_subset_s6(data_dir, subset_output_dir, request):
         group='data_01'
     )
 
-    start_dt = time_utils.translate_timestamp(min_time)
-    end_dt = time_utils.translate_timestamp(max_time)
+    start_dt = time_utils._translate_timestamp(min_time)
+    end_dt = time_utils._translate_timestamp(max_time)
 
     # All dates should be within the given temporal bounds.
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()
@@ -1209,8 +1209,8 @@ def test_temporal_merged_topex(data_dir, subset_output_dir, request):
         decode_coords=False
     )
 
-    start_dt = time_utils.translate_timestamp(min_time)
-    end_dt = time_utils.translate_timestamp(max_time)
+    start_dt = time_utils._translate_timestamp(min_time)
+    end_dt = time_utils._translate_timestamp(max_time)
 
     # delta time from the MJD of this data collection
     mjd_dt = np.datetime64("1992-01-01")
@@ -1244,7 +1244,7 @@ def test_get_time_epoch_var(data_dir, subset_output_dir):
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset
         )
-        epoch_time_var = time_utils.get_time_epoch_var(dataset, time_var_names[0])
+        epoch_time_var = time_utils._get_time_epoch_var(dataset, time_var_names[0])
         assert epoch_time_var.split('/')[-1] == 'time'
 
 
@@ -1293,8 +1293,8 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
     out_ds = xr.open_dataset(join(subset_output_dir, output_file),
                              decode_coords=False)
 
-    start_dt = time_utils.translate_timestamp(min_time)
-    end_dt = time_utils.translate_timestamp(max_time)
+    start_dt = time_utils._translate_timestamp(min_time)
+    end_dt = time_utils._translate_timestamp(max_time)
 
     # All dates should be within the given temporal bounds.
     assert (out_ds.time >= pd.to_datetime(start_dt)).all()

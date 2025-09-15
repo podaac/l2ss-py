@@ -110,7 +110,7 @@ def set_version_history(dataset: xr.Dataset, cut: bool, bbox: np.ndarray = None,
     dataset.attrs['history'] = history.strip()
 
 
-def get_group(ds, group_path):
+def _get_group(ds, group_path):
     """Traverse the group path and return the final group."""
     if group_path in ('', '/'):
         return ds
@@ -131,7 +131,7 @@ def ensure_time_units(nc_file, time_encoding):
     with nc.Dataset(nc_file, 'r+') as ds:
         for group_name, vars_dict in time_encoding.items():
             try:
-                group = get_group(ds, group_name)
+                group = _get_group(ds, group_name)
             except KeyError:
                 continue
 
@@ -243,12 +243,6 @@ def update_netcdf_attrs(output_file: str,
                     else output_file)
 
     set_attr_with_type(dataset, "product_name", product_name)
-
-
-# Import these functions from coordinate_utils to avoid circular imports
-def remove_scale_offset(value: float, scale: float, offset: float) -> float:
-    """Remove scale and offset from the given value"""
-    return (value * scale) - offset
 
 
 def legalize_attr_name(attr):
