@@ -4,7 +4,7 @@
 import datetime
 import logging
 import re
-from typing import Any, Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
 import cf_xarray as cfxr
 import numpy as np
@@ -223,7 +223,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 indexers = get_indexers_from_nd(cond, cut)
             if not all(len(value) > 0 for value in indexers.values()):
                 raise NoDataException("No data in subsetted granule.")
-                # return copy_empty_dataset(dataset), {}
 
             # Check for partial dimension overlap
             partial_dim_in_vars = check_partial_dim_overlap_node(dataset, indexers)
@@ -380,29 +379,6 @@ def get_variables_with_indexers(dataset, indexers):
     return subset_vars, no_subset_vars
 
 
-def get_fill_value(var: xr.DataArray) -> Union[np.datetime64, np.timedelta64, Any]:
-    """
-    Get appropriate fill value based on variable type.
-
-    Parameters
-    ----------
-    var : xr.DataArray
-        The variable to get fill value for
-
-    Returns
-    -------
-    Union[np.datetime64, np.timedelta64, Any]
-        The appropriate fill value for the variable type
-    """
-    fill_value = var.attrs.get('_FillValue')
-
-    if np.issubdtype(var.dtype, np.dtype(np.datetime64)):
-        return np.datetime64('nat')
-    if np.issubdtype(var.dtype, np.dtype(np.timedelta64)):
-        return np.timedelta64('nat')
-    return fill_value
-
-
 def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
     """
     Cast data to the specified dtype.
@@ -420,40 +396,6 @@ def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
         The data cast to the new dtype
     """
     return data.astype(dtype_str)
-
-
-def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
-    """
-    Copy a dataset into a new, empty dataset. This dataset should:
-        * Contain the same structure as the input dataset (only include
-          requested variables, if variable subset)
-        * Contain the same global metadata as the input dataset
-        * Contain a history field which describes this subset operation.
-
-    Parameters
-    ----------
-    dataset: xarray.Dataset
-        The dataset to copy into a empty dataset.
-
-    Returns
-    -------
-    xarray.Dataset
-        The new dataset which has no data.
-    """
-    # Create a dict object where each key is a variable in the dataset and the value is an
-    # array initialized to the fill value for that variable or NaN if there is no fill value
-    # attribute for the variable
-
-    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan), dtype=v.dtype) for k, v in dataset.items()}
-
-    # Create a copy of the dataset filled with the empty data. Then select the first index along each
-    # dimension and return the result
-
-    # maybe check with the dimensions on being differ
-    # tests/test_subset.py::test_subset_empty_bbox[TEMPO_HCHO_L2_V01_20240110T170237Z_S005G08.nc]
-    # tests/test_subset.py::test_no_null_time_values_in_time_and_space_subset_for_tempo
-    # return dataset.copy(data=empty_data)
-    return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
 
 
 def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
@@ -699,7 +641,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             result = method(path, ds)
             if result:
                 return result
-
     return None
 
 

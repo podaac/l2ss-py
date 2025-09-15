@@ -13,7 +13,8 @@ import xarray as xr
 
 from podaac.subsetter import subset
 from conftest import data_files 
-
+from podaac.subsetter.utils.coordinate_utils import convert_bbox
+from podaac.subsetter import datatree_subset
 
 @pytest.mark.parametrize("test_file", data_files())
 def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
@@ -33,21 +34,26 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
         output_file=subset_output_file
     )
 
-    out_ds, _, file_ext = subset.open_as_nc_dataset(subset_output_file)
-    out_ds = xr.open_dataset(xr.backends.NetCDF4DataStore(out_ds),
+    out_ds = xr.open_dataset(subset_output_file,
                              decode_times=False,
                              decode_coords=False,
                              mask_and_scale=False)
 
-    lat_var_name, lon_var_name = subset.compute_coordinate_variable_names(out_ds)
 
-    lat_var_name = lat_var_name[0]
-    lon_var_name = lon_var_name[0]
+    out_ds_tree = xr.open_datatree(subset_output_file,
+                                   decode_times=False,
+                                   decode_coords=False,
+                                   mask_and_scale=False)
 
-    lon_bounds, lat_bounds = subset.convert_bbox(bbox, out_ds, lat_var_name, lon_var_name)
+    lon_var_name, lat_var_name = datatree_subset.compute_coordinate_variable_names_from_tree(out_ds_tree)
 
-    lats = out_ds[lat_var_name].values
-    lons = out_ds[lon_var_name].values
+    lat_var_name = lat_var_name[0].strip('/')
+    lon_var_name = lon_var_name[0].strip('/')
+
+    lon_bounds, lat_bounds = convert_bbox(bbox, out_ds_tree, lat_var_name, lon_var_name)
+
+    lats = out_ds_tree[lat_var_name].values
+    lons = out_ds_tree[lon_var_name].values
 
     warnings.filterwarnings('ignore')
 
