@@ -194,6 +194,9 @@ def find_fully_empty_paths(dt: xr.DataTree):
 
 def safe_name(name: str) -> str:
     """Replace illegal NetCDF characters with underscores and prevent names starting with digits."""
+    if name is None:
+        return "unnamed"
+    name = str(name)
     name = re.sub(r'[^A-Za-z0-9_]', '_', name)
     if re.match(r'^\d', name):
         name = '_' + name
