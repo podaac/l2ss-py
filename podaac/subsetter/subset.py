@@ -350,9 +350,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     time_encoding[group_path] = {}
 
                 time_encoding[group_path][var_name] = {}
-
-                if calendar and units:
+                if calendar:
                     time_encoding[group_path][var_name]['calendar'] = calendar
+                if units:
                     time_encoding[group_path][var_name]['units'] = units
                 time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
@@ -451,7 +451,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
-        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset)
+        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
             subsetted_dataset,
             lat_var_names,

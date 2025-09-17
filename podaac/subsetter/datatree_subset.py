@@ -832,7 +832,7 @@ def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataT
     return tree
 
 
-def prepare_basic_encoding(datasets: DataTree) -> dict:
+def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
     """
     Prepare basic encoding dictionary for DataTree organized by groups.
     Only applies zlib and complevel for float32, float64, int32, uint16 datatypes.
@@ -893,6 +893,9 @@ def prepare_basic_encoding(datasets: DataTree) -> dict:
             else:
                 merged[key] = value
         return merged
+
+    if time_encoding:
+        group_encodings = deep_merge(group_encodings, time_encoding)
 
     return group_encodings
 

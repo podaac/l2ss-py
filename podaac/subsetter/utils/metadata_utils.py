@@ -144,6 +144,11 @@ def ensure_time_units(nc_file, time_encoding):
                     correct_units = attr_dict['units']
                     if current_units != correct_units:
                         var.units = correct_units
+                if 'calendar' in attr_dict:
+                    current_calendar = getattr(var, 'calendar', None)
+                    correct_calendar = attr_dict['calendar']
+                    if current_calendar != correct_calendar:
+                        var.calendar = correct_calendar
 
 
 def update_netcdf_attrs(output_file: str,
