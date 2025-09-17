@@ -451,7 +451,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
-        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
+        encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset)
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
             subsetted_dataset,
             lat_var_names,
