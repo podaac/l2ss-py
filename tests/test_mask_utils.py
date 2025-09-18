@@ -60,12 +60,20 @@ class TestAlignDimsCondOnly:
         assert result is cond
         assert "x" in result.dims
 
-    def test_rename_dim(self):
-        ds = xr.Dataset({"a": ("x", np.arange(5))})
-        cond = xr.DataArray(np.ones(5, dtype=bool), dims="phony")
+    def test_rename_dim_test(self):
+        # Dataset with dims (x, y)
+        ds = xr.Dataset(
+            {"a": (("x", "y"), np.arange(20).reshape(5, 4))}
+        )
 
+        # Condition DataArray with dims (x, z) but same shape
+        cond = xr.DataArray(
+            np.ones((5, 4), dtype=bool),
+            dims=("x", "z")
+        )
         result = align_dims_cond_only(ds, cond)
 
         # Size matches → should rename
-        assert "x" not in result.dims
-        assert "phony" in result.dims
+        assert "x" in result.dims
+        assert "y" in result.dims
+        assert "z" not in result.dims
