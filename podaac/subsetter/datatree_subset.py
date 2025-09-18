@@ -165,6 +165,42 @@ def get_sibling_or_parent_condition(condition_dict, path):
     return condition_dict.get("/", None)
 
 
+def is_empty(dt, check_attrs=False):
+    """
+    Check if a DataTree node is empty.
+    If check_attrs is True, only require data_vars, ds.attrs, and dt.attrs to be empty.
+    If check_attrs is False, require both data_vars and coords to be empty.
+    """
+    ds = dt.ds
+    if ds is None:
+        return True
+    if check_attrs:
+        return len(ds.data_vars) == 0 and len(ds.attrs) == 0 and len(dt.attrs) == 0
+    return len(ds.data_vars) == 0 and len(ds.coords) == 0
+
+
+def subtree_is_empty(dt, check_attrs=False):
+    """
+    Check if a DataTree entire tree is empty.
+    """
+    if not is_empty(dt, check_attrs):
+        return False
+    return all(subtree_is_empty(child, check_attrs) for child in dt.children.values())
+
+
+def find_fully_empty_paths(dt: xr.DataTree):
+    """
+    Returns a list of paths in the DataTree where the node and all descendants are empty.
+    """
+    results = []
+    if subtree_is_empty(dt):
+        results.append(dt.path)  # dt.path is typically a tuple like ("root", "child1", ...)
+    else:
+        for child in dt.children.values():
+            results.extend(find_fully_empty_paths(child))
+    return results
+
+
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
     Return a DataTree which meets the given condition, processing all nodes in the tree.
@@ -186,7 +222,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
-    def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
+    def process_node(node: DataTree, path: str, empty_paths) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
 
@@ -314,26 +350,34 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         processed_children = {}
         for child_name, child_node in node.children.items():
             # Process the child node
-            child_ds, child_children, child_indexers = process_node(child_node, f"{path}/{child_name}")
+            current_path = f"{path}/{child_name}"
+            if current_path in empty_paths:
+                processed_children[child_name] = child_node
+            else:
+                child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
 
-            # --- Align parent and child datasets before attaching child ---
-            if indexers is None and child_indexers:
-                indexers = child_indexers
-                processed_ds = processed_ds.isel(**child_indexers, missing_dims='ignore')
+                # --- Align parent and child datasets before attaching child ---
+                if indexers is None and child_indexers:
+                    indexers = child_indexers
+                    processed_ds = processed_ds.isel(**child_indexers, missing_dims='ignore')
 
-            # Create new DataTree for the processed child
-            child_tree = DataTree(name=child_name, dataset=child_ds)
+                # Create new DataTree for the processed child
+                child_tree = DataTree(name=child_name, dataset=child_ds)
 
-            # Add all processed grandchildren to the child tree
-            for grandchild_name, grandchild_tree in child_children.items():
-                child_tree[grandchild_name] = grandchild_tree
+                # Add all processed grandchildren to the child tree
+                for grandchild_name, grandchild_tree in child_children.items():
+                    child_tree[grandchild_name] = grandchild_tree
 
-            processed_children[child_name] = child_tree
+                child_tree_empty = subtree_is_empty(child_tree, check_attrs=True)
+                # trees that have no data and attributes after processing are empty so we don't want to attach them
+                if child_tree_empty is False:
+                    processed_children[child_name] = child_tree
 
         return processed_ds, processed_children, indexers
 
+    empty_paths = find_fully_empty_paths(tree)
     # Start processing from root
-    root_ds, children, _ = process_node(tree, '')
+    root_ds, children, _ = process_node(tree, '', empty_paths)
 
     # Create new root tree preserving the original name and attributes
     result_tree = DataTree(name=tree.name, dataset=root_ds)
