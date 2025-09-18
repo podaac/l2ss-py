@@ -172,6 +172,24 @@ def is_empty(dt: xr.DataTree):
     return len(ds.data_vars) == 0 and len(ds.coords) == 0
 
 
+def is_empty_data_attrs(dt: xr.DataTree) -> bool:
+    """
+    Check if a DataTree node is empty.
+
+    If check_attrs is False:
+        - Node is empty if it has no variables and no coords.
+    If check_attrs is True:
+        - Node is empty if it has no variables, no coords, and no attributes.
+    """
+    ds = dt.ds
+
+    return (
+        len(ds.data_vars) == 0 and
+        len(ds.attrs) == 0 and
+        len(dt.attrs) == 0
+    )
+
+
 def subtree_is_empty(dt: xr.DataTree):
     """Returns True if the node and all its descendants are empty."""
     if not is_empty(dt):
@@ -356,7 +374,10 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
                 # Add all processed grandchildren to the child tree
                 for grandchild_name, grandchild_tree in child_children.items():
-                    child_tree[grandchild_name] = grandchild_tree
+                    child_tree_empty = is_empty_data_attrs(grandchild_tree)
+                    # trees that have no data and attributes after processing are empty so we don't want to attach them
+                    if child_tree_empty is False:
+                        child_tree[grandchild_name] = grandchild_tree
 
                 processed_children[child_name] = child_tree
 
