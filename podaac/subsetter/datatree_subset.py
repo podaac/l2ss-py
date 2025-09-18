@@ -164,37 +164,27 @@ def get_sibling_or_parent_condition(condition_dict, path):
     return condition_dict.get("/", None)
 
 
-def is_empty(dt: xr.DataTree):
-    """Check if a DataTree node has no variables and no coords (ds is None or empty)."""
+def is_empty(dt, check_attrs=False):
+    """
+    Check if a DataTree node is empty.
+    If check_attrs is True, only require data_vars, ds.attrs, and dt.attrs to be empty.
+    If check_attrs is False, require both data_vars and coords to be empty.
+    """
     ds = dt.ds
     if ds is None:
         return True
+    if check_attrs:
+        return len(ds.data_vars) == 0 and len(ds.attrs) == 0 and len(dt.attrs) == 0
     return len(ds.data_vars) == 0 and len(ds.coords) == 0
 
 
-def is_empty_data_attrs(dt: xr.DataTree) -> bool:
+def subtree_is_empty(dt, check_attrs=False):
     """
-    Check if a DataTree node is empty.
-
-    If check_attrs is False:
-        - Node is empty if it has no variables and no coords.
-    If check_attrs is True:
-        - Node is empty if it has no variables, no coords, and no attributes.
+    Check if a DataTree entire tree is empty.
     """
-    ds = dt.ds
-
-    return (
-        len(ds.data_vars) == 0 and
-        len(ds.attrs) == 0 and
-        len(dt.attrs) == 0
-    )
-
-
-def subtree_is_empty(dt: xr.DataTree):
-    """Returns True if the node and all its descendants are empty."""
-    if not is_empty(dt):
+    if not is_empty(dt, check_attrs):
         return False
-    return all(subtree_is_empty(child) for child in dt.children.values())
+    return all(subtree_is_empty(child, check_attrs) for child in dt.children.values())
 
 
 def find_fully_empty_paths(dt: xr.DataTree):
@@ -374,12 +364,12 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
                 # Add all processed grandchildren to the child tree
                 for grandchild_name, grandchild_tree in child_children.items():
-                    child_tree_empty = is_empty_data_attrs(grandchild_tree)
-                    # trees that have no data and attributes after processing are empty so we don't want to attach them
-                    if child_tree_empty is False:
-                        child_tree[grandchild_name] = grandchild_tree
+                    child_tree[grandchild_name] = grandchild_tree
 
-                processed_children[child_name] = child_tree
+                child_tree_empty = subtree_is_empty(child_tree, check_attrs=True)
+                # trees that have no data and attributes after processing are empty so we don't want to attach them
+                if child_tree_empty is False:
+                    processed_children[child_name] = child_tree
 
         return processed_ds, processed_children, indexers
 
