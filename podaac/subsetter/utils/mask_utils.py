@@ -5,6 +5,7 @@ mask_utils.py
 Utilities for creating and applying masks for subsetting operations.
 Place all mask creation, manipulation, and application functions here.
 """
+import xarray as xr
 
 
 def align_time_to_lon_dim(time_data, lon_data, temporal_cond):
@@ -40,3 +41,41 @@ def align_time_to_lon_dim(time_data, lon_data, temporal_cond):
             return temporal_cond.rename({time_dim: lon_dim_2})
 
     return temporal_cond  # Return unchanged if no renaming needed
+
+
+def align_dims_cond_only(dataset: xr.Dataset, cond: xr.Dataset) -> xr.Dataset:
+    """
+    Align dims in `cond` to match `dataset` only if they are unaligned but sizes match.
+    Works for both Dataset and DataArray.
+    """
+    # Helper to get dim sizes
+    def get_sizes(obj):
+        if isinstance(obj, xr.Dataset):
+            return dict(obj.dims)
+        return dict(obj.sizes)
+
+    dataset_sizes = get_sizes(dataset)
+    cond_sizes = get_sizes(cond)
+
+    dataset_dims = set(dataset_sizes)
+    cond_dims = set(cond_sizes)
+    matches = dataset_dims & cond_dims
+
+    # Return early if none or all dims match
+    if len(matches) == 0 or matches == dataset_dims:
+        return cond
+
+    # Build mapping for dims that need alignment based on size
+    dim_map = {}
+    for cdim, csize in cond_sizes.items():
+        if cdim in dataset_sizes and dataset_sizes[cdim] == csize:
+            continue  # already aligned
+        for ddim, dsize in dataset_sizes.items():
+            if dsize == csize and ddim not in cond_dims and ddim not in dim_map.values():
+                dim_map[cdim] = ddim
+                break
+
+    if dim_map:
+        cond = cond.rename(dim_map)
+
+    return cond
