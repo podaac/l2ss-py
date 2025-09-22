@@ -109,7 +109,7 @@ jobs:
       - name: SonarCloud Scan Retry
         id: sonarcloud-retry
         if: steps.sonarcloud.outcome == 'failure'
-        uses: sonarsource/sonarqube-scan-action@v4
+        uses: sonarsource/sonarqube-scan-action@v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
