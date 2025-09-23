@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/335] (https://github.com/podaac/l2ss-py/pull/335): Code Organization
 - [issue/316] (https://github.com/podaac/l2ss-py/pull/316): Improve performance when subsetting, including shapefile subsetting
 - [issue/333] (https://github.com/podaac/l2ss-py/pull/333): Fix AQUARIUS_L2_SSS_V5 and HAWKEYE_L2_OC
+- [issue/344] (https://github.com/podaac/l2ss-py/pull/344): Continuation of L2SS Testing - MODIS, VIIRS, OLCI
+- [issue/345] (https://github.com/podaac/l2ss-py/pull/345): Adds groups that only contain metadata (no variables) to the output
+
 ### Deprecated 
 ### Removed
 ### Fixed
