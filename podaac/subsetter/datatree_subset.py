@@ -4,7 +4,7 @@
 import datetime
 import logging
 import re
-from typing import Any, Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple, Union
 
 import cf_xarray as cfxr
 import numpy as np
@@ -12,6 +12,7 @@ import xarray as xr
 from xarray import DataTree
 from netCDF4 import date2num  # pylint: disable=no-name-in-module
 from podaac.subsetter import dimension_cleanup as dc
+from podaac.subsetter.utils import mask_utils
 try:
     from harmony_service_lib.exceptions import NoDataException
 except ImportError:
@@ -164,6 +165,42 @@ def get_sibling_or_parent_condition(condition_dict, path):
     return condition_dict.get("/", None)
 
 
+def is_empty(dt, check_attrs=False):
+    """
+    Check if a DataTree node is empty.
+    If check_attrs is True, only require data_vars, ds.attrs, and dt.attrs to be empty.
+    If check_attrs is False, require both data_vars and coords to be empty.
+    """
+    ds = dt.ds
+    if ds is None:
+        return True
+    if check_attrs:
+        return len(ds.data_vars) == 0 and len(ds.attrs) == 0 and len(dt.attrs) == 0
+    return len(ds.data_vars) == 0 and len(ds.coords) == 0
+
+
+def subtree_is_empty(dt, check_attrs=False):
+    """
+    Check if a DataTree entire tree is empty.
+    """
+    if not is_empty(dt, check_attrs):
+        return False
+    return all(subtree_is_empty(child, check_attrs) for child in dt.children.values())
+
+
+def find_fully_empty_paths(dt: xr.DataTree):
+    """
+    Returns a list of paths in the DataTree where the node and all descendants are empty.
+    """
+    results = []
+    if subtree_is_empty(dt):
+        results.append(dt.path)  # dt.path is typically a tuple like ("root", "child1", ...)
+    else:
+        for child in dt.children.values():
+            results.extend(find_fully_empty_paths(child))
+    return results
+
+
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
     Return a DataTree which meets the given condition, processing all nodes in the tree.
@@ -185,7 +222,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
-    def process_node(node: DataTree, path: str) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
+    def process_node(node: DataTree, path: str, empty_paths) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
 
@@ -216,6 +253,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
         if dataset.variables and cond is not None:  # Only process if node has data
             # Create indexers from condition
+            cond = mask_utils.align_dims_cond_only(dataset, cond)
 
             if cond.values.ndim == 1:
                 indexers = get_indexers_from_1d(cond)
@@ -223,7 +261,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 indexers = get_indexers_from_nd(cond, cut)
             if not all(len(value) > 0 for value in indexers.values()):
                 raise NoDataException("No data in subsetted granule.")
-                # return copy_empty_dataset(dataset), {}
 
             # Check for partial dimension overlap
             partial_dim_in_vars = check_partial_dim_overlap_node(dataset, indexers)
@@ -313,26 +350,34 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         processed_children = {}
         for child_name, child_node in node.children.items():
             # Process the child node
-            child_ds, child_children, child_indexers = process_node(child_node, f"{path}/{child_name}")
+            current_path = f"{path}/{child_name}"
+            if current_path in empty_paths:
+                processed_children[child_name] = child_node
+            else:
+                child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
 
-            # --- Align parent and child datasets before attaching child ---
-            if indexers is None and child_indexers:
-                indexers = child_indexers
-                processed_ds = processed_ds.isel(**child_indexers, missing_dims='ignore')
+                # --- Align parent and child datasets before attaching child ---
+                if indexers is None and child_indexers:
+                    indexers = child_indexers
+                    processed_ds = processed_ds.isel(**child_indexers, missing_dims='ignore')
 
-            # Create new DataTree for the processed child
-            child_tree = DataTree(name=child_name, dataset=child_ds)
+                # Create new DataTree for the processed child
+                child_tree = DataTree(name=child_name, dataset=child_ds)
 
-            # Add all processed grandchildren to the child tree
-            for grandchild_name, grandchild_tree in child_children.items():
-                child_tree[grandchild_name] = grandchild_tree
+                # Add all processed grandchildren to the child tree
+                for grandchild_name, grandchild_tree in child_children.items():
+                    child_tree[grandchild_name] = grandchild_tree
 
-            processed_children[child_name] = child_tree
+                child_tree_empty = subtree_is_empty(child_tree, check_attrs=True)
+                # trees that have no data and attributes after processing are empty so we don't want to attach them
+                if child_tree_empty is False:
+                    processed_children[child_name] = child_tree
 
         return processed_ds, processed_children, indexers
 
+    empty_paths = find_fully_empty_paths(tree)
     # Start processing from root
-    root_ds, children, _ = process_node(tree, '')
+    root_ds, children, _ = process_node(tree, '', empty_paths)
 
     # Create new root tree preserving the original name and attributes
     result_tree = DataTree(name=tree.name, dataset=root_ds)
@@ -380,29 +425,6 @@ def get_variables_with_indexers(dataset, indexers):
     return subset_vars, no_subset_vars
 
 
-def get_fill_value(var: xr.DataArray) -> Union[np.datetime64, np.timedelta64, Any]:
-    """
-    Get appropriate fill value based on variable type.
-
-    Parameters
-    ----------
-    var : xr.DataArray
-        The variable to get fill value for
-
-    Returns
-    -------
-    Union[np.datetime64, np.timedelta64, Any]
-        The appropriate fill value for the variable type
-    """
-    fill_value = var.attrs.get('_FillValue')
-
-    if np.issubdtype(var.dtype, np.dtype(np.datetime64)):
-        return np.datetime64('nat')
-    if np.issubdtype(var.dtype, np.dtype(np.timedelta64)):
-        return np.timedelta64('nat')
-    return fill_value
-
-
 def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
     """
     Cast data to the specified dtype.
@@ -420,40 +442,6 @@ def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
         The data cast to the new dtype
     """
     return data.astype(dtype_str)
-
-
-def copy_empty_dataset(dataset: xr.Dataset) -> xr.Dataset:
-    """
-    Copy a dataset into a new, empty dataset. This dataset should:
-        * Contain the same structure as the input dataset (only include
-          requested variables, if variable subset)
-        * Contain the same global metadata as the input dataset
-        * Contain a history field which describes this subset operation.
-
-    Parameters
-    ----------
-    dataset: xarray.Dataset
-        The dataset to copy into a empty dataset.
-
-    Returns
-    -------
-    xarray.Dataset
-        The new dataset which has no data.
-    """
-    # Create a dict object where each key is a variable in the dataset and the value is an
-    # array initialized to the fill value for that variable or NaN if there is no fill value
-    # attribute for the variable
-
-    empty_data = {k: np.full(v.shape, dataset.variables[k].attrs.get('_FillValue', np.nan), dtype=v.dtype) for k, v in dataset.items()}
-
-    # Create a copy of the dataset filled with the empty data. Then select the first index along each
-    # dimension and return the result
-
-    # maybe check with the dimensions on being differ
-    # tests/test_subset.py::test_subset_empty_bbox[TEMPO_HCHO_L2_V01_20240110T170237Z_S005G08.nc]
-    # tests/test_subset.py::test_no_null_time_values_in_time_and_space_subset_for_tempo
-    # return dataset.copy(data=empty_data)
-    return dataset.copy(data=empty_data).isel({dim: slice(0, 1, 1) for dim in dataset.dims})
 
 
 def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
@@ -699,7 +687,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             result = method(path, ds)
             if result:
                 return result
-
     return None
 
 
@@ -891,7 +878,7 @@ def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataT
     return tree
 
 
-def prepare_basic_encoding(datasets: DataTree, time_encoding=None) -> dict:
+def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
     """
     Prepare basic encoding dictionary for DataTree organized by groups.
     Only applies zlib and complevel for float32, float64, int32, uint16 datatypes.
@@ -919,7 +906,6 @@ def prepare_basic_encoding(datasets: DataTree, time_encoding=None) -> dict:
         for var_name in node.ds.data_vars:
             var = node.ds[var_name]
 
-            # Start with just _FillValue
             encoding = {
                 "_FillValue": var.encoding.get('_FillValue')
             }

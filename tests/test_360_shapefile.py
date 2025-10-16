@@ -1,7 +1,7 @@
 import unittest
 from shapely.geometry import Point, Polygon
 from shapely.geometry.multipolygon import MultiPolygon
-from podaac.subsetter.subset import translate_longitude
+from podaac.subsetter.utils.spatial_utils import translate_longitude
 
 class TestTranslateLongitude(unittest.TestCase):
 

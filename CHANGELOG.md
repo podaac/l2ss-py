@@ -13,6 +13,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [3.2.0]
+### Added
+### Changed
+- [issue/245] (https://github.com/podaac/l2ss-py/pull/245): Update l2ss-py to use python 3.12
+- [issue/342] (https://github.com/podaac/l2ss-py/pull/342): Preserve Time format from original file to subset file
+- [issue/45] (https://github.com/podaac/l2ss-py/pull/45): SMAP_JPL_L2B_NRT_SSS_CAP_V5 time calculation issues
+- [issue/335] (https://github.com/podaac/l2ss-py/pull/335): Code Organization
+- [issue/316] (https://github.com/podaac/l2ss-py/pull/316): Improve performance when subsetting, including shapefile subsetting
+- [issue/333] (https://github.com/podaac/l2ss-py/pull/333): Fix AQUARIUS_L2_SSS_V5 and HAWKEYE_L2_OC
+- [issue/344] (https://github.com/podaac/l2ss-py/pull/344): Continuation of L2SS Testing - MODIS, VIIRS, OLCI
+- [issue/345] (https://github.com/podaac/l2ss-py/pull/345): Adds groups that only contain metadata (no variables) to the output
+
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
 ## [3.1.0]
 ### Added
 ### Changed
