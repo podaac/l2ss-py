@@ -101,7 +101,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
                 epoch_datetime = dataset[epoch_var].values[0]
                 timestamp -= epoch_datetime
         elif np.issubdtype(dtype, np.floating):
-            description = time_data.attrs.get('description')
+            description = time_data.attrs.get('description') or time_data.attrs.get('Units')
             long_name = time_data.attrs.get('long_name')
             if description:
                 epoch_datetime = _extract_epoch(description)
