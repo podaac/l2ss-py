@@ -878,7 +878,7 @@ def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataT
     return tree
 
 
-def prepare_basic_encoding(datasets: DataTree, time_encoding=None) -> dict:
+def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
     """
     Prepare basic encoding dictionary for DataTree organized by groups.
     Only applies zlib and complevel for float32, float64, int32, uint16 datatypes.
@@ -906,7 +906,6 @@ def prepare_basic_encoding(datasets: DataTree, time_encoding=None) -> dict:
         for var_name in node.ds.data_vars:
             var = node.ds[var_name]
 
-            # Start with just _FillValue
             encoding = {
                 "_FillValue": var.encoding.get('_FillValue')
             }
