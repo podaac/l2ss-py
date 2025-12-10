@@ -71,8 +71,12 @@ def _convert_time_from_description(seconds_since, description: str):
     Convert time array from seconds-since format using the description.
     """
     epoch = _extract_epoch(description)
-    epoch_dt64 = np.datetime64(epoch, 's')
-    delta = np.array(seconds_since) * np.timedelta64(1, 's')
+    epoch_dt64 = np.datetime64(epoch, 'ns')  # Use nanosecond precision
+
+    # Convert to float64 and then to nanoseconds to preserve precision
+    seconds_array = np.asarray(seconds_since, dtype=np.float64)
+    nanoseconds = (seconds_array * 1e9).astype('int64')
+    delta = nanoseconds.astype('timedelta64[ns]')
     result = epoch_dt64 + delta
     if isinstance(seconds_since, xr.DataArray):
         return xr.DataArray(result, coords=seconds_since.coords, dims=seconds_since.dims, attrs=seconds_since.attrs)
