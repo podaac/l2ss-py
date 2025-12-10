@@ -354,7 +354,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 if calendar and units:
                     time_encoding[group_path][var_name]['calendar'] = calendar
                     time_encoding[group_path][var_name]['units'] = units
-                time_encoding[group_path][var_name]['dtype'] = dtype
+                if dtype and units:
+                    time_encoding[group_path][var_name]['dtype'] = dtype
+                    time_encoding[group_path][var_name]['units'] = units
                 if calendar:
                     time_calendar_attributes[time] = calendar
 
