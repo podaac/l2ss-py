@@ -84,7 +84,7 @@ jobs:
           poetry run flake8 podaac
       - name: Test and coverage
         run: |
-          poetry run pytest -n 2 --dist loadscope -v \
+          poetry run pytest -v \
             --junitxml=build/reports/pytest.xml \
             --cov=podaac \
             --cov-report=xml:build/reports/coverage.xml \
