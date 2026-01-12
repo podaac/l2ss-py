@@ -4,6 +4,8 @@ import numpy as np
 from datetime import datetime
 import re
 from podaac.subsetter.datatree_subset import compute_time_variable_name_tree, find_matching_coords
+from podaac.subsetter.utils import time_utils
+from podaac.subsetter import subset
 
 def create_test_dataset(coords=None, data_vars=None, attrs=None):
     """Helper function to create test datasets as a DataTree
@@ -186,3 +188,74 @@ class TestComputeTimeVariableName:
         lat_var = tree.ds['lat']
         result = compute_time_variable_name_tree(tree, lat_var, ['/time1', '/time2'])
         assert result == '/time1'
+
+    def test_build_temporal_cond_solar_time(self):
+        # Simulate a dataset with 'solar_time' variable and 'time_coverage_start' attribute
+        n = 5
+        solar_seconds = np.array([0, 3600, 7200, 10800, 14400])  # every hour for 5 hours
+        time_coverage_start = "2023-01-01T00:00:00Z"
+        ds = xr.Dataset({
+            'solar_time': (('time',), solar_seconds)
+        }, attrs={
+            'time_coverage_start': time_coverage_start
+        })
+        # min_time and max_time in ISO format
+        min_time = "2023-01-01T01:00:00Z"
+        max_time = "2023-01-01T03:00:00Z"
+        cond = time_utils.build_temporal_cond(min_time, max_time, ds, '/solar_time')
+        # The expected mask: only hours 1, 2, 3 are within bounds
+        expected = np.array([False, True, True, True, False])
+        assert np.all(cond == expected)
+
+    def test_subset_with_solar_time(self, tmp_path_factory):
+        """
+        Create a dummy NetCDF file with a 'solar_time' variable and test subsetting using only a time subset.
+        """
+        tmp_path = tmp_path_factory.mktemp("solar_time_test")
+
+        # Create dummy data
+        lat = np.linspace(-90, 90, 5)
+        lon = np.linspace(-180, 180, 8)
+        solar_time = np.array([0, 3600, 7200, 10800, 14400])  # seconds since midnight
+        dummy_var = np.random.rand(5, 8)
+
+        ds = xr.Dataset(
+            {
+                "solar_time": ("time", solar_time),
+                "dummy_var": (("time", "lon"), dummy_var),
+            },
+            coords={
+                "time": np.arange(5),
+                "lat": ("time", lat),
+                "lon": lon,
+            },
+            attrs={"time_coverage_start": "2023-01-01T00:00:00Z"}
+        )
+        ds["solar_time"].attrs["units"] = "seconds since 2023-01-01T00:00:00Z"
+        ds["solar_time"].attrs["calendar"] = "gregorian"
+
+        nc_path = tmp_path / "dummy_solar_time.nc"
+        ds.to_netcdf(nc_path)
+        output_path = tmp_path / "subset_solar_time.nc"
+
+        # Use a global bbox for completeness
+        bbox = np.array([[-180, 180], [-90, 90]])
+
+        # Subset using only a time range, with solar_time as the time variable
+        min_time = "2023-01-01T01:00:00Z"
+        max_time = "2023-01-01T03:00:00Z"
+        subset.subset(
+            file_to_subset=str(nc_path),
+            bbox=bbox,
+            min_time=min_time,
+            max_time=max_time,
+            output_file=str(output_path),
+            time_var_names=["/solar_time"]
+        )
+
+        # Open the output and check that the correct time indices were kept
+        ds_out = xr.open_dataset(output_path, decode_times=False)
+        # Only hours 1, 2, 3 should be True (see test_build_temporal_cond_solar_time)
+        expected_solar = np.array([3600, 7200, 10800])
+        assert np.all(np.isin(ds_out['solar_time'].values, expected_solar))
+        ds_out.close()

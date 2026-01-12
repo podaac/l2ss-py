@@ -8,8 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 ### Deprecated 
+- [issue/358] Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
 ### Removed
 ### Fixed
+- [issue/359] Fix bug where for HIRDLS2 temporal subset fails when time has attribute "Units", and not "description"
+- [issue/307] (https://github.com/podaac/l2ss-py/issues/307): Fix CYGNSS_L2_SURFACE_FLUX_V3.2 failing spatial and temporal subsetting
 ### Security
 
 
@@ -24,10 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/333] (https://github.com/podaac/l2ss-py/pull/333): Fix AQUARIUS_L2_SSS_V5 and HAWKEYE_L2_OC
 - [issue/344] (https://github.com/podaac/l2ss-py/pull/344): Continuation of L2SS Testing - MODIS, VIIRS, OLCI
 - [issue/345] (https://github.com/podaac/l2ss-py/pull/345): Adds groups that only contain metadata (no variables) to the output
-- [issue/359] Fix bug where for HIRDLS2 temporal subset fails when time has attribute "Units", and not "description"
 ### Deprecated
-=======
-- Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
 ### Removed
 ### Fixed
 ### Security

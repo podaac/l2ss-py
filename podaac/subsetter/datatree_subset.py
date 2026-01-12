@@ -276,7 +276,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
                 new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
-
                 # data with variables that shouldn't be subsetted
                 new_dataset_non_sub = indexed_ds[non_subset_vars]
 
@@ -481,7 +480,7 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
         current_lat_coord_names = []
         current_lon_coord_names = []
 
-        dataset = xr.decode_cf(dataset)
+        dataset = xr.decode_cf(dataset, decode_times=False)
 
         def append_coords_pair(pair):
             lat_name, lon_name = pair
@@ -686,6 +685,9 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
         for path, ds in all_datasets:
             result = method(path, ds)
             if result:
+                # Normalize /sample_time to /solar_time for this unique case
+                if result == "/sample_time":
+                    return "/solar_time"
                 return result
     return None
 
