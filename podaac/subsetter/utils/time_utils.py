@@ -90,7 +90,18 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     """
     def build_cond(str_timestamp, compare):
         timestamp = pd.to_datetime(_translate_timestamp(str_timestamp)).to_datetime64()
-        time_data = dataset[time_var_name]
+
+        if time_var_name == '/solar_time':
+            reference_date = dataset.attrs.get('time_coverage_start')  # Replace with the correct date
+            ref_ts = pd.to_datetime(reference_date)
+            # Remove timezone if present
+            if hasattr(ref_ts, 'tzinfo') and ref_ts.tzinfo is not None:
+                ref_ts = ref_ts.tz_convert(None)
+            seconds = dataset['solar_time'].values
+            time_data = ref_ts + pd.to_timedelta(seconds, unit='s')
+        else:
+            time_data = dataset[time_var_name]
+
         dtype = time_data.dtype
         if np.issubdtype(dtype, np.datetime64):
             pass

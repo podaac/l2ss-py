@@ -336,6 +336,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 lon_var_names=lon_var_names,
                 time_var_names=time_var_names
             )
+
             for time in time_var_names:
 
                 time_var = dataset[time]
@@ -353,11 +354,16 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 if calendar:
                     time_encoding[group_path][var_name]['calendar'] = calendar
                 if units:
+                    if time != '/solar_time':
+                        time_encoding[group_path][var_name]['units'] = units
                     time_encoding[group_path][var_name]['units'] = units
                 if dtype and units:
                     time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
                     time_calendar_attributes[time] = calendar
+
+    if len(time_var_names) == 1 and (min_time or max_time) and time_var_names[0] == '/solar_time':
+        args['decode_times'] = False
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
