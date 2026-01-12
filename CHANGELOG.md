@@ -25,8 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/344] (https://github.com/podaac/l2ss-py/pull/344): Continuation of L2SS Testing - MODIS, VIIRS, OLCI
 - [issue/345] (https://github.com/podaac/l2ss-py/pull/345): Adds groups that only contain metadata (no variables) to the output
 - [issue/359] Fix bug where for HIRDLS2 temporal subset fails when time has attribute "Units", and not "description"
-
 ### Deprecated
+=======
+- Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
 ### Removed
 ### Fixed
 ### Security
