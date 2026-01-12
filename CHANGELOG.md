@@ -6,6 +6,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issue/364] Implement vertical subsetting via dimensions.
 ### Changed
 ### Deprecated 
 - [issue/358] Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present

@@ -325,3 +325,116 @@ def test_harmony_exception_raised(mock_environ,
     with patch.dict(os.environ, test_env_vars), patch.object(sys, 'argv', test_args), patch('podaac.subsetter.subset.subset', return_value=None):
         with pytest.raises(NoDataException):
             service.invoke()
+
+
+def test_service_invoke_vertical_dimension(mock_environ, temp_dir, test_env_vars, harmony_message_base):
+    """Test Harmony service vertical dimension subsetting using a STAC item."""
+    import xarray as xr
+    import numpy as np
+    import os
+    import types
+    import pystac
+    from datetime import datetime
+    from harmony_service_lib.message import Message
+    from podaac.subsetter.subset_harmony import L2SubsetterService
+
+    # Create dummy dataset with vertical dimension
+    lat = np.linspace(-90, 90, 4)
+    lon = np.linspace(-180, 180, 6)
+    depth = np.array([0, 10, 20, 30, 40])
+    data = np.random.rand(4, 6, 5)
+    data = np.broadcast_to(depth, (len(lat), len(lon), len(depth)))  # shape: (lat, lon, depth)
+    lat_data = np.tile(lat[:, None], (1, 6))  # shape (4, 6)
+    lon_data = np.tile(lon[None, :], (4, 1))   # shape (4, 6)
+    
+    ds = xr.Dataset(
+        {
+            "temperature": (("lat", "lon", "depth"), data),
+        },
+        coords={
+            "lat": lat,
+            "lon": lon,
+            "depth": depth,
+        }
+    )
+
+    nc_path = os.path.join(temp_dir, "vertical_test.nc")
+    ds.to_netcdf(nc_path)
+
+    # Create STAC item for the test file
+    bbox = [-180, -90, 180, 90]
+    item = pystac.Item(
+        id="vertical-test",
+        geometry={
+            "type": "Polygon",
+            "coordinates": [[
+                [bbox[0], bbox[1]],
+                [bbox[0], bbox[3]],
+                [bbox[2], bbox[3]],
+                [bbox[2], bbox[1]],
+                [bbox[0], bbox[1]]
+            ]]
+        },
+        bbox=bbox,
+        datetime=datetime.strptime("2025-03-06T00:48:19Z", "%Y-%m-%dT%H:%M:%SZ"),
+        properties={}
+    )
+    item.add_asset(
+        "data",
+        pystac.Asset(
+            href=nc_path,  # Use plain file path, not file:// URI
+            media_type="application/x-netcdf4",
+            roles=["data"]
+        )
+    )
+
+    # Add vertical dimension to Harmony message
+    harmony_message = harmony_message_base.copy()
+    harmony_message["subset"]["dimensions"] = [
+        {"name": "temperature", "min": 10, "max": 30}
+    ]
+    # Ensure 'depth' is not included as a variable or coordinate variable
+    harmony_message["sources"] = [{
+        "collection": "test-collection",
+        "variables": [
+            {"id": "V0001-EXAMPLE", "name": "temperature", "type": "SCIENCE"},
+            {"id": "V0001-EXAMPLE", "name": "lat", "type": "COORDINATE", "subtype": "LATITUDE"},
+            {"id": "V0001-EXAMPLE", "name": "lon", "type": "COORDINATE", "subtype": "LONGITUDE"}
+        ],
+        "coordinateVariables": [
+            {"id": "V0001-EXAMPLE", "name": "lat", "type": "COORDINATE", "subtype": "LATITUDE"},
+            {"id": "V0001-EXAMPLE", "name": "lon", "type": "COORDINATE", "subtype": "LONGITUDE"}
+        ]
+    }]
+    # Sanity check: depth should not be in variables or coordinateVariables
+    for var in harmony_message["sources"][0]["variables"]:
+        assert var["name"] != "depth", "'depth' should not be in variables list"
+    for var in harmony_message["sources"][0]["coordinateVariables"]:
+        assert var["name"] != "depth", "'depth' should not be in coordinateVariables list"
+
+    harmony_message['subset']['bbox'] = [-180, -90, 180, 90]
+    # Create catalog and wrap message
+    catalog = pystac.Catalog(id="test-catalog", description="Test catalog for vertical dimension")
+    catalog.add_item(item)
+    message = Message(harmony_message)
+    service = L2SubsetterService(message, catalog=catalog)
+
+    # Patch download/stage/output filename
+    import podaac.subsetter.subset_harmony as sh
+    sh.download = lambda href, *args, **kwargs: href
+    sh.stage = lambda output_file, staged_filename, mime, **kwargs: output_file
+    sh.generate_output_filename = lambda href, ext, **ops: 'output.nc'
+
+    # Run process_item
+    source = message.sources[0]
+    result_item = service.process_item(item, source)
+    # Check that the bbox and geometry are set
+    assert result_item.bbox is not None
+    assert result_item.geometry is not None
+    # Check output file exists and has correct depth subset
+    output_asset = result_item.assets['data']
+    output_path = output_asset.href.replace('file://', '')
+    ds_out = xr.open_dataset(output_path)
+    assert np.all((ds_out['depth'].values >= 10) & (ds_out['depth'].values <= 30))
+    assert ds_out['depth'].size == 3
+    ds_out.close()

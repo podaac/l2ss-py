@@ -18,6 +18,7 @@ jobs:
   build:
     name: Build, Test, Verify, Publish
     # The type of runner that the job will run on
+    timeout-minutes: 60  # stops this job after 30 minutes
     runs-on: ubuntu-latest
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it

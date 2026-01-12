@@ -119,7 +119,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      cut: bool = True,
                      min_time: str = None,
                      max_time: str = None,
-                     pixel_subset: bool = False) -> np.ndarray:
+                     pixel_subset: bool = False,
+                     vertical_var: str = None,
+                     vertical_min: float = None,
+                     vertical_max: float = None) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -146,6 +149,12 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     pixel_subset : boolean
         Cut the lon lat based on the rows and columns within the bounding box,
         but could result with lon lats that are outside the bounding box
+    vertical_var : str, optional
+        Name of the vertical variable to subset by (e.g., depth, altitude)
+    vertical_min : float, optional
+        Minimum value for vertical subsetting (inclusive)
+    vertical_max : float, optional
+        Maximum value for vertical subsetting (inclusive)
 
     TODO: add docstring and type hint for `variables` parameter.
 
@@ -169,6 +178,26 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         iterator = zip_longest(lat_var_names, lon_var_names, [])
     else:
         iterator = zip(lat_var_names, lon_var_names, time_var_names)
+
+    vert_mask = True
+    if vertical_var is not None:
+        vertical_data = dataset[vertical_var]
+        # Find the third dimension name (not in lat/lon dims)
+        lat_dims = set(dataset[lat_var_names[0]].dims)
+        lon_dims = set(dataset[lon_var_names[0]].dims)
+        vert_dim = None
+        for dim in vertical_data.dims:
+            if dim not in lat_dims and dim not in lon_dims:
+                vert_dim = dim
+                break
+
+        # Create a mask for the third dimension using vert_min and vert_max
+        vert_mask = np.ones(vertical_data.sizes[vert_dim], dtype=bool)
+
+        if vertical_min is not None:
+            vert_mask &= (vertical_data[{vert_dim: slice(None)}] >= vertical_min).any(dim=[d for d in vertical_data.dims if d != vert_dim]).values
+        if vertical_max is not None:
+            vert_mask &= (vertical_data[{vert_dim: slice(None)}] <= vertical_max).any(dim=[d for d in vertical_data.dims if d != vert_dim]).values
 
     for lat_var_name, lon_var_name, time_var_name in iterator:
 
@@ -206,6 +235,11 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             subset_dictionary[lat_path] = operation
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
+
+    # Apply vertical mask after spatial/temporal subsetting
+    if vertical_var is not None and vert_dim is not None and isinstance(vert_mask, np.ndarray):
+        return_dataset = return_dataset.isel({vert_dim: vert_mask})
+
     return return_dataset
 
 
@@ -216,7 +250,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            origin_source: str = None,
            lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (),
            pixel_subset: bool = False, stage_file_name_subsetted_true: str = None,
-           stage_file_name_subsetted_false: str = None
+           stage_file_name_subsetted_false: str = None,
+           vertical_var: str = None, vertical_min: float = None, vertical_max: float = None
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -275,6 +310,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         stage file name if subsetting is true name depends on result of subset
     stage_file_name_subsetted_false: str
         stage file name if subsetting is false name depends on result of subset
+    vertical_var : str, optional
+        Name of the vertical variable to subset by (e.g., depth, altitude)
+    vertical_min : float, optional
+        Minimum value for vertical subsetting (inclusive)
+    vertical_max : float, optional
+        Maximum value for vertical subsetting (inclusive)
 
     # clean up time variable in SNDR before decode_times
     # SNDR.AQUA files have ascending node time blank
@@ -436,7 +477,10 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 cut=cut,
                 min_time=min_time,
                 max_time=max_time,
-                pixel_subset=pixel_subset
+                pixel_subset=pixel_subset,
+                vertical_var=vertical_var,
+                vertical_min=vertical_min,
+                vertical_max=vertical_max
             )
         else:
             raise ValueError('Either bbox or shapefile must be provided')
