@@ -350,10 +350,11 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         for child_name, child_node in node.children.items():
             # Process the child node
             current_path = f"{path}/{child_name}"
+            # If the child is in empty_paths, apply indexers if present to align dimensions recursively
             if current_path in empty_paths:
-                child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
-                child_tree = DataTree(name=child_name, dataset=child_ds)
-                processed_children[child_name] = child_tree
+                if indexers is not None:
+                    child_node = apply_indexers_to_tree(child_node, indexers)
+                processed_children[child_name] = child_node
             else:
                 child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
 
@@ -1037,3 +1038,17 @@ def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
             ds[time_name + "_datetime"] = (ds["Year"].dims, np.array(new_time_list_dt))
 
     return ds
+
+
+def apply_indexers_to_tree(node: DataTree, indexers: dict) -> DataTree:
+    """
+    Recursively apply indexers to a DataTree node and all its descendants.
+    Returns a new DataTree with the same structure but with all datasets subsetted.
+    """
+    ds = node.ds
+    if ds is not None:
+        ds = ds.isel(**indexers, missing_dims='ignore')
+    new_node = DataTree(name=node.name, dataset=ds)
+    for child_name, child_node in node.children.items():
+        new_node[child_name] = apply_indexers_to_tree(child_node, indexers)
+    return new_node
