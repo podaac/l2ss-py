@@ -195,9 +195,9 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         vert_mask = np.ones(vertical_data.sizes[vert_dim], dtype=bool)
 
         if vertical_min is not None:
-            vert_mask &= (vertical_data[{vert_dim: slice(None)}] >= vertical_min).any(dim=[d for d in vertical_data.dims if d != vert_dim]).values
+            vert_mask &= vertical_data[vert_dim].values >= vertical_min
         if vertical_max is not None:
-            vert_mask &= (vertical_data[{vert_dim: slice(None)}] <= vertical_max).any(dim=[d for d in vertical_data.dims if d != vert_dim]).values
+            vert_mask &= vertical_data[vert_dim].values <= vertical_max
 
     for lat_var_name, lon_var_name, time_var_name in iterator:
 

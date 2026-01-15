@@ -351,7 +351,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             # Process the child node
             current_path = f"{path}/{child_name}"
             if current_path in empty_paths:
-                processed_children[child_name] = child_node
+                child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
+                child_tree = DataTree(name=child_name, dataset=child_ds)
+                processed_children[child_name] = child_tree
             else:
                 child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
 
