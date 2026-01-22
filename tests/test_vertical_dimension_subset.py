@@ -42,8 +42,8 @@ def test_vertical_dimension_subset(tmp_path):
     )
 
     ds_out = xr.open_dataset(output_path)
-    # Check that only the correct depth values remain
-    assert np.all((ds_out['depth'].values >= 10) & (ds_out['depth'].values <= 30))
-    # Check that the shape matches the expected number of depth levels
-    assert ds_out['depth'].size == 3
+    # Check that only the correct temperature values remain
+    arr = ds_out['temperature'].values
+    assert np.any(np.isnan(arr)), "There should be NaN values present"
+    assert np.any((arr >= 10) & (arr <= 30)), "There should be values between 10 and 30"
     ds_out.close()

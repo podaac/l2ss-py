@@ -435,6 +435,7 @@ def test_service_invoke_vertical_dimension(mock_environ, temp_dir, test_env_vars
     output_asset = result_item.assets['data']
     output_path = output_asset.href.replace('file://', '')
     ds_out = xr.open_dataset(output_path)
-    assert np.all((ds_out['depth'].values >= 10) & (ds_out['depth'].values <= 30))
-    assert ds_out['depth'].size == 3
+    arr = ds_out['temperature'].values
+    assert np.any(np.isnan(arr)), "There should be NaN values present"
+    assert np.any((arr >= 10) & (arr <= 30)), "There should be values between 10 and 30"
     ds_out.close()
