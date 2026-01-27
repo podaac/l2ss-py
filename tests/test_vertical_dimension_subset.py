@@ -38,7 +38,8 @@ def test_vertical_dimension_subset(tmp_path):
         lon_var_names=["lon"],
         vertical_var="temperature",
         vertical_min=10,
-        vertical_max=30
+        vertical_max=30,
+        cut=False
     )
 
     ds_out = xr.open_dataset(output_path)

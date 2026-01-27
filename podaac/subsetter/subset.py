@@ -39,6 +39,7 @@ from podaac.subsetter.utils import spatial_utils
 from podaac.subsetter.utils import time_utils
 from podaac.subsetter.utils import file_utils
 from podaac.subsetter.utils import variables_utils
+from podaac.subsetter.vertical_subset import vertical_subset
 
 SERVICE_NAME = 'l2ss-py'
 
@@ -179,18 +180,6 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     else:
         iterator = zip(lat_var_names, lon_var_names, time_var_names)
 
-    vert_mask = None
-    vertical_data = None
-    if vertical_var is not None:
-        vertical_data = dataset[vertical_var]
-        # Create a mask for the third dimension using vert_min and vert_max
-        vert_mask = np.ones(vertical_data.shape, dtype=bool)
-
-        if vertical_min is not None:
-            vert_mask &= vertical_data.values >= vertical_min
-        if vertical_max is not None:
-            vert_mask &= vertical_data.values <= vertical_max
-
     for lat_var_name, lon_var_name, time_var_name in iterator:
 
         lat_path = file_utils.get_path(lat_var_name)
@@ -228,21 +217,8 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
 
-    # Apply vertical mask after spatial/temporal subsetting
-    if vertical_var is not None and vert_mask is not None and vertical_data is not None:
-        def apply_vert_mask(ds):
-            masked = ds.copy()
-            mask_dims = getattr(vertical_data, 'dims', None)
-            for var in ds.data_vars:
-                da = ds[var]
-                # Only apply mask if dims match
-                if mask_dims is not None and tuple(da.dims) == tuple(mask_dims):
-                    masked[var] = da.where(vert_mask)
-                else:
-                    masked[var] = da
-            return masked
-        new_tree = xr.map_over_datasets(apply_vert_mask, return_dataset)
-        return new_tree
+    if vertical_var is not None:
+        return vertical_subset(dataset, return_dataset, lat_var_names, lon_var_names, vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max, cut=cut)
 
     return return_dataset
 
