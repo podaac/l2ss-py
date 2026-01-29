@@ -211,25 +211,3 @@ def get_vert_values(tree: xr.DataTree, vert_dim: str) -> np.ndarray:
     # Dimension not found anywhere
     raise KeyError(f"Vertical dimension '{vert_dim}' not found in DataTree")
 
-
-def find_nodes_by_dim(tree: xr.DataTree, dim_name: str) -> list:
-    """
-    Return nodes that contain a dimension `dim_name`.
-
-    Parameters
-    ----------
-    tree : xarray.DataTree
-        The DataTree to search.
-    dim_name : str
-        Name of the dimension to look for.
-
-    Returns
-    -------
-    list
-        List of nodes containing the dimension.
-    """
-    result = []
-    for node in tree.values():
-        if node.ds is not None and dim_name in node.ds.dims:
-            result.append(node)
-    return result
