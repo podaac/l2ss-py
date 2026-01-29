@@ -210,4 +210,3 @@ def get_vert_values(tree: xr.DataTree, vert_dim: str) -> np.ndarray:
 
     # Dimension not found anywhere
     raise KeyError(f"Vertical dimension '{vert_dim}' not found in DataTree")
-
