@@ -192,7 +192,7 @@ def get_vert_values(tree: xr.DataTree, vert_dim: str) -> np.ndarray:
         If the dimension does not exist in any node.
     """
     for node in tree.values():
-        ds = node.ds
+        ds = getattr(node, 'ds', None)
         if ds is None:
             continue
 
