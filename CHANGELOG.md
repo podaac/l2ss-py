@@ -6,13 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- [issue/364] (https://github.com/podaac/l2ss-py/issues/364) Implement vertical subsetting via dimensions.
 ### Changed
 ### Deprecated 
-- [issue/358] Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
+- [issue/358] (https://github.com/podaac/l2ss-py/issues/358) Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
 ### Removed
 ### Fixed
-- [issue/359] Fix bug where for HIRDLS2 temporal subset fails when time has attribute "Units", and not "description"
+- [issue/359] (https://github.com/podaac/l2ss-py/issues/359) Fix bug where for HIRDLS2 temporal subset fails when time has attribute "Units", and not "description"
 - [issue/307] (https://github.com/podaac/l2ss-py/issues/307): Fix CYGNSS_L2_SURFACE_FLUX_V3.2 failing spatial and temporal subsetting
+- [issue/376] (https://github.com/podaac/l2ss-py/issues/376) Fixed empty group dimension alignment
 ### Security
 
 
