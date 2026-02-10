@@ -376,7 +376,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     time_encoding[group_path][var_name]['calendar'] = calendar
                 if units:
                     if time != '/solar_time':
-                        time_encoding[group_path][var_name]['units'] = units
+                        time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
                 if dtype and units:
                     time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
