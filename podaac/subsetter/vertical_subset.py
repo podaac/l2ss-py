@@ -53,7 +53,7 @@ def vertical_subset(
 
     if vertical_var is not None:
         try:
-            vertical_data = dataset[vertical_var]
+            vertical_data = return_dataset[vertical_var]
             dimensional_subsetting = "variable"
         except KeyError:
             dimensional_subsetting = "dimension"
