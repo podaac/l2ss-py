@@ -465,8 +465,18 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
-        metadata_utils.set_version_history(subsetted_dataset, cut, bbox, shapefile)
-        metadata_utils.set_json_history(subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source)
+        metadata_utils.set_version_history(
+            subsetted_dataset, cut, bbox, shapefile,
+            min_time=min_time, max_time=max_time,
+            vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max,
+            variables=variables, pixel_subset=pixel_subset
+        )
+        metadata_utils.set_json_history(
+            subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source,
+            min_time=min_time, max_time=max_time,
+            vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max,
+            variables=variables, pixel_subset=pixel_subset
+        )
 
         if time_calendar_attributes:
             for time_var, calendar in time_calendar_attributes.items():
