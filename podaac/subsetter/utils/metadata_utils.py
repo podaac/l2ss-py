@@ -95,9 +95,9 @@ def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
 
 
 def set_version_history(dataset: xr.Dataset, cut: bool, bbox: np.ndarray = None, shapefile: str = None,
-                       min_time: str = None, max_time: str = None,
-                       vertical_var: str = None, vertical_min: float = None, vertical_max: float = None,
-                       variables: list = None, pixel_subset: bool = False) -> None:
+                        min_time: str = None, max_time: str = None,
+                        vertical_var: str = None, vertical_min: float = None, vertical_max: float = None,
+                        variables: list = None, pixel_subset: bool = False) -> None:
     """
     Set the 'history' metadata header of the granule to reflect the
     current version of the subsetter, as well as the parameters used
