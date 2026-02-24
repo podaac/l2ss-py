@@ -10,11 +10,13 @@ import datetime
 import operator
 import functools
 import re
+from typing import get_args
 import pandas as pd
 import numpy as np
 from dateutil import parser
 import julian
 import xarray as xr
+from xarray.core.types import NPDatetimeUnitOptions
 
 
 def _translate_timestamp(str_timestamp: str) -> datetime.datetime:
@@ -176,3 +178,29 @@ def _is_time_mjd(dataset: xr.Dataset, time_var_name: str) -> bool:
         if 'Modified Julian Day' in time_var.attrs['comment']:
             return True
     return False
+
+
+# taken from xarray.coding.times, could just import but it is a private
+# method to the times module
+def _numpy_to_netcdf_timeunit(units: NPDatetimeUnitOptions) -> str:
+    return {
+        "ns": "nanoseconds",
+        "us": "microseconds",
+        "ms": "milliseconds",
+        "s": "seconds",
+        "m": "minutes",
+        "h": "hours",
+        "D": "days",
+    }[units]
+
+
+def check_time_units(unit_str: str) -> str:
+    """
+    Checking if the time unit is a a numpy datetime unit, and
+    replacing with CF compliant unit via a lookup table if it is. """
+    unit_str_list = unit_str.split(" ")
+
+    unit = unit_str_list[0]
+    if unit in get_args(NPDatetimeUnitOptions):
+        unit_str_list[0] = _numpy_to_netcdf_timeunit(unit)
+    return " ".join(unit_str_list)

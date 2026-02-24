@@ -136,7 +136,7 @@ def history_json_schema():
                     },
                     "parameters": {
                         "description": "The list of parameters to the program when generating this data file",
-                        "type": ["array", "string"],
+                        "type": [ "array", "string", "object" ],
                         "items": {"type": "string"}
                     },
                     "program_ref": {
@@ -591,146 +591,11 @@ def test_group_subset(data_dir, subset_output_dir):
         output_file=os.path.join(subset_output_dir, s6_output_file_name)
     )
 
-
     # Check that bounds are within requested bbox
     assert bounds[0][0] >= bbox[0][0]
     assert bounds[0][1] <= bbox[0][1]
     assert bounds[1][0] >= bbox[1][0]
     assert bounds[1][1] <= bbox[1][1]
-
-
-def test_json_history_metadata_append(history_json_schema, data_dir, subset_output_dir, request):
-    """
-    Tests that the json history metadata header is appended to when it
-    already exists. First we create a fake json_history header for input file.
-    """
-    test_file = next(filter(
-        lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
-        , TEST_DATA_FILES))
-    output_file = "{}_{}".format(request.node.name, test_file)
-    input_file_subset = join(subset_output_dir, "int_{}".format(output_file))
-
-    fake_history = [
-        {
-            "date_time": "2021-05-10T14:30:24.553263",
-            "derived_from": basename(input_file_subset),
-            "program": SERVICE_NAME,
-            "version": importlib_metadata.distribution(SERVICE_NAME).version,
-            "parameters": "bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True",
-            "program_ref": "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD",
-            "$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-        }
-    ]
-
-    in_nc = xr.open_dataset(join(data_dir, test_file))
-    in_nc.attrs['history_json'] = json.dumps(fake_history)
-    in_nc.to_netcdf(join(subset_output_dir, 'int_{}'.format(output_file)), 'w')
-
-    subset.subset(
-        file_to_subset=input_file_subset,
-        bbox=np.array(((-180, 180), (-90.0, 90))),
-        output_file=join(subset_output_dir, output_file)
-    )
-
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
-
-    history_json = json.loads(out_nc.attrs['history_json'])
-    assert len(history_json) == 2
-
-    validate(instance=history_json, schema=history_json_schema)
-
-    for history in history_json:
-        assert "date_time" in history
-        assert history.get('program') == SERVICE_NAME
-        assert history.get('derived_from') == basename(input_file_subset)
-        assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
-        assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
-        assert history.get(
-            'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
-        assert history.get(
-            '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-
-
-def test_json_history_metadata_create(history_json_schema, data_dir, subset_output_dir, request):
-    """
-    Tests that the json history metadata header is created when it does
-    not exist. All test granules does not contain this header.
-    """
-    test_file = next(filter(
-        lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
-        , TEST_DATA_FILES))
-    output_file = "{}_{}".format(request.node.name, test_file)
-
-    # Remove the 'history' metadata from the granule
-    in_nc = xr.open_dataset(join(data_dir, test_file))
-    in_nc.to_netcdf(join(subset_output_dir, 'int_{}'.format(output_file)), 'w')
-
-    input_file_subset = join(subset_output_dir, "int_{}".format(output_file))
-    subset.subset(
-        file_to_subset=input_file_subset,
-        bbox=np.array(((-180, 180), (-90.0, 90))),
-        output_file=join(subset_output_dir, output_file)
-    )
-
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
-
-    history_json = json.loads(out_nc.attrs['history_json'])
-    assert len(history_json) == 1
-
-    validate(instance=history_json, schema=history_json_schema)
-
-    for history in history_json:
-        assert "date_time" in history
-        assert history.get('program') == SERVICE_NAME
-        assert history.get('derived_from') == basename(input_file_subset)
-        assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
-        assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
-        assert history.get(
-            'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
-        assert history.get(
-            '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-
-
-def test_json_history_metadata_create_origin_source(history_json_schema, data_dir, subset_output_dir, request):
-    """
-    Tests that the json history metadata header is created when it does
-    not exist. All test granules does not contain this header.
-    """
-    test_file = next(filter(
-        lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
-        , TEST_DATA_FILES))
-    output_file = "{}_{}".format(request.node.name, test_file)
-
-    # Remove the 'history' metadata from the granule
-    in_nc = xr.open_dataset(join(data_dir, test_file))
-    in_nc.to_netcdf(join(subset_output_dir, 'int_{}'.format(output_file)), 'w')
-
-    input_file_subset = join(subset_output_dir, "int_{}".format(output_file))
-    subset.subset(
-        file_to_subset=input_file_subset,
-        bbox=np.array(((-180, 180), (-90.0, 90))),
-        output_file=join(subset_output_dir, output_file),
-        origin_source="fake_original_file.nc"
-    )
-
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
-
-    history_json = json.loads(out_nc.attrs['history_json'])
-    assert len(history_json) == 1
-
-    validate(instance=history_json, schema=history_json_schema)
-
-    for history in history_json:
-        assert "date_time" in history
-        assert history.get('program') == SERVICE_NAME
-        assert history.get('derived_from') == "fake_original_file.nc"
-        assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
-        assert history.get('parameters') == 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
-        assert history.get(
-            'program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
-        assert history.get(
-            '$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
-
 
 def test_temporal_subset_ascat(data_dir, subset_output_dir, request):
     """
@@ -1852,3 +1717,138 @@ def test_temporal_subset_tempo(data_dir, subset_output_dir, request):
     assert dtree['/geolocation/time'].values[9] ==  1388941402.834026
     assert dtree['/geolocation/time'].values[10] ==  1388941405.867095
     assert dtree['/geolocation/time'].values[11] == 1388941408.900158
+
+# --- Constants for Expected Values ---
+EXPECTED_1 = 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
+EXPECTED_2 = "{'bbox': [[-180.0, 180.0], [-90.0, 90.0]], 'cut': True, 'pixel_subset': False, 'variables': []}"
+EXPECTED_PARAMETERS = {
+    "bbox": [[-180.0, 180.0], [-90.0, 90.0]],
+    "cut": True,
+    "pixel_subset": False,
+    "variables": [],
+}
+JSON_HISTORY_TARGET_GRANULE = '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc'
+
+# --- Helper Functions ---
+def get_json_history_test_file():
+    """Helper to fetch the specific test file from the file list."""
+    return next(filter(lambda f: JSON_HISTORY_TARGET_GRANULE in f, TEST_DATA_FILES))
+
+def assert_history_metadata(history_json, schema, expected_len, expected_derived_from):
+    """Encapsulates the repetitive validation and assertion logic for history payloads."""
+    validate(instance=history_json, schema=schema)
+    assert len(history_json) == expected_len
+
+    for history in history_json:
+        assert "date_time" in history
+        assert history.get('program') == SERVICE_NAME
+        assert history.get('derived_from') == expected_derived_from
+        assert history.get('version') == importlib_metadata.distribution(SERVICE_NAME).version
+        assert history.get('program_ref') == "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD"
+        assert history.get('$schema') == "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+
+        params = history.get('parameters')
+        if isinstance(params, str):
+            assert params in (EXPECTED_1, EXPECTED_2)
+        else:
+            assert params == EXPECTED_PARAMETERS
+
+def test_json_history_metadata_append(history_json_schema, data_dir, subset_output_dir, request):
+    """
+    Tests that the json history metadata header is appended to when it
+    already exists. First we create a fake json_history header for input file.
+    """
+    test_file = get_json_history_test_file()
+    output_file = f"{request.node.name}_{test_file}"
+    input_file_subset = join(subset_output_dir, f"int_{output_file}")
+
+    fake_history = [{
+        "date_time": "2021-05-10T14:30:24.553263",
+        "derived_from": basename(input_file_subset),
+        "program": SERVICE_NAME,
+        "version": importlib_metadata.distribution(SERVICE_NAME).version,
+        "parameters": "bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True",
+        "program_ref": "https://cmr.earthdata.nasa.gov:443/search/concepts/S1962070864-POCLOUD",
+        "$schema": "https://harmony.earthdata.nasa.gov/schemas/history/0.1.0/history-v0.1.0.json"
+    }]
+
+    # Use context managers for xarray to prevent unclosed file leaks
+    with xr.open_dataset(join(data_dir, test_file)) as in_nc:
+        in_nc.attrs['history_json'] = json.dumps(fake_history)
+        in_nc.to_netcdf(input_file_subset, 'w')
+
+    subset.subset(
+        file_to_subset=input_file_subset,
+        bbox=np.array(((-180, 180), (-90.0, 90))),
+        output_file=join(subset_output_dir, output_file)
+    )
+
+    with xr.open_dataset(join(subset_output_dir, output_file)) as out_nc:
+        history_json = json.loads(out_nc.attrs['history_json'])
+
+    assert_history_metadata(
+        history_json, 
+        history_json_schema, 
+        expected_len=2, 
+        expected_derived_from=basename(input_file_subset)
+    )
+
+
+def test_json_history_metadata_create(history_json_schema, data_dir, subset_output_dir, request):
+    """
+    Tests that the json history metadata header is created when it does
+    not exist. All test granules do not contain this header.
+    """
+    test_file = get_json_history_test_file()
+    output_file = f"{request.node.name}_{test_file}"
+    input_file_subset = join(subset_output_dir, f"int_{output_file}")
+
+    # Open, save without history, and close safely
+    with xr.open_dataset(join(data_dir, test_file)) as in_nc:
+        in_nc.to_netcdf(input_file_subset, 'w')
+
+    subset.subset(
+        file_to_subset=input_file_subset,
+        bbox=np.array(((-180, 180), (-90.0, 90))),
+        output_file=join(subset_output_dir, output_file)
+    )
+
+    with xr.open_dataset(join(subset_output_dir, output_file)) as out_nc:
+        history_json = json.loads(out_nc.attrs['history_json'])
+
+    assert_history_metadata(
+        history_json, 
+        history_json_schema, 
+        expected_len=1, 
+        expected_derived_from=basename(input_file_subset)
+    )
+
+
+def test_json_history_metadata_create_origin_source(history_json_schema, data_dir, subset_output_dir, request):
+    """
+    Tests that the json history metadata header is created when it does
+    not exist, specifically testing the origin_source injection.
+    """
+    test_file = get_json_history_test_file()
+    output_file = f"{request.node.name}_{test_file}"
+    input_file_subset = join(subset_output_dir, f"int_{output_file}")
+
+    with xr.open_dataset(join(data_dir, test_file)) as in_nc:
+        in_nc.to_netcdf(input_file_subset, 'w')
+
+    subset.subset(
+        file_to_subset=input_file_subset,
+        bbox=np.array(((-180, 180), (-90.0, 90))),
+        output_file=join(subset_output_dir, output_file),
+        origin_source="fake_original_file.nc"
+    )
+
+    with xr.open_dataset(join(subset_output_dir, output_file)) as out_nc:
+        history_json = json.loads(out_nc.attrs['history_json'])
+
+    assert_history_metadata(
+        history_json, 
+        history_json_schema, 
+        expected_len=1, 
+        expected_derived_from="fake_original_file.nc"
+    )
