@@ -25,7 +25,10 @@ SERVICE_NAME = 'l2ss-py'
 
 
 def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
-                     bbox: np.ndarray = None, shapefile: str = None, origin_source=None) -> None:
+                     bbox: np.ndarray = None, shapefile: str = None, origin_source=None,
+                     min_time: str = None, max_time: str = None,
+                     vertical_var: str = None, vertical_min: float = None, vertical_max: float = None,
+                     variables: list = None, pixel_subset: bool = False) -> None:
     """
     Set the 'json_history' metadata header of the granule to reflect the
     current version of the subsetter, as well as the parameters used
@@ -47,11 +50,26 @@ def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
     TODO: add docstring and type hint for `origin_source` parameter.
     """
 
-    params = f'cut={cut}'
+    params = {
+        "cut": cut,
+        "pixel_subset": pixel_subset,
+    }
     if bbox is not None:
-        params = f'bbox={bbox.tolist()} {params}'
-    elif shapefile is not None:
-        params = f'shapefile={shapefile} {params}'
+        params["bbox"] = bbox.tolist()
+    if shapefile is not None:
+        params["shapefile"] = shapefile
+    if min_time is not None:
+        params["min_time"] = min_time
+    if max_time is not None:
+        params["max_time"] = max_time
+    if vertical_var is not None:
+        params["vertical_var"] = vertical_var
+    if vertical_min is not None:
+        params["vertical_min"] = vertical_min
+    if vertical_max is not None:
+        params["vertical_max"] = vertical_max
+    if variables is not None:
+        params["variables"] = variables
 
     history_json = dataset.attrs.get('history_json', [])
     if history_json:
@@ -76,7 +94,10 @@ def set_json_history(dataset: xr.Dataset, cut: bool, file_to_subset: str,
     dataset.attrs['history_json'] = json.dumps(history_json)
 
 
-def set_version_history(dataset: xr.Dataset, cut: bool, bbox: np.ndarray = None, shapefile: str = None) -> None:
+def set_version_history(dataset: xr.Dataset, cut: bool, bbox: np.ndarray = None, shapefile: str = None,
+                        min_time: str = None, max_time: str = None,
+                        vertical_var: str = None, vertical_min: float = None, vertical_max: float = None,
+                        variables: list = None, pixel_subset: bool = False) -> None:
     """
     Set the 'history' metadata header of the granule to reflect the
     current version of the subsetter, as well as the parameters used
@@ -100,13 +121,29 @@ def set_version_history(dataset: xr.Dataset, cut: bool, bbox: np.ndarray = None,
     version = importlib_metadata.distribution(SERVICE_NAME).version
     history = dataset.attrs.get('history', "")
     timestamp = datetime.datetime.utcnow()
-    params = f'cut={cut}'
+    params = {
+        "cut": cut,
+        "pixel_subset": pixel_subset,
+    }
     if bbox is not None:
-        params = f'bbox={bbox.tolist()} {params}'
-    elif shapefile is not None:
-        params = f'shapefile={shapefile} {params}'
+        params["bbox"] = bbox.tolist()
+    if shapefile is not None:
+        params["shapefile"] = shapefile
+    if min_time is not None:
+        params["min_time"] = min_time
+    if max_time is not None:
+        params["max_time"] = max_time
+    if vertical_var is not None:
+        params["vertical_var"] = vertical_var
+    if vertical_min is not None:
+        params["vertical_min"] = vertical_min
+    if vertical_max is not None:
+        params["vertical_max"] = vertical_max
+    if variables is not None:
+        params["variables"] = variables
 
-    history += f"\n{timestamp} {SERVICE_NAME} v{version} ({params})"
+    params_str = ', '.join(f'{k}={v}' for k, v in params.items())
+    history += f"\n{timestamp} {SERVICE_NAME} v{version} ({params_str})"
     dataset.attrs['history'] = history.strip()
 
 
