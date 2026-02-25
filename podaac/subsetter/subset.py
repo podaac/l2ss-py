@@ -190,12 +190,23 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         temporal_cond = time_utils.build_temporal_cond(min_time, max_time, dataset, time_var_name)
         time_path = None
-        if time_var_name and (min_time or max_time):
+        if time_var_name:
             time_path = file_utils.get_path(time_var_name)
-            time_data = dataset[time_var_name]
 
-            if time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
-                temporal_cond = mask_utils.align_time_to_lon_dim(time_data, lon_data, temporal_cond)
+            try:
+                time_data = dataset[time_var_name]
+            except KeyError:
+                time_data = None
+
+            if (
+                time_data is not None
+                and time_data.ndim == 1
+                and lon_data.ndim == 2
+                and temporal_cond is not True
+            ):
+                temporal_cond = mask_utils.align_time_to_lon_dim(
+                    time_data, lon_data, temporal_cond
+                )
 
         operation = (
             oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
