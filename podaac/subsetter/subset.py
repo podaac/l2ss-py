@@ -190,7 +190,7 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
 
         temporal_cond = time_utils.build_temporal_cond(min_time, max_time, dataset, time_var_name)
         time_path = None
-        if time_var_name:
+        if time_var_name and (min_time or max_time):
             time_path = file_utils.get_path(time_var_name)
             time_data = dataset[time_var_name]
 
