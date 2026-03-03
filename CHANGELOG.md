@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
+## [3.3.0]
+### Added
 - [issue/364] (https://github.com/podaac/l2ss-py/issues/364) Implement vertical subsetting via dimensions.
 ### Changed
 - [issue/246] (https://github.com/podaac/l2ss-py/issues/246) Subsetting parameters part of history attributes and json history.
