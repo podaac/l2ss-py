@@ -18,10 +18,11 @@ jobs:
   build:
     name: Build, Test, Verify, Publish
     # The type of runner that the job will run on
+    timeout-minutes: 60  # stops this job after 60 minutes
     runs-on: ubuntu-latest
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -35,11 +36,7 @@ jobs:
           echo "current_version=$(poetry version | awk '{print $2}')" >> $GITHUB_OUTPUT
           echo "pyproject_name=$(poetry version | awk '{print $1}')" >> $GITHUB_ENV
       - name: Bump pre-alpha version
-        # If triggered by push to a feature branch
-        if: |
-          ${{ startsWith(github.ref, 'refs/heads/issue') }}      ||
-          ${{ startsWith(github.ref, 'refs/heads/dependabot/') }} ||
-          ${{ startsWith(github.ref, 'refs/heads/feature/') }}
+        if: startsWith(github.ref, 'refs/heads/issue') || startsWith(github.ref, 'refs/heads/dependabot/') || startsWith(github.ref, 'refs/heads/feature/')
         run: |
           new_ver="${{ steps.get-version.outputs.current_version }}+$(git rev-parse --short ${GITHUB_SHA})"
           poetry version $new_ver
@@ -84,9 +81,10 @@ jobs:
           poetry run flake8 podaac
       - name: Test and coverage
         run: |
-          poetry run pytest -n auto --dist loadscope -vv \
+          poetry run pytest -v \
             --junitxml=build/reports/pytest.xml \
-            --cov=podaac --cov-report=xml:build/reports/coverage.xml \
+            --cov=podaac \
+            --cov-report=xml:build/reports/coverage.xml \
             --cov-report=term-missing:skip-covered \
             -m "not aws and not integration" \
             tests/

@@ -184,6 +184,12 @@ class L2SubsetterService(BaseHarmonyAdapter):
             if message.pixelSubset:
                 subset_params['pixel_subset'] = message.pixelSubset
 
+            if message.subset and message.subset.dimensions:
+                # Vertical dimension subsetting via a variable, only handle one for now
+                subset_params['vertical_var'] = message.subset.dimensions[0].name
+                subset_params['vertical_min'] = message.subset.dimensions[0].min
+                subset_params['vertical_max'] = message.subset.dimensions[0].max
+
             subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
 
             try:

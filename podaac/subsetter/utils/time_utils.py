@@ -10,11 +10,13 @@ import datetime
 import operator
 import functools
 import re
+from typing import get_args
 import pandas as pd
 import numpy as np
 from dateutil import parser
 import julian
 import xarray as xr
+from xarray.core.types import NPDatetimeUnitOptions
 
 
 def _translate_timestamp(str_timestamp: str) -> datetime.datetime:
@@ -71,8 +73,12 @@ def _convert_time_from_description(seconds_since, description: str):
     Convert time array from seconds-since format using the description.
     """
     epoch = _extract_epoch(description)
-    epoch_dt64 = np.datetime64(epoch, 's')
-    delta = np.array(seconds_since) * np.timedelta64(1, 's')
+    epoch_dt64 = np.datetime64(epoch, 'ns')  # Use nanosecond precision
+
+    # Convert to float64 and then to nanoseconds to preserve precision
+    seconds_array = np.asarray(seconds_since, dtype=np.float64)
+    nanoseconds = (seconds_array * 1e9).astype('int64')
+    delta = nanoseconds.astype('timedelta64[ns]')
     result = epoch_dt64 + delta
     if isinstance(seconds_since, xr.DataArray):
         return xr.DataArray(result, coords=seconds_since.coords, dims=seconds_since.dims, attrs=seconds_since.attrs)
@@ -86,7 +92,18 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     """
     def build_cond(str_timestamp, compare):
         timestamp = pd.to_datetime(_translate_timestamp(str_timestamp)).to_datetime64()
-        time_data = dataset[time_var_name]
+
+        if time_var_name == '/solar_time':
+            reference_date = dataset.attrs.get('time_coverage_start')  # Replace with the correct date
+            ref_ts = pd.to_datetime(reference_date)
+            # Remove timezone if present
+            if hasattr(ref_ts, 'tzinfo') and ref_ts.tzinfo is not None:
+                ref_ts = ref_ts.tz_convert(None)
+            seconds = dataset['solar_time'].values
+            time_data = ref_ts + pd.to_timedelta(seconds, unit='s')
+        else:
+            time_data = dataset[time_var_name]
+
         dtype = time_data.dtype
         if np.issubdtype(dtype, np.datetime64):
             pass
@@ -101,7 +118,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
                 epoch_datetime = dataset[epoch_var].values[0]
                 timestamp -= epoch_datetime
         elif np.issubdtype(dtype, np.floating):
-            description = time_data.attrs.get('description')
+            description = time_data.attrs.get('description') or time_data.attrs.get('Units')
             long_name = time_data.attrs.get('long_name')
             if description:
                 epoch_datetime = _extract_epoch(description)
@@ -161,3 +178,29 @@ def _is_time_mjd(dataset: xr.Dataset, time_var_name: str) -> bool:
         if 'Modified Julian Day' in time_var.attrs['comment']:
             return True
     return False
+
+
+# taken from xarray.coding.times, could just import but it is a private
+# method to the times module
+def _numpy_to_netcdf_timeunit(units: NPDatetimeUnitOptions) -> str:
+    return {
+        "ns": "nanoseconds",
+        "us": "microseconds",
+        "ms": "milliseconds",
+        "s": "seconds",
+        "m": "minutes",
+        "h": "hours",
+        "D": "days",
+    }[units]
+
+
+def check_time_units(unit_str: str) -> str:
+    """
+    Checking if the time unit is a a numpy datetime unit, and
+    replacing with CF compliant unit via a lookup table if it is. """
+    unit_str_list = unit_str.split(" ")
+
+    unit = unit_str_list[0]
+    if unit in get_args(NPDatetimeUnitOptions):
+        unit_str_list[0] = _numpy_to_netcdf_timeunit(unit)
+    return " ".join(unit_str_list)

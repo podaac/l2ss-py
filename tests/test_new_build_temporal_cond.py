@@ -85,6 +85,47 @@ class TestNewBuildTemporalCond:
         expected = np.array([False, True, True, False])
         np.testing.assert_array_equal(result, expected)
 
+
+    def test_float64_without_description_but_with_units(self):
+        """
+        Test the case where time_data is float64/float32, has no description,
+        but has Units "seconds since 1993-01-01 00:00:00".
+        This should use REV_START_TIME from dataset attributes.
+        """
+        # Create time data with seconds since start
+        # Based off HIRDLS data structure where time /only/ has
+        # attributes 'Title', 'Units', and 'UniqueFieldDefinition'
+        time_data = xr.DataArray(
+            data=np.array([0.0, 3600.0, 7200.0, 10800.0], dtype=np.float64),
+            dims=['time'],
+            attrs={
+                'Units': 'seconds since 1993-01-01 00:00:00',
+                'Title': 'TAI Time'
+            }
+        )
+
+        dataset = xr.Dataset({
+            'time_var': time_data
+        })
+
+        min_time = '1993-01-01T01:00:00Z'
+        max_time = '1993-01-01T02:00:00Z'
+
+        # Test with both min and max time
+        result = build_temporal_cond(min_time, max_time, dataset, 'time_var')
+
+        # The result should be a DataArray with boolean values
+        assert isinstance(result, xr.DataArray)
+        assert result.dtype == bool
+        assert result.shape == (4,)
+
+        # The first time point (0 seconds) should be False (before min_time)
+        # The second time point (3600 seconds = 1 hour) should be True
+        # The third time point (7200 seconds = 2 hours) should be True
+        # The fourth time point (10800 seconds = 3 hours) should be False (after max_time)
+        expected = np.array([False, True, True, False])
+        np.testing.assert_array_equal(result.values, expected)
+
     def test_float32_with_description_attribute(self):
         """
         Test the case where time_data is float32 and has a description attribute.

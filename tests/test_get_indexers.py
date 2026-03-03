@@ -182,7 +182,6 @@ def test_random_dim():
     )
     indexers = get_indexers_from_nd(cond, cut=True)
     
-    print(indexers)
     assert 'x' in indexers
     assert 'y' in indexers
     assert len(indexers['x']) > 0

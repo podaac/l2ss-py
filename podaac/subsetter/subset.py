@@ -39,6 +39,7 @@ from podaac.subsetter.utils import spatial_utils
 from podaac.subsetter.utils import time_utils
 from podaac.subsetter.utils import file_utils
 from podaac.subsetter.utils import variables_utils
+from podaac.subsetter.vertical_subset import vertical_subset
 
 SERVICE_NAME = 'l2ss-py'
 
@@ -119,7 +120,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
                      cut: bool = True,
                      min_time: str = None,
                      max_time: str = None,
-                     pixel_subset: bool = False) -> np.ndarray:
+                     pixel_subset: bool = False,
+                     vertical_var: str = None,
+                     vertical_min: float = None,
+                     vertical_max: float = None) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -146,6 +150,12 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     pixel_subset : boolean
         Cut the lon lat based on the rows and columns within the bounding box,
         but could result with lon lats that are outside the bounding box
+    vertical_var : str, optional
+        Name of the vertical variable to subset by (e.g., depth, altitude)
+    vertical_min : float, optional
+        Minimum value for vertical subsetting (inclusive)
+    vertical_max : float, optional
+        Maximum value for vertical subsetting (inclusive)
 
     TODO: add docstring and type hint for `variables` parameter.
 
@@ -206,6 +216,10 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             subset_dictionary[lat_path] = operation
 
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
+
+    if vertical_var is not None:
+        return vertical_subset(dataset, return_dataset, lat_var_names, lon_var_names, vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max, cut=cut)
+
     return return_dataset
 
 
@@ -216,7 +230,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
            origin_source: str = None,
            lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (),
            pixel_subset: bool = False, stage_file_name_subsetted_true: str = None,
-           stage_file_name_subsetted_false: str = None
+           stage_file_name_subsetted_false: str = None,
+           vertical_var: str = None, vertical_min: float = None, vertical_max: float = None
            ) -> Union[np.ndarray, None]:
     """
     Subset a given NetCDF file given a bounding box
@@ -275,6 +290,12 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         stage file name if subsetting is true name depends on result of subset
     stage_file_name_subsetted_false: str
         stage file name if subsetting is false name depends on result of subset
+    vertical_var : str, optional
+        Name of the vertical variable to subset by (e.g., depth, altitude)
+    vertical_min : float, optional
+        Minimum value for vertical subsetting (inclusive)
+    vertical_max : float, optional
+        Maximum value for vertical subsetting (inclusive)
 
     # clean up time variable in SNDR before decode_times
     # SNDR.AQUA files have ascending node time blank
@@ -336,6 +357,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 lon_var_names=lon_var_names,
                 time_var_names=time_var_names
             )
+
             for time in time_var_names:
 
                 time_var = dataset[time]
@@ -353,10 +375,15 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 if calendar:
                     time_encoding[group_path][var_name]['calendar'] = calendar
                 if units:
-                    time_encoding[group_path][var_name]['units'] = units
-                time_encoding[group_path][var_name]['dtype'] = dtype
+                    if time != '/solar_time':
+                        time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
+                if dtype and units:
+                    time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
                     time_calendar_attributes[time] = calendar
+
+    if len(time_var_names) == 1 and (min_time or max_time) and time_var_names[0] == '/solar_time':
+        args['decode_times'] = False
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
@@ -430,13 +457,26 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 cut=cut,
                 min_time=min_time,
                 max_time=max_time,
-                pixel_subset=pixel_subset
+                pixel_subset=pixel_subset,
+                vertical_var=vertical_var,
+                vertical_min=vertical_min,
+                vertical_max=vertical_max
             )
         else:
             raise ValueError('Either bbox or shapefile must be provided')
 
-        metadata_utils.set_version_history(subsetted_dataset, cut, bbox, shapefile)
-        metadata_utils.set_json_history(subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source)
+        metadata_utils.set_version_history(
+            subsetted_dataset, cut, bbox, shapefile,
+            min_time=min_time, max_time=max_time,
+            vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max,
+            variables=variables, pixel_subset=pixel_subset
+        )
+        metadata_utils.set_json_history(
+            subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source,
+            min_time=min_time, max_time=max_time,
+            vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max,
+            variables=variables, pixel_subset=pixel_subset
+        )
 
         if time_calendar_attributes:
             for time_var, calendar in time_calendar_attributes.items():

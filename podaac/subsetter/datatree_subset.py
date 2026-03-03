@@ -276,7 +276,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
                 new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
-
                 # data with variables that shouldn't be subsetted
                 new_dataset_non_sub = indexed_ds[non_subset_vars]
 
@@ -351,7 +350,10 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         for child_name, child_node in node.children.items():
             # Process the child node
             current_path = f"{path}/{child_name}"
+            # If the child is in empty_paths, apply indexers if present to align dimensions recursively
             if current_path in empty_paths:
+                if indexers is not None:
+                    child_node = apply_indexers_to_tree(child_node, indexers)
                 processed_children[child_name] = child_node
             else:
                 child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
@@ -481,7 +483,7 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
         current_lat_coord_names = []
         current_lon_coord_names = []
 
-        dataset = xr.decode_cf(dataset)
+        dataset = xr.decode_cf(dataset, decode_times=False)
 
         def append_coords_pair(pair):
             lat_name, lon_name = pair
@@ -686,6 +688,9 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
         for path, ds in all_datasets:
             result = method(path, ds)
             if result:
+                # Normalize /sample_time to /solar_time for this unique case
+                if result == "/sample_time":
+                    return "/solar_time"
                 return result
     return None
 
@@ -1033,3 +1038,17 @@ def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
             ds[time_name + "_datetime"] = (ds["Year"].dims, np.array(new_time_list_dt))
 
     return ds
+
+
+def apply_indexers_to_tree(node: DataTree, indexers: dict) -> DataTree:
+    """
+    Recursively apply indexers to a DataTree node and all its descendants.
+    Returns a new DataTree with the same structure but with all datasets subsetted.
+    """
+    ds = node.ds
+    if ds is not None:
+        ds = ds.isel(**indexers, missing_dims='ignore')
+    new_node = DataTree(name=node.name, dataset=ds)
+    for child_name, child_node in node.children.items():
+        new_node[child_name] = apply_indexers_to_tree(child_node, indexers)
+    return new_node
