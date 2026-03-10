@@ -6,7 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+- Updated readme documentation
 ### Changed
+- Changed way Cygnss collection finds time variable
 ### Deprecated 
 ### Removed
 ### Fixed
