@@ -690,7 +690,10 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             if result:
                 # Normalize /sample_time to /solar_time for this unique case
                 if result == "/sample_time":
-                    return "/solar_time"
+                    # Check if '/solar_time' exists in the dataset
+                    if "/solar_time" in [f"/{v}" for v in ds.variables]:
+                        print('returning solar time')
+                        return "/solar_time"
                 return result
     return None
 

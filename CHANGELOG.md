@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 
 
+## [3.3.1]
+### Added
+- Updated readme documentation
+### Changed
+- Changed way Cygnss collection finds time variable
+### Deprecated 
+### Removed
+### Fixed
+### Security
+
+
 ## [3.3.0]
 ### Added
 - [issue/364] (https://github.com/podaac/l2ss-py/issues/364) Implement vertical subsetting via dimensions.
