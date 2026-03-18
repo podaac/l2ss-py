@@ -44,6 +44,33 @@ from podaac.subsetter.vertical_subset import vertical_subset
 SERVICE_NAME = 'l2ss-py'
 
 
+import numpy as np
+import xarray.coding.times
+
+# 1. Save the original Xarray function so we don't permanently break it
+original_decode_dtype = xarray.coding.times._decode_cf_datetime_dtype
+
+# 2. Define our custom, error-proof version
+def patched_decode_cf_datetime_dtype(data, units, calendar, use_cftime, time_unit="ns"):
+    try:
+        # First, try doing it the normal Xarray way
+        return original_decode_dtype(data, units, calendar, use_cftime, time_unit)
+    except ValueError as e:
+        # If it hits your specific "unable to decode time units" bug, intercept it!
+        if "unable to decode time units" in str(e):
+            # Bypass the test and force Xarray to assume the standard time types.
+            # It will replace the bad fill values with 'NaT' (Not a Time) later.
+            if use_cftime:
+                return np.dtype("O")  # Object type for cftime
+            else:
+                return np.dtype("datetime64[ns]")
+        
+        # If it's a different ValueError, raise it normally
+        raise e
+
+# 3. Inject our patched function back into Xarray's internals
+xarray.coding.times._decode_cf_datetime_dtype = patched_decode_cf_datetime_dtype
+
 def subset_with_shapefile_multi(dataset: xr.Dataset,
                                 lat_var_names: List[str],
                                 lon_var_names: List[str],
@@ -318,7 +345,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     """
 
     file_extension = os.path.splitext(file_to_subset)[1]
-    file_utils.override_decode_cf_datetime()
+    #file_utils.override_decode_cf_datetime()
 
     hdf_type = False
 
@@ -337,7 +364,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     if min_time or max_time:
         fill_value_f8 = nc.default_fillvals.get('f8')
         float_dtypes = ['float64', 'float32']
-        args['decode_times'] = True
+        args['decode_times'] = xr.coders.CFDatetimeCoder(use_cftime=True, time_unit="ns"),
         # try to open file to see if we can access the time variable
         try:
             with nc.Dataset(file_to_subset, 'r') as nc_dataset:

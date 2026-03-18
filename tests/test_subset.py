@@ -225,8 +225,8 @@ def test_history_metadata_append(data_dir, subset_output_dir, request):
         output_file=join(subset_output_dir, output_file)
     )
 
-    in_nc = xr.open_dataset(join(data_dir, test_file))
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
+    in_nc = xr.open_dataset(join(data_dir, test_file), decode_times=False)
+    out_nc = xr.open_dataset(join(subset_output_dir, output_file), decode_times=False)
 
     # Assert that the original granule contains history
     assert in_nc.attrs.get('history') is not None
@@ -253,7 +253,7 @@ def test_history_metadata_create(data_dir, subset_output_dir, request):
     output_file = "{}_{}".format(request.node.name, test_file)
 
     # Remove the 'history' metadata from the granule
-    in_nc = xr.open_dataset(join(data_dir, test_file))
+    in_nc = xr.open_dataset(join(data_dir, test_file), decode_times=False)
     del in_nc.attrs['history']
     in_nc.to_netcdf(join(subset_output_dir, 'int_{}'.format(output_file)), 'w')
 
@@ -263,7 +263,7 @@ def test_history_metadata_create(data_dir, subset_output_dir, request):
         output_file=join(subset_output_dir, output_file)
     )
 
-    out_nc = xr.open_dataset(join(subset_output_dir, output_file))
+    out_nc = xr.open_dataset(join(subset_output_dir, output_file), decode_times=False)
 
     # Assert that the input granule contains no history
     assert in_nc.attrs.get('history') is None
@@ -335,7 +335,7 @@ def test_data_1D(data_dir, subset_output_dir, request):
         output_file=join(subset_output_dir, output_file)
     )
 
-    xr.open_dataset(join(subset_output_dir, output_file))
+    xr.open_dataset(join(subset_output_dir, output_file), decode_times=False)
 
 def rename_variables_in_dtree(dtree: xr.DataTree, rename_dict: dict) -> xr.DataTree:
     for node in dtree.subtree:
@@ -509,7 +509,7 @@ def test_shapefile_subset(data_dir, subset_output_dir, request):
 
     # Check that each point of data is within the shapefile
     shapefile_df = gpd.read_file(shapefile_file_path)
-    with xr.open_dataset(output_file_path) as result_dataset:
+    with xr.open_dataset(output_file_path, decode_times=False) as result_dataset:
         def in_shape(lon, lat):
             if np.isnan(lon) or np.isnan(lat):
                 return
@@ -820,8 +820,8 @@ def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     )
     # check if the box_test is
 
-    in_nc = nc.Dataset(join(SNDR_dir, sndr_file))
-    out_nc = nc.Dataset(join(subset_output_dir, output_file))
+    in_nc = nc.Dataset(join(SNDR_dir, sndr_file), decode_times=False)
+    out_nc = nc.Dataset(join(subset_output_dir, output_file), decode_times=False)
 
     for var_name, _ in in_nc.variables.items():
         assert in_nc[var_name].shape == out_nc[var_name].shape
@@ -1603,7 +1603,7 @@ def test_bad_time_unit(subset_output_dir):
     nc_out_location = join(subset_output_dir, "bad_time.nc")
     ds.to_netcdf(nc_out_location)
 
-    file_utils.override_decode_cf_datetime()
+    #file_utils.override_decode_cf_datetime()
 
     ds_test = xr.open_dataset(nc_out_location)
     ds_test.close()
@@ -1813,7 +1813,7 @@ def test_json_history_metadata_create(history_json_schema, data_dir, subset_outp
         output_file=join(subset_output_dir, output_file)
     )
 
-    with xr.open_dataset(join(subset_output_dir, output_file)) as out_nc:
+    with xr.open_dataset(join(subset_output_dir, output_file), decode_times=False) as out_nc:
         history_json = json.loads(out_nc.attrs['history_json'])
 
     assert_history_metadata(
@@ -1843,7 +1843,7 @@ def test_json_history_metadata_create_origin_source(history_json_schema, data_di
         origin_source="fake_original_file.nc"
     )
 
-    with xr.open_dataset(join(subset_output_dir, output_file)) as out_nc:
+    with xr.open_dataset(join(subset_output_dir, output_file), decode_times=False) as out_nc:
         history_json = json.loads(out_nc.attrs['history_json'])
 
     assert_history_metadata(
