@@ -330,9 +330,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
         if '.HDF5' == file_extension:
-            for group in dataset.groups:
-                if "ScanTime" in group:
-                    hdf_type = 'GPM'
+            hdf_type = file_utils.get_hdf_type(dataset)
 
     if min_time or max_time:
         fill_value_f8 = nc.default_fillvals.get('f8')
@@ -398,7 +396,6 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
-        hdf_type = file_utils.get_hdf_type(dataset)
 
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset,
