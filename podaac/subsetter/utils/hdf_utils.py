@@ -1,11 +1,10 @@
-from xarray.core.datatree import DataTree
-
 import re
 from collections import defaultdict
 import warnings
 
 import numpy as np
 import xarray as xr
+from xarray.core.datatree import DataTree
 
 
 _PHONY_RE = re.compile(r'^phony_dim_(\d+)$')
