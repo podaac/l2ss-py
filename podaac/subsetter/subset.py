@@ -40,6 +40,7 @@ from podaac.subsetter.utils import time_utils
 from podaac.subsetter.utils import file_utils
 from podaac.subsetter.utils import variables_utils
 from podaac.subsetter.vertical_subset import vertical_subset
+from podaac.subsetter.utils import hdf_utils
 
 SERVICE_NAME = 'l2ss-py'
 
@@ -396,6 +397,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
+        if hdf_type:
+            dataset = hdf_utils.rename_phony_dims(dataset)
 
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset,
