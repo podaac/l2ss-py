@@ -1,0 +1,260 @@
+from xarray.core.datatree import DataTree
+
+import re
+from collections import defaultdict
+import warnings
+
+import numpy as np
+import xarray as xr
+
+
+_PHONY_RE = re.compile(r'^phony_dim_(\d+)$')
+
+def _is_phony(dim: str) -> bool:
+    return _PHONY_RE.match(dim) is not None
+
+
+def _phony_index(dim: str) -> int:
+    m = _PHONY_RE.match(dim)
+    return int(m.group(1)) if m else -1
+
+
+def rename_phony_dims(dt: DataTree) -> DataTree:
+    """
+    Return a new DataTree with all phony_dim_N dimensions renamed to
+    meaningful names.  The three strategies are tried in priority order;
+    the first one that produces a non-empty mapping is used.
+
+    Parameters
+    ----------
+    dt : DataTree
+        Tree loaded from an HDF/HDF-EOS5 file
+
+    Returns
+    -------
+    DataTree
+        A new tree with renamed dimensions.
+    """
+    mapping = _mapping_from_dimension_names(dt)
+
+    if not mapping:
+        mapping = _mapping_from_struct_metadata(dt)
+
+    if not mapping:
+        return dt
+
+    return _apply_mapping(dt, mapping)
+
+
+def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
+    """
+    Iterate every variable in every group.  If a variable carries a
+    DimensionNames attribute (comma-separated list of real dim names),
+    zip those names against the variable's current (phony) dim names to
+    build the global mapping.
+
+    A variable with dims (phony_dim_0, phony_dim_1) and attribute
+    DimensionNames = "nTimes,nXtrack" results in {phony_dim_0: nTimes,
+    phony_dim_1: nXtrack}
+    """
+    mapping: dict[str, str] = {}
+
+    for node in dt.subtree:
+        ds = node.ds
+        if ds is None:
+            continue
+        for var_name, da in ds.items():
+            dim_names_attr = da.attrs.get("DimensionNames")
+            if dim_names_attr is None:
+                continue
+
+            real_names = [n.strip() for n in dim_names_attr.split(",")]
+
+            # if attribute shapes mismatch, then continue
+            if len(real_names) != len(da.dims):
+                continue
+
+            for phony, real in zip(da.dims, real_names):
+                if not _is_phony(phony):
+                    continue
+                existing = mapping.get(phony)
+                if existing is not None and existing != real:
+                    # if two variables disagree on what this phony dim
+                    # should be called then keep the first assignment and warn.
+                    warnings.warn(
+                        f"Conflicting DimensionNames for {phony!r}: "
+                        f"{existing!r} vs {real!r}.  Keeping {existing!r}."
+                    )
+                else:
+                    mapping[phony] = real
+
+    return mapping
+
+
+def _mapping_from_struct_metadata(dt: DataTree) -> dict[str, str]:
+    """
+    Locate the StructMetadata.0 variable (typically at /HDFEOS
+    INFORMATION), parse its ODL (Object Description Language) content
+    to extract every named dimension and its size, then match those
+    against the phony dims in the tree by size.
+
+    Returns an empty dict if no StructMetadata.0 is found or parsing
+    fails.
+    """
+    struct_text = _find_struct_metadata(dt)
+    if not struct_text:
+        return {}
+
+    # parse named dimensions: {dim_name: size}
+    named_dims = _parse_odl_dimensions(struct_text)
+    if not named_dims:
+        return {}
+
+    # Build size -> name lookup. If two dims share a size we keep both and
+    # later rely on positional ordering within each group.
+    size_to_names: dict[int, list[str]] = defaultdict(list)
+    for name, size in named_dims.items():
+        size_to_names[size].append(name)
+
+    return _match_phony_to_named(dt, size_to_names, named_dims)
+
+
+def _find_struct_metadata(dt: DataTree) -> str | None:
+    """Return the decoded text of StructMetadata.0 if present anywhere
+    in the tree.
+    """
+    for node in dt.subtree:
+        ds = node.ds
+        if ds is None:
+            continue
+        for var_name in ds.data_vars:
+            if "StructMetadata" in var_name:
+                raw = ds[var_name].values
+                # may be bytes, numpy bytes_, or already a string
+                if isinstance(raw, (bytes, np.bytes_)):
+                    return raw.decode("utf-8", errors="replace")
+                if hasattr(raw, "item"):
+                    val = raw.item()
+                    if isinstance(val, (bytes, np.bytes_)):
+                        return val.decode("utf-8", errors="replace")
+                    return str(val)
+                return str(raw)
+    return None
+
+
+def _parse_odl_dimensions(odl_text: str) -> dict[str, int]:
+    """
+    Extract all ``DimensionName`` / ``Size`` pairs from an ODL
+    metadata block.
+
+    ODL blocks look like
+
+        OBJECT=Dimension_1
+            DimensionName="nTimes"
+            Size=1496
+        END_OBJECT=Dimension_1
+    """
+    named_dims: dict[str, int] = {}
+
+    # split on END_OBJECT boundaries so we can parse each object block
+    blocks = re.split(r'END_OBJECT\s*=\s*\w+', odl_text)
+    for block in blocks:
+        dim_name_match = re.search(r'DimensionName\s*=\s*"([^"]+)"', block)
+        size_match     = re.search(r'\bSize\s*=\s*(\d+)', block)
+        if dim_name_match and size_match:
+            name = dim_name_match.group(1).strip()
+            size = int(size_match.group(1))
+            named_dims[name] = size
+
+    return named_dims
+
+
+def _match_phony_to_named(
+    dt: DataTree,
+    size_to_names: dict[int, list[str]],
+    named_dims: dict[str, int],
+) -> dict[str, str]:
+    """
+    For every phony dim in the tree, look up its size in ``size_to_names``.
+
+    - If only one real name has that size, the mapping is unambiguous.
+    - If multiple real names share the same size, we use the *position* of
+      the phony dim within its group's sorted dimension list to pick among
+      the candidates (ordered as they appear in the ODL block).
+    """
+    # ordered list of all named dims so we can use index as a tiebreaker
+    ordered_named = list(named_dims.keys())
+
+    mapping: dict[str, str] = {}
+
+    for node in dt.subtree:
+        ds = node.ds
+        if ds is None:
+            continue
+
+        # phony dims in this group sorted by their index (N in
+        # phony_dim_N)
+        local_phonies = sorted(
+            [d for d in ds.dims if _is_phony(d)],
+            key=_phony_index
+        )
+
+        for phony in local_phonies:
+            size = ds.dims[phony]
+            candidates = size_to_names.get(size, [])
+            if not candidates:
+                continue
+            if len(candidates) == 1:
+                mapping[phony] = candidates[0]
+            else:
+                # use the position of this phony dim among same-size dims in
+                # this group to index into the ordered candidate list.
+                same_size_in_group = [
+                    p for p in local_phonies if ds.dims[p] == size
+                ]
+                pos = same_size_in_group.index(phony)
+                # sort candidates by their order in the odl block
+                ordered_candidates = sorted(
+                    candidates, key=lambda n: ordered_named.index(n)
+                )
+                if pos < len(ordered_candidates):
+                    mapping[phony] = ordered_candidates[pos]
+
+    return mapping
+
+
+
+def _apply_mapping(dt: DataTree, mapping: dict[str, str]) -> DataTree:
+    """
+    Walk the tree, apply rename_dims to every group dataset that contains
+    any of the phony dims in ``mapping``, then reconstruct the entire tree
+    from a flat path -> dataset dict using DataTree.from_dict.
+
+    This avoids any direct node copying and is the idiomatic way to rebuild
+    a modified DataTree.
+    """
+    path_to_ds: dict[str, xr.Dataset] = {}
+
+    for node in dt.subtree:
+        ds = node.ds if node.ds is not None else xr.Dataset()
+
+        local_mapping = {k: v for k, v in mapping.items() if k in ds.dims}
+        if local_mapping:
+            ds = ds.rename_dims(local_mapping)
+
+        path_to_ds[node.path] = ds
+
+    return DataTree.from_dict(path_to_ds)
+
+
+def _transform_tree(node: DataTree, fn) -> DataTree:
+    """Recursively apply fn to every node and reconstruct the tree."""
+    new_children = {
+        name: _transform_tree(child, fn)
+        for name, child in node.children.items()
+    }
+    new_node = fn(node)
+    # attach renamed children
+    for name, child in new_children.items():
+        new_node[name] = child
+    return new_node
