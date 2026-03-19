@@ -7,7 +7,8 @@ import xarray as xr
 from xarray.core.datatree import DataTree
 
 
-_PHONY_RE = re.compile(r'^phony_dim_(\d+)$')
+_PHONY_RE = re.compile(r"^phony_dim_(\d+)$")
+
 
 def _is_phony(dim: str) -> bool:
     return _PHONY_RE.match(dim) is not None
@@ -156,10 +157,10 @@ def _parse_odl_dimensions(odl_text: str) -> dict[str, int]:
     named_dims: dict[str, int] = {}
 
     # split on END_OBJECT boundaries so we can parse each object block
-    blocks = re.split(r'END_OBJECT\s*=\s*\w+', odl_text)
+    blocks = re.split(r"END_OBJECT\s*=\s*\w+", odl_text)
     for block in blocks:
         dim_name_match = re.search(r'DimensionName\s*=\s*"([^"]+)"', block)
-        size_match     = re.search(r'\bSize\s*=\s*(\d+)', block)
+        size_match = re.search(r"\bSize\s*=\s*(\d+)", block)
         if dim_name_match and size_match:
             name = dim_name_match.group(1).strip()
             size = int(size_match.group(1))
@@ -193,10 +194,7 @@ def _match_phony_to_named(
 
         # phony dims in this group sorted by their index (N in
         # phony_dim_N)
-        local_phonies = sorted(
-            [d for d in ds.dims if _is_phony(d)],
-            key=_phony_index
-        )
+        local_phonies = sorted([d for d in ds.dims if _is_phony(d)], key=_phony_index)
 
         for phony in local_phonies:
             size = ds.dims[phony]
@@ -208,9 +206,7 @@ def _match_phony_to_named(
             else:
                 # use the position of this phony dim among same-size dims in
                 # this group to index into the ordered candidate list.
-                same_size_in_group = [
-                    p for p in local_phonies if ds.dims[p] == size
-                ]
+                same_size_in_group = [p for p in local_phonies if ds.dims[p] == size]
                 pos = same_size_in_group.index(phony)
                 # sort candidates by their order in the odl block
                 ordered_candidates = sorted(
@@ -220,7 +216,6 @@ def _match_phony_to_named(
                     mapping[phony] = ordered_candidates[pos]
 
     return mapping
-
 
 
 def _apply_mapping(dt: DataTree, mapping: dict[str, str]) -> DataTree:
@@ -249,8 +244,7 @@ def _apply_mapping(dt: DataTree, mapping: dict[str, str]) -> DataTree:
 def _transform_tree(node: DataTree, fn) -> DataTree:
     """Recursively apply fn to every node and reconstruct the tree."""
     new_children = {
-        name: _transform_tree(child, fn)
-        for name, child in node.children.items()
+        name: _transform_tree(child, fn) for name, child in node.children.items()
     }
     new_node = fn(node)
     # attach renamed children

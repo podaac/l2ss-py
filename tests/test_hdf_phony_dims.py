@@ -4,6 +4,7 @@ from xarray.core.datatree import DataTree
 
 from podaac.subsetter.utils.hdf_utils import rename_phony_dims
 
+
 def make_tree(groups: dict[str, xr.Dataset]) -> DataTree:
     return DataTree.from_dict(groups)
 
@@ -26,20 +27,24 @@ def test_dimension_names_single_group():
 
 def test_dimension_names_match_across_groups():
     da_data = xr.DataArray(
-        [[1.0, 2.0]], dims=[phony(0), phony(1)],
+        [[1.0, 2.0]],
+        dims=[phony(0), phony(1)],
         attrs={"DimensionNames": "nTimes,nXtrack"},
     )
     da_geo = xr.DataArray(
-        [[3.0, 4.0]], dims=[phony(2), phony(3)],
+        [[3.0, 4.0]],
+        dims=[phony(2), phony(3)],
         attrs={"DimensionNames": "nTimes,nXtrack"},
     )
-    dt = make_tree({
-        "/Data Fields":        xr.Dataset({"ColumnAmount": da_data}),
-        "/Geolocation Fields": xr.Dataset({"Latitude": da_geo}),
-    })
+    dt = make_tree(
+        {
+            "/Data Fields": xr.Dataset({"ColumnAmount": da_data}),
+            "/Geolocation Fields": xr.Dataset({"Latitude": da_geo}),
+        }
+    )
     result = rename_phony_dims(dt)
     data_dims = result["/Data Fields"].ds["ColumnAmount"].dims
-    geo_dims  = result["/Geolocation Fields"].ds["Latitude"].dims
+    geo_dims = result["/Geolocation Fields"].ds["Latitude"].dims
     assert data_dims == geo_dims == ("nTimes", "nXtrack")
 
 
@@ -63,23 +68,28 @@ def test_size_matching_different_sizes_get_different_names():
 
 def test_dimension_names_independent_swaths_do_not_share_dims():
     da1 = xr.DataArray(
-        [[1.0, 2.0]], dims=[phony(0), phony(1)],
+        [[1.0, 2.0]],
+        dims=[phony(0), phony(1)],
         attrs={"DimensionNames": "nTimesA,nXtrackA"},
     )
     da2 = xr.DataArray(
-        [[3.0, 4.0]], dims=[phony(2), phony(3)],
+        [[3.0, 4.0]],
+        dims=[phony(2), phony(3)],
         attrs={"DimensionNames": "nTimesB,nXtrackB"},
     )
-    dt = make_tree({
-        "/HDFEOS/SWATHS/SwathA/Data Fields": xr.Dataset({"a": da1}),
-        "/HDFEOS/SWATHS/SwathB/Data Fields": xr.Dataset({"b": da2}),
-    })
+    dt = make_tree(
+        {
+            "/HDFEOS/SWATHS/SwathA/Data Fields": xr.Dataset({"a": da1}),
+            "/HDFEOS/SWATHS/SwathB/Data Fields": xr.Dataset({"b": da2}),
+        }
+    )
     result = rename_phony_dims(dt)
     dims_a = result["/HDFEOS/SWATHS/SwathA/Data Fields"].ds["a"].dims
     dims_b = result["/HDFEOS/SWATHS/SwathB/Data Fields"].ds["b"].dims
     assert dims_a == ("nTimesA", "nXtrackA")
     assert dims_b == ("nTimesB", "nXtrackB")
     assert set(dims_a).isdisjoint(set(dims_b))
+
 
 def test_struct_metadata_renames_dims():
     odl = (
@@ -89,11 +99,11 @@ def test_struct_metadata_renames_dims():
         "END_GROUP=DimensionMap\n"
         "GROUP=Dimension\n"
         "OBJECT=Dimension_1\n"
-        "DimensionName=\"nTimes\"\n"
+        'DimensionName="nTimes"\n'
         "Size=1496\n"
         "END_OBJECT=Dimension_1\n"
         "OBJECT=Dimension_2\n"
-        "DimensionName=\"nXtrack\"\n"
+        'DimensionName="nXtrack"\n'
         "Size=60\n"
         "END_OBJECT=Dimension_2\n"
         "END_GROUP=Dimension\n"
@@ -105,13 +115,16 @@ def test_struct_metadata_renames_dims():
         [[1.0] * 60] * 1496,
         dims=[phony(0), phony(1)],
     )
-    dt = make_tree({
-        "/HDFEOS INFORMATION":                       xr.Dataset({"StructMetadata.0": struct_da}),
-        "/HDFEOS/SWATHS/MySWATH/Data Fields":        xr.Dataset({"ColumnAmount": da}),
-    })
+    dt = make_tree(
+        {
+            "/HDFEOS INFORMATION": xr.Dataset({"StructMetadata.0": struct_da}),
+            "/HDFEOS/SWATHS/MySWATH/Data Fields": xr.Dataset({"ColumnAmount": da}),
+        }
+    )
     result = rename_phony_dims(dt)
     dims = result["/HDFEOS/SWATHS/MySWATH/Data Fields"].ds["ColumnAmount"].dims
     assert dims == ("nTimes", "nXtrack")
+
 
 def test_no_phony_dims_returns_unchanged():
     da = xr.DataArray([[1.0]], dims=["x", "y"])
