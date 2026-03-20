@@ -1,6 +1,5 @@
-import pytest
 import xarray as xr
-from xarray.core.datatree import DataTree
+from xarray import DataTree
 
 from podaac.subsetter.utils.hdf_utils import rename_phony_dims
 

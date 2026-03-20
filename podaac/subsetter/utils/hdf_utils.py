@@ -4,7 +4,7 @@ import warnings
 
 import numpy as np
 import xarray as xr
-from xarray.core.datatree import DataTree
+from xarray import DataTree
 
 
 _PHONY_RE = re.compile(r"^phony_dim_(\d+)$")
