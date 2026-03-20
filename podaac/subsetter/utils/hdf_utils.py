@@ -239,15 +239,3 @@ def _apply_mapping(dt: DataTree, mapping: dict[str, str]) -> DataTree:
         path_to_ds[node.path] = ds
 
     return DataTree.from_dict(path_to_ds)
-
-
-def _transform_tree(node: DataTree, fn) -> DataTree:
-    """Recursively apply fn to every node and reconstruct the tree."""
-    new_children = {
-        name: _transform_tree(child, fn) for name, child in node.children.items()
-    }
-    new_node = fn(node)
-    # attach renamed children
-    for name, child in new_children.items():
-        new_node[name] = child
-    return new_node
