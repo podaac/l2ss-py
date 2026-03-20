@@ -44,6 +44,7 @@ from podaac.subsetter.utils import hdf_utils
 
 SERVICE_NAME = 'l2ss-py'
 
+_HDF_EXTENSIONS: list[str] = ['.hdf5', '.he5', '.h5', '.hdf']
 
 def subset_with_shapefile_multi(dataset: xr.Dataset,
                                 lat_var_names: List[str],
@@ -330,7 +331,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     }
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
-        if '.HDF5' == file_extension:
+        if file_extension.lower() in _HDF_EXTENSIONS:
             hdf_type = file_utils.get_hdf_type(dataset)
 
     if min_time or max_time:
@@ -407,7 +408,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
 
-        if '.HDF5' == file_extension:
+        # note(ocs): I believe this only applies to GPM, but checking
+        #            against general hdf until certain
+        if hdf_type:
             new_time_var_names = []
             for group in dataset.groups:
                 if "ScanTime" in group:
