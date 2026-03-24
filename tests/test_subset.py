@@ -1646,23 +1646,149 @@ def test_get_unique_groups():
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
 
-def test_subset_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
+@pytest.fixture(scope="session")
+def fake_gpm_file(tmp_path_factory):
+    """
+    Create fake gpm data at run time which mirrors structure and behavior of data pulled from CMR
+
+    Will create data which mirrors how libnetcdf resolves dimension
+    names with when reading data from CMR. Dimension names are given
+    phony between groups even if dimension is shared. E.g. all data
+    variables will share the same dimensions "nTimes,nXtrack", but
+    will be given phony_dim names as seen below
+
+    Group:
+        /HDFEOS/SWATHS/GPM_DPR/Data Fields
+            Dimensions:                (phony_dim_0: 10, phony_dim_1: 5)
+            Dimensions without coordinates: phony_dim_0, phony_dim_1
+            Data variables:
+                precipRateNearSurface  (phony_dim_0, phony_dim_1)
+        Group: /HDFEOS/SWATHS/GPM_DPR/Geolocation Fields
+            Dimensions:    (phony_dim_2: 10, phony_dim_3: 5)
+            Dimensions without coordinates: phony_dim_2, phony_dim_3
+            Data variables:
+                Latitude   (phony_dim_2, phony_dim_3)
+                Longitude  (phony_dim_2, phony_dim_3)
+
+
+    """
+    filepath = tmp_path_factory.mktemp("data") / "fake_gpm.HDF5"
+
+    with h5py.File(filepath, "w") as f:
+
+        # mirror the real gpm HDFEOS group structure
+        data_fields = f.require_group("HDFEOS/SWATHS/GPM_DPR/Data Fields")
+        geo_fields  = f.require_group("HDFEOS/SWATHS/GPM_DPR/Geolocation Fields")
+        scan_time   = f.require_group("HDFEOS/SWATHS/GPM_DPR/ScanTime")
+
+        info        = f.require_group("HDFEOS INFORMATION")
+
+        n_times  = 10
+        n_xtrack = 5
+
+        # write data fields variable with dimensionnames attr as gpm does
+        precip = data_fields.create_dataset(
+            "precipRateNearSurface",
+            data=np.random.rand(n_times, n_xtrack).astype(np.float32),
+        )
+        precip.attrs["DimensionNames"] = "nTimes,nXtrack"
+        precip.attrs["Units"]          = "mm/hr"
+        precip.attrs["MissingValue"]   = -9999.9
+
+        # geolocation fields variables
+        lat = geo_fields.create_dataset(
+            "Latitude",
+            data=np.linspace(-90, 90, n_times * n_xtrack)
+                   .reshape(n_times, n_xtrack)
+                   .astype(np.float32),
+        )
+        lat.attrs["DimensionNames"] = "nTimes,nXtrack"
+        lat.attrs["Units"]          = "degrees_north"
+
+        lon = geo_fields.create_dataset(
+            "Longitude",
+            data=np.linspace(-180, 180, n_times * n_xtrack)
+                   .reshape(n_times, n_xtrack)
+                   .astype(np.float32),
+        )
+        lon.attrs["DimensionNames"] = "nTimes,nXtrack"
+        lon.attrs["Units"]          = "degrees_east"
+
+        # scantime variables
+        year_data   = np.full(n_times, 2021,    dtype=np.float32)
+        month_data  = np.full(n_times, 5,       dtype=np.float32)
+        day_data    = np.full(n_times, 30,      dtype=np.float32)
+        hour_data   = np.full(n_times, 9,       dtype=np.float32)
+        minute_data = np.full(n_times, 57,      dtype=np.float32)
+        second_data = np.full(n_times, 0.0,     dtype=np.float32)
+        milli_data  = np.full(n_times, 0.0,     dtype=np.float32)
+        doy_data    = np.full(n_times, 150,     dtype=np.float32)
+        sod_data    = np.full(n_times, 35820.0, dtype=np.float64)
+
+        for name, data in [
+            ("Year",        year_data),
+            ("Month",       month_data),
+            ("DayOfMonth",  day_data),
+            ("Hour",        hour_data),
+            ("Minute",      minute_data),
+            ("Second",      second_data),
+            ("MilliSecond", milli_data),
+            ("DayOfYear",   doy_data),
+            ("SecondOfDay", sod_data),
+        ]:
+            ds = scan_time.create_dataset(name, data=data)
+            ds.attrs["DimensionNames"] = "nTimes"
+
+        # structmetadata
+        odl = (
+            "GROUP=SwathStructure\n"
+            "GROUP=SWATH_1\n"
+            "SwathName=\"GPM_DPR\"\n"
+            "GROUP=Dimension\n"
+            "OBJECT=Dimension_1\n"
+            "DimensionName=\"nTimes\"\n"
+            f"Size={n_times}\n"
+            "END_OBJECT=Dimension_1\n"
+            "OBJECT=Dimension_2\n"
+            "DimensionName=\"nXtrack\"\n"
+            f"Size={n_xtrack}\n"
+            "END_OBJECT=Dimension_2\n"
+            "END_GROUP=Dimension\n"
+            "END_GROUP=SWATH_1\n"
+            "END_GROUP=SwathStructure\n"
+        )
+        info.create_dataset("StructMetadata.0", data=odl)
+
+    return filepath
+
+
+def test_subset_gpm_compute_new_var_data(fake_gpm_file, data_dir, subset_output_dir, request):
     """Test GPM files that have scantime variable to compute the time for seconds
     since 1980-01-06"""
-    
-    gpm_dir = join(data_dir, 'GPM')
-    gpm_file = 'GPM_test_file_2.HDF5'  # Keep the correct file name
+
+    with xr.open_datatree(fake_gpm_file) as dtree:
+        print(dtree)
+        for node in dtree.subtree:
+            ds = node.ds
+            if isinstance(ds, xr.Dataset):
+                dims = ds.dims.keys()
+
+                # ensure that test data is being read by netcdf backend with phony dim names
+                # like we expect from GPM data from CMR
+                for dim in dims:
+                    assert 'phony' in dim, f"Unexpected non 'phony' dimension found: {dim}"
+
 
     # Correct bbox with (min_lon, min_lat) and (max_lon, max_lat)
     bbox = np.array(((-180, 90), (-90, 90)))
 
-    output_file = f"gpm_test_{gpm_file}"  # Keep the extension
+    output_file = f"gpm_test_subset.HDF5"  # Keep the extension
     subset_output_file = join(subset_output_dir, output_file)
     subset.subset(
-        file_to_subset=join(gpm_dir, gpm_file),  
+        file_to_subset=fake_gpm_file,#join(gpm_dir, gpm_file),
         bbox=bbox,
         output_file=subset_output_file
-    )    
+    )
 
     # Open subsetted file using xarray-datatree
     dtree = xr.open_datatree(subset_output_file)
