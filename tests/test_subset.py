@@ -1767,7 +1767,6 @@ def test_subset_gpm_compute_new_var_data(fake_gpm_file, data_dir, subset_output_
     since 1980-01-06"""
 
     with xr.open_datatree(fake_gpm_file) as dtree:
-        print(dtree)
         for node in dtree.subtree:
             ds = node.ds
             if isinstance(ds, xr.Dataset):
