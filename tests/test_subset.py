@@ -1785,7 +1785,7 @@ def test_subset_gpm_compute_new_var_data(fake_gpm_file, data_dir, subset_output_
     output_file = f"gpm_test_subset.HDF5"  # Keep the extension
     subset_output_file = join(subset_output_dir, output_file)
     subset.subset(
-        file_to_subset=fake_gpm_file,#join(gpm_dir, gpm_file),
+        file_to_subset=fake_gpm_file,
         bbox=bbox,
         output_file=subset_output_file
     )
