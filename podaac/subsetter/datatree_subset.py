@@ -1001,8 +1001,7 @@ def clean_inherited_coords(dt: DataTree) -> DataTree:
 
 def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
     """
-    Update dataset dimensions based on 'DimensionNames' attributes and compute a time variable
-    if not present, using values from the dataset.
+    Compute a time variable if not present, using values from the dataset.
     """
     ds = og_ds.copy()
 

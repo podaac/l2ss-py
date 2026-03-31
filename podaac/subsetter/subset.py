@@ -40,9 +40,11 @@ from podaac.subsetter.utils import time_utils
 from podaac.subsetter.utils import file_utils
 from podaac.subsetter.utils import variables_utils
 from podaac.subsetter.vertical_subset import vertical_subset
+from podaac.subsetter.utils import hdf_utils
 
 SERVICE_NAME = 'l2ss-py'
 
+_HDF_EXTENSIONS: list[str] = ['.hdf5', '.he5', '.h5', '.hdf']
 
 def subset_with_shapefile_multi(dataset: xr.Dataset,
                                 lat_var_names: List[str],
@@ -329,10 +331,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     }
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
-        if '.HDF5' == file_extension:
-            for group in dataset.groups:
-                if "ScanTime" in group:
-                    hdf_type = 'GPM'
+        if file_extension.lower() in _HDF_EXTENSIONS:
+            hdf_type = file_utils.get_hdf_type(dataset)
 
     if min_time or max_time:
         fill_value_f8 = nc.default_fillvals.get('f8')
@@ -398,7 +398,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
-        hdf_type = file_utils.get_hdf_type(dataset)
+        if hdf_type:
+            dataset = hdf_utils.rename_phony_dims(dataset)
 
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset,
@@ -407,7 +408,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
 
-        if '.HDF5' == file_extension:
+        # note(ocs): I believe this only applies to GPM, but checking
+        #            against general hdf until certain
+        if hdf_type:
             new_time_var_names = []
             for group in dataset.groups:
                 if "ScanTime" in group:
