@@ -1,11 +1,18 @@
+"""
+===============
+hdf_utils.py
+===============
+
+Utility functions for handling HDF files, and dimension recovery
+"""
+
 import re
-from collections import defaultdict
 import warnings
+from collections import defaultdict
 
 import numpy as np
 import xarray as xr
 from xarray import DataTree
-
 
 _PHONY_RE = re.compile(r"^phony_dim_(\d+)$")
 
@@ -63,7 +70,7 @@ def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
         ds = node.ds
         if ds is None:
             continue
-        for var_name, da in ds.items():
+        for _, da in ds.items():
             dim_names_attr = da.attrs.get("DimensionNames")
             if dim_names_attr is None:
                 continue
@@ -209,9 +216,7 @@ def _match_phony_to_named(
                 same_size_in_group = [p for p in local_phonies if ds.dims[p] == size]
                 pos = same_size_in_group.index(phony)
                 # sort candidates by their order in the odl block
-                ordered_candidates = sorted(
-                    candidates, key=lambda n: ordered_named.index(n)
-                )
+                ordered_candidates = sorted(candidates, key=ordered_named.index)
                 if pos < len(ordered_candidates):
                     mapping[phony] = ordered_candidates[pos]
 
