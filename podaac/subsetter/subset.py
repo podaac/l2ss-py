@@ -46,6 +46,7 @@ SERVICE_NAME = 'l2ss-py'
 
 _HDF_EXTENSIONS: list[str] = ['.hdf5', '.he5', '.h5', '.hdf']
 
+
 def subset_with_shapefile_multi(dataset: xr.Dataset,
                                 lat_var_names: List[str],
                                 lon_var_names: List[str],
