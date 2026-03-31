@@ -74,14 +74,21 @@ def test_access_sst_dtime_values(nc_dataset):
 
 def get_hdf_type(tree: DataTree) -> Optional[str]:
     """
-    Determine the HDF type (OMI or MLS) from a DataTree object.
+    Determine the HDF type (OMI, MLS, or GPM) from a DataTree object.
     """
     try:
+        # GPM
+        for group in tree.groups:
+            if "ScanTime" in group:
+                return 'GPM'
+
+        # try to get types from instrument name
         additional_attrs = tree['/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES']
         if additional_attrs is not None and 'InstrumentName' in additional_attrs.attrs:
             instrument = additional_attrs.attrs['InstrumentName']
             if isinstance(instrument, bytes):
                 instrument = instrument.decode("utf-8")
+
         else:
             return None
         if 'OMI' in instrument:
