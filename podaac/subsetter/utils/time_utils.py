@@ -133,9 +133,7 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
                 date = datetime.datetime.fromisoformat(start_time.replace("Z", "+00:00")).date()
                 seconds_in_day = dataset['/HDFEOS/SWATHS/MOP02/Geolocation Fields/SecondsinDay']
                 start_date = pd.to_datetime(date, format="%Y-%j")
-                print(start_date)
                 time_data = np.datetime64(start_date) + seconds_in_day.values.astype('timedelta64[s]')
-                print(time_data)
         if getattr(time_data, 'long_name', None) == "reference time of sst file":
             base_time = dataset['time'].astype('datetime64[s]')
             offset = dataset['sst_dtime'].astype('timedelta64[s]')
@@ -146,7 +144,6 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
         temporal_conds.append(build_cond(min_time, operator.ge))
     if max_time:
         temporal_conds.append(build_cond(max_time, operator.le))
-    print(temporal_conds)
     return functools.reduce(operator.and_, temporal_conds, True)
 
 
