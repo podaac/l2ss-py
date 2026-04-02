@@ -131,12 +131,10 @@ def _find_scope_roots(dt: DataTree) -> list[DataTree]:
     """
     candidates = []
     for node in dt.subtree:
-        path = node.path.rstrip("/")
+        path = node.path.rstrip("/").casefold()
         if path in (
-            "/HDFEOS/SWATHS",
-            "/HDFEOS/GRIDS",
-            "/HDFEOS/Swaths",
-            "/HDFEOS/Grids",
+            "/hdfeos/swaths",
+            "/hdfeos/grids",
         ):
             candidates.extend(node.children.values())
     return candidates
