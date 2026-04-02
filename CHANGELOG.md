@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Removed
 ### Fixed
 - [issue/394] (https://github.com/podaac/l2ss-py/issues/394) Fixes HDF handling with datatree
+- [issue/394] (https://github.com/podaac/l2ss-py/issues/394) Update ODL parser to handle multi swath/grid collections
 ### Security
 
 

@@ -1,7 +1,6 @@
 import xarray as xr
-from xarray import DataTree
-
 from podaac.subsetter.utils.hdf_utils import rename_phony_dims
+from xarray import DataTree
 
 
 def make_tree(groups: dict[str, xr.Dataset]) -> DataTree:
@@ -94,8 +93,7 @@ def test_struct_metadata_renames_dims():
     odl = (
         "GROUP=SwathStructure\n"
         "GROUP=SWATH_1\n"
-        "GROUP=DimensionMap\n"
-        "END_GROUP=DimensionMap\n"
+        'SwathName="MySWATH\n"'
         "GROUP=Dimension\n"
         "OBJECT=Dimension_1\n"
         'DimensionName="nTimes"\n'
@@ -106,6 +104,8 @@ def test_struct_metadata_renames_dims():
         "Size=60\n"
         "END_OBJECT=Dimension_2\n"
         "END_GROUP=Dimension\n"
+        "GROUP=DimensionMap\n"
+        "END_GROUP=DimensionMap\n"
         "END_GROUP=SWATH_1\n"
         "END_GROUP=SwathStructure\n"
     )
@@ -122,6 +122,116 @@ def test_struct_metadata_renames_dims():
     )
     result = rename_phony_dims(dt)
     dims = result["/HDFEOS/SWATHS/MySWATH/Data Fields"].ds["ColumnAmount"].dims
+    assert dims == ("nTimes", "nXtrack")
+
+
+def test_struct_metadata_renames_dims_multi_swath():
+    # note(ocs): this type of multi swatch structure occurs in collections like OMPIXCOR_003
+    odl = (
+        "GROUP=SwathStructure\n"
+        "GROUP=SWATH_1\n"
+        'SwathName="MySWATH\n"'
+        "GROUP=Dimension\n"
+        "OBJECT=Dimension_1\n"
+        'DimensionName="nTimes"\n'
+        "Size=1496\n"
+        "END_OBJECT=Dimension_1\n"
+        "OBJECT=Dimension_2\n"
+        'DimensionName="nXtrack"\n'
+        "Size=60\n"
+        "END_OBJECT=Dimension_2\n"
+        "END_GROUP=Dimension\n"
+        "GROUP=DimensionMap\n"
+        "END_GROUP=DimensionMap\n"
+        "END_GROUP=SWATH_1\n"
+        # start of swath 2
+        "GROUP=SWATH_2\n"
+        'SwathName="MySWATH2\n"'
+        "GROUP=Dimension\n"
+        "OBJECT=Dimension_1\n"
+        'DimensionName="nTimes"\n'
+        "Size=1496\n"
+        "END_OBJECT=Dimension_1\n"
+        "OBJECT=Dimension_2\n"
+        'DimensionName="nXtrack"\n'
+        # this nXtrack size is different in swath 2
+        "Size=30\n"
+        "END_OBJECT=Dimension_2\n"
+        "END_GROUP=Dimension\n"
+        "END_GROUP=SWATH_2\n"
+        "END_GROUP=SwathStructure\n"
+    )
+    struct_da = xr.DataArray(odl)
+    da = xr.DataArray(
+        [[1.0] * 60] * 1496,
+        dims=[phony(0), phony(1)],
+    )
+
+    da2 = xr.DataArray(
+        [[1.0] * 30] * 1496,
+        dims=[phony(0), phony(1)],
+    )
+    dt = make_tree(
+        {
+            "/HDFEOS INFORMATION": xr.Dataset({"StructMetadata.0": struct_da}),
+            "/HDFEOS/SWATHS/MySWATH/Data Fields": xr.Dataset({"ColumnAmount": da}),
+            "/HDFEOS/SWATHS/MySWATH2/Data Fields": xr.Dataset({"ColumnAmount": da2}),
+        }
+    )
+    result = rename_phony_dims(dt)
+    swath1_dims = result["/HDFEOS/SWATHS/MySWATH/Data Fields"].ds["ColumnAmount"].dims
+    swath2_dims = result["/HDFEOS/SWATHS/MySWATH2/Data Fields"].ds["ColumnAmount"].dims
+
+    # have the names been recovered?
+    assert swath1_dims == ("nTimes", "nXtrack")
+    assert swath2_dims == ("nTimes", "nXtrack")
+
+    swath1_dim_shape = (
+        result["/HDFEOS/SWATHS/MySWATH/Data Fields"].ds["ColumnAmount"].shape
+    )
+    swath2_dim_shape = (
+        result["/HDFEOS/SWATHS/MySWATH2/Data Fields"].ds["ColumnAmount"].shape
+    )
+
+    # are dimensions in differnet swaths, with different sizes but
+    # same name matched correctly?
+    assert swath1_dim_shape == (1496, 60)
+    assert swath2_dim_shape == (1496, 30)
+
+
+def test_struct_grid_metadata_renames_dims():
+    odl = (
+        "GROUP=GridStructure\n"
+        "GROUP=GRID_1\n"
+        'SwathName="MyGRID\n"'
+        "GROUP=Dimension\n"
+        "OBJECT=Dimension_1\n"
+        'DimensionName="nTimes"\n'
+        "Size=1496\n"
+        "END_OBJECT=Dimension_1\n"
+        "OBJECT=Dimension_2\n"
+        'DimensionName="nXtrack"\n'
+        "Size=60\n"
+        "END_OBJECT=Dimension_2\n"
+        "END_GROUP=Dimension\n"
+        "GROUP=DimensionMap\n"
+        "END_GROUP=DimensionMap\n"
+        "END_GROUP=GRID_1\n"
+        "END_GROUP=GridStructure\n"
+    )
+    struct_da = xr.DataArray(odl)
+    da = xr.DataArray(
+        [[1.0] * 60] * 1496,
+        dims=[phony(0), phony(1)],
+    )
+    dt = make_tree(
+        {
+            "/HDFEOS INFORMATION": xr.Dataset({"StructMetadata.0": struct_da}),
+            "/HDFEOS/GRIDS/MyGRID/Data Fields": xr.Dataset({"ColumnAmount": da}),
+        }
+    )
+    result = rename_phony_dims(dt)
+    dims = result["/HDFEOS/GRIDS/MyGRID/Data Fields"].ds["ColumnAmount"].dims
     assert dims == ("nTimes", "nXtrack")
 
 
