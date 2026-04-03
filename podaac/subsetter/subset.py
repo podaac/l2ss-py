@@ -357,9 +357,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         except Exception:  # pylint: disable=broad-exception-caught
             pass
 
-    # set decodetimes to false if "GPM" hdf, or if netcdf has
-    # scantime present (e.g. GPM v08)
-    if hdf_type == 'GPM' or scantime_present:
+    # set decode_times to false if scantime present (e.g. GPM)
+    if scantime_present:
         args['decode_times'] = False
 
     time_encoding = {}
