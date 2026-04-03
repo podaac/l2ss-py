@@ -416,7 +416,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         # assumption is that GPM HDFEOS or GPM V08+ NetCDF4 will have
         # scantime.
-        if hdf_type == "GPM" or scantime_present:
+        if scantime_present:
             new_time_var_names = []
             for group in dataset.groups:
                 if "ScanTime" in group:
