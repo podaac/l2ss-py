@@ -323,7 +323,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     file_extension = os.path.splitext(file_to_subset)[1]
     file_utils.override_decode_cf_datetime()
 
-    hdf_type = False
+    hdf_type = ""
+    scantime_present = False
 
     args = {
         'decode_coords': False,
@@ -334,6 +335,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     with xr.open_datatree(file_to_subset, **args) as dataset:
         if file_extension.lower() in _HDF_EXTENSIONS:
             hdf_type = file_utils.get_hdf_type(dataset)
+            scantime_present = hdf_type == "GPM"
+        else:
+            scantime_present = file_utils.has_scantime(dataset)
 
     if min_time or max_time:
         fill_value_f8 = nc.default_fillvals.get('f8')
@@ -353,7 +357,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         except Exception:  # pylint: disable=broad-exception-caught
             pass
 
-    if hdf_type == 'GPM':
+    # set decodetimes to false if "GPM" hdf, or if netcdf has
+    # scantime present (e.g. GPM v08)
+    if hdf_type == 'GPM' or scantime_present:
         args['decode_times'] = False
 
     time_encoding = {}
@@ -409,9 +415,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
 
-        # note(ocs): I believe this only applies to GPM, but checking
-        #            against general hdf until certain
-        if hdf_type:
+        # assumption is that GPM HDFEOS or GPM V08+ NetCDF4 will have
+        # scantime.
+        if hdf_type == "GPM" or scantime_present:
             new_time_var_names = []
             for group in dataset.groups:
                 if "ScanTime" in group:
