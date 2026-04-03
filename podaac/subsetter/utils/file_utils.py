@@ -77,10 +77,8 @@ def get_hdf_type(tree: DataTree) -> Optional[str]:
     Determine the HDF type (OMI, MLS, or GPM) from a DataTree object.
     """
     try:
-        # GPM
-        for group in tree.groups:
-            if "ScanTime" in group:
-                return 'GPM'
+        if has_scantime(tree):
+            return 'GPM'
 
         # try to get types from instrument name
         additional_attrs = tree['/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES']
@@ -104,3 +102,8 @@ def get_path(s):
     """Extracts the path by removing the last part after the final '/'."""
     path = s.rsplit('/', 1)[0] if '/' in s else s
     return path if path.startswith('/') else f'/{path}'
+
+
+def has_scantime(dataset: DataTree) -> bool:
+    """Check if "ScanTime" group present in dataset"""
+    return any("ScanTime" in group for group in dataset.groups)
