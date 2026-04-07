@@ -85,6 +85,68 @@ def _convert_time_from_description(seconds_since, description: str):
     return result
 
 
+def _get_time_data(dataset: xr.Dataset, time_var_name: str):
+    """
+    Return the time data array, handling special solar_time encoding.
+    """
+    if time_var_name != '/solar_time':
+        return dataset[time_var_name]
+
+    reference_date = dataset.attrs.get('time_coverage_start')
+    ref_ts = pd.to_datetime(reference_date)
+    if hasattr(ref_ts, 'tzinfo') and ref_ts.tzinfo is not None:
+        ref_ts = ref_ts.tz_convert(None)
+    seconds = dataset['solar_time'].values
+    return ref_ts + pd.to_timedelta(seconds, unit='s')
+
+
+def _coerce_timestamp_for_timedelta(dataset: xr.Dataset, time_var_name: str, timestamp):
+    """
+    Adjust a timestamp when the dataset time is a timedelta from an epoch.
+    """
+    if _is_time_mjd(dataset, time_var_name):
+        mjd_datetime = _datetime_from_mjd(dataset, time_var_name)
+        if mjd_datetime is None:
+            raise ValueError('Unable to get datetime from dataset to calculate time delta')
+        return timestamp - np.datetime64(mjd_datetime)
+    epoch_var = _get_time_epoch_var(dataset, time_var_name)
+    epoch_datetime = dataset[epoch_var].values[0]
+    return timestamp - epoch_datetime
+
+
+def _convert_time_data_for_floating(dataset: xr.Dataset, time_var_name: str, time_data):
+    """
+    Convert floating time data to datetime64 when possible.
+    """
+    description = time_data.attrs.get('description') or time_data.attrs.get('Units')
+    long_name = time_data.attrs.get('long_name')
+    if description:
+        return _convert_time_from_description(time_data, description)
+    if long_name == "Approximate observation time for each row":
+        start_time = dataset.attrs.get('REV_START_TIME')
+        date_str = start_time.split("T")[0]
+        start_date = pd.to_datetime(date_str, format="%Y-%j")
+        return np.datetime64(start_date) + time_data.values.astype('timedelta64[s]')
+    if time_var_name == '/HDFEOS/SWATHS/MOP02/Geolocation Fields/Time':
+        start_time = dataset['/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES'].attrs.get('StartDateTime')
+        date = datetime.datetime.fromisoformat(start_time.replace("Z", "+00:00")).date()
+        seconds_in_day = dataset['/HDFEOS/SWATHS/MOP02/Geolocation Fields/SecondsinDay']
+        start_date = pd.to_datetime(date, format="%Y-%j")
+        return np.datetime64(start_date) + seconds_in_day.values.astype('timedelta64[s]')
+    return time_data
+
+
+def _maybe_apply_reference_time_offset(dataset: xr.Dataset, time_data):
+    """
+    Apply the sst reference time offset if present.
+    """
+    if getattr(time_data, 'long_name', None) == "reference time of sst file":
+        base_time = dataset['time'].astype('datetime64[s]')
+        offset = dataset['sst_dtime'].astype('timedelta64[s]')
+        return base_time + offset
+    return time_data
+
+
 def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_var_name: str):
     """
     Build the temporal condition used in the xarray 'where' call which
@@ -93,45 +155,16 @@ def build_temporal_cond(min_time: str, max_time: str, dataset: xr.Dataset, time_
     def build_cond(str_timestamp, compare):
         timestamp = pd.to_datetime(_translate_timestamp(str_timestamp)).to_datetime64()
 
-        if time_var_name == '/solar_time':
-            reference_date = dataset.attrs.get('time_coverage_start')  # Replace with the correct date
-            ref_ts = pd.to_datetime(reference_date)
-            # Remove timezone if present
-            if hasattr(ref_ts, 'tzinfo') and ref_ts.tzinfo is not None:
-                ref_ts = ref_ts.tz_convert(None)
-            seconds = dataset['solar_time'].values
-            time_data = ref_ts + pd.to_timedelta(seconds, unit='s')
-        else:
-            time_data = dataset[time_var_name]
+        time_data = _get_time_data(dataset, time_var_name)
 
         dtype = time_data.dtype
         if np.issubdtype(dtype, np.datetime64):
             pass
         elif np.issubdtype(dtype, np.timedelta64):
-            if _is_time_mjd(dataset, time_var_name):
-                mjd_datetime = _datetime_from_mjd(dataset, time_var_name)
-                if mjd_datetime is None:
-                    raise ValueError('Unable to get datetime from dataset to calculate time delta')
-                timestamp -= np.datetime64(mjd_datetime)
-            else:
-                epoch_var = _get_time_epoch_var(dataset, time_var_name)
-                epoch_datetime = dataset[epoch_var].values[0]
-                timestamp -= epoch_datetime
+            timestamp = _coerce_timestamp_for_timedelta(dataset, time_var_name, timestamp)
         elif np.issubdtype(dtype, np.floating):
-            description = time_data.attrs.get('description') or time_data.attrs.get('Units')
-            long_name = time_data.attrs.get('long_name')
-            if description:
-                epoch_datetime = _extract_epoch(description)
-                time_data = _convert_time_from_description(time_data, description)
-            elif long_name == "Approximate observation time for each row":
-                start_time = dataset.attrs.get('REV_START_TIME')
-                date_str = start_time.split("T")[0]
-                start_date = pd.to_datetime(date_str, format="%Y-%j")
-                time_data = np.datetime64(start_date) + time_data.values.astype('timedelta64[s]')
-        if getattr(time_data, 'long_name', None) == "reference time of sst file":
-            base_time = dataset['time'].astype('datetime64[s]')
-            offset = dataset['sst_dtime'].astype('timedelta64[s]')
-            time_data = base_time + offset
+            time_data = _convert_time_data_for_floating(dataset, time_var_name, time_data)
+        time_data = _maybe_apply_reference_time_offset(dataset, time_data)
         return compare(time_data, timestamp)
     temporal_conds = []
     if min_time:
