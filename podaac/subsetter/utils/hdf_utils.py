@@ -29,8 +29,10 @@ def _phony_index(dim: str) -> int:
 def rename_phony_dims(dt: DataTree) -> DataTree:
     """
     Return a new DataTree with all phony_dim_N dimensions renamed to
-    meaningful names.  The three strategies are tried in priority order;
-    the first one that produces a non-empty mapping is used.
+    meaningful names. First check if `DimensionNames` is present as
+    attributes for each variable otherwise check for `StructMeta.0`
+    and assuming an HDFEOS structure. the first one that produces a
+    non-empty mapping is used.
 
     Parameters
     ----------
@@ -98,34 +100,6 @@ def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
     return mapping
 
 
-def _mapping_from_struct_metadata(dt: DataTree) -> dict[str, str]:
-    """
-    Locate the StructMetadata.0 variable (typically at /HDFEOS
-    INFORMATION), parse its ODL (Object Description Language) content
-    to extract every named dimension and its size, then match those
-    against the phony dims in the tree by size.
-
-    Returns an empty dict if no StructMetadata.0 is found or parsing
-    fails.
-    """
-    struct_text = _find_struct_metadata(dt)
-    if not struct_text:
-        return {}
-
-    # parse named dimensions: {dim_name: size}
-    named_dims = _parse_odl_dimensions(struct_text)
-    if not named_dims:
-        return {}
-
-    # Build size -> name lookup. If two dims share a size we keep both and
-    # later rely on positional ordering within each group.
-    size_to_names: dict[int, list[str]] = defaultdict(list)
-    for name, size in named_dims.items():
-        size_to_names[size].append(name)
-
-    return _match_phony_to_named(dt, size_to_names, named_dims)
-
-
 def _find_struct_metadata(dt: DataTree) -> str | None:
     """Return the decoded text of StructMetadata.0 if present anywhere
     in the tree.
@@ -149,31 +123,109 @@ def _find_struct_metadata(dt: DataTree) -> str | None:
     return None
 
 
-def _parse_odl_dimensions(odl_text: str) -> dict[str, int]:
+def _find_scope_roots(dt: DataTree) -> list[DataTree]:
     """
-    Extract all ``DimensionName`` / ``Size`` pairs from an ODL
-    metadata block.
-
-    ODL blocks look like
-
-        OBJECT=Dimension_1
-            DimensionName="nTimes"
-            Size=1496
-        END_OBJECT=Dimension_1
+    Return the immediate children of /HDFEOS/SWATHS or /HDFEOS/GRIDS.
+    These represent individual swaths / grids and are the correct scopes
+    within which phony dims should be unified.
     """
-    named_dims: dict[str, int] = {}
+    candidates = []
+    for node in dt.subtree:
+        path = node.path.rstrip("/").casefold()
+        if path in (
+            "/hdfeos/swaths",
+            "/hdfeos/grids",
+        ):
+            candidates.extend(node.children.values())
+    return candidates
 
-    # split on END_OBJECT boundaries so we can parse each object block
-    blocks = re.split(r"END_OBJECT\s*=\s*\w+", odl_text)
-    for block in blocks:
-        dim_name_match = re.search(r'DimensionName\s*=\s*"([^"]+)"', block)
-        size_match = re.search(r"\bSize\s*=\s*(\d+)", block)
-        if dim_name_match and size_match:
-            name = dim_name_match.group(1).strip()
-            size = int(size_match.group(1))
-            named_dims[name] = size
 
-    return named_dims
+def _parse_odl_scope_dimensions(odl_text: str) -> dict[str, dict[str, int]]:
+    """
+    Parse the ODL block and return a per-scope dimension mapping:
+        {scope_name: {dim_name: size}}
+
+    Handles both SwathStructure (SWATH_N / SwathName) and GridStructure
+    (GRID_N / GridName) blocks. Each scope is parsed independently so that
+    two scopes sharing a dimension name but with different sizes never
+    overwrite each other.
+    """
+    result: dict[str, dict[str, int]] = {}
+
+    # split on any SWATH_N or GRID_N end-group boundary
+    scope_blocks = re.split(r"END_GROUP\s*=\s*(?:SWATH|GRID)_\d+", odl_text)
+
+    for block in scope_blocks:
+        name_match = re.search(r'(?:SwathName|GridName)\s*=\s*"([^"]+)"', block)
+        if not name_match:
+            continue
+        scope_name = name_match.group(1).strip()
+
+        dim_group_match = re.search(
+            r"GROUP\s*=\s*Dimension(.+?)END_GROUP\s*=\s*Dimension",
+            block,
+            re.DOTALL,
+        )
+        if not dim_group_match:
+            continue
+
+        named_dims: dict[str, int] = {}
+        for obj_block in re.split(
+            r"END_OBJECT\s*=\s*Dimension_\d+", dim_group_match.group(1)
+        ):
+            dim_name_match = re.search(r'DimensionName\s*=\s*"([^"]+)"', obj_block)
+            size_match = re.search(r"\bSize\s*=\s*(\d+)", obj_block)
+            if dim_name_match and size_match:
+                named_dims[dim_name_match.group(1).strip()] = int(size_match.group(1))
+
+        if named_dims:
+            result[scope_name] = named_dims
+
+    return result
+
+
+def _mapping_from_struct_metadata(dt: DataTree) -> dict[str, str]:
+    """
+    Locate the StructMetadata.0 variable (typically at /HDFEOS
+    INFORMATION), parse its ODL (Object Description Language) content
+    to extract every named dimension and its size, then match those
+    against the phony dims in the tree by size.
+
+    Returns an empty dict if no StructMetadata.0 is found or parsing
+    fails.
+    """
+    struct_text = _find_struct_metadata(dt)
+    if not struct_text:
+        return {}
+
+    swath_dims = _parse_odl_scope_dimensions(struct_text)
+    if not swath_dims:
+        return {}
+
+    mapping: dict[str, str] = {}
+
+    scope_roots = _find_scope_roots(dt)
+    if not scope_roots:
+        scope_roots = [dt]
+
+    for scope_root in scope_roots:
+        # extract the swath name from the path, e.g.
+        # "/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1" -> "OMI Ground Pixel Corners UV-1"
+        swath_name = scope_root.path.rstrip("/").split("/")[-1]
+        named_dims = swath_dims.get(swath_name)
+
+        if not named_dims:
+            # swath name not found in ODL
+            continue
+
+        size_to_names: dict[int, list[str]] = defaultdict(list)
+        for name, size in named_dims.items():
+            size_to_names[size].append(name)
+
+        scope_mapping = _match_phony_to_named(scope_root, size_to_names, named_dims)
+        mapping.update(scope_mapping)
+
+    return mapping
 
 
 def _match_phony_to_named(
