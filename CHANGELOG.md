@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/394] (https://github.com/podaac/l2ss-py/issues/394) Update ODL parser to handle multi swath/grid collections
 - [issue/396] (https://github.com/podaac/l2ss-py/issues/396) Handle new GPM v08 collections with netcdf format, but still containing wonky ScanTime swath group
 - [issue/400] (https://github.com/podaac/l2ss-py/issues/400) Fixed temporal subsetting for MOPITT collections
+- [issue/394] (https://github.com/podaac/l2ss-py/issues/394) Update ODL parser to apply direct mapping from DataField and GeoField objects
 ### Security
 
 
