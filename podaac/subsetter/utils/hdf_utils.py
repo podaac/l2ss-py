@@ -13,6 +13,12 @@ import numpy as np
 import xarray as xr
 from xarray import DataTree
 
+_PHONY_RE = re.compile(r"^phony_dim_(\d+)$")
+
+
+def _is_phony(dim: str) -> bool:
+    return _PHONY_RE.match(dim) is not None
+
 
 def rename_phony_dims(dt: DataTree) -> DataTree:
     """
@@ -75,6 +81,10 @@ def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
                 continue
 
             for phony, real in zip(da.dims, real_names):
+                # guard for incorrectly specified HDFEOS data
+                # which might not have phony_dims being populated
+                if not _is_phony(phony):
+                    continue
                 existing = mapping.get(phony)
                 if existing is not None and existing != real:
                     # if two variables disagree on what this phony dim
@@ -235,6 +245,10 @@ def _apply_from_field_dimlists(
                 if odl_dims is None or len(odl_dims) != len(da.dims):
                     continue
                 for current_dim, real_name in zip(da.dims, odl_dims):
+                    # guard for incorrectly specified HDFEOS data
+                    # which might not have phony_dims being populated
+                    if not _is_phony(current_dim):
+                        continue
                     existing = local_mapping.get(current_dim)
                     if existing is not None and existing != real_name:
                         warnings.warn(
