@@ -106,9 +106,16 @@ def test_struct_metadata_renames_dims():
         "END_GROUP=Dimension\n"
         "GROUP=DimensionMap\n"
         "END_GROUP=DimensionMap\n"
+        "GROUP=DataField\n"
+        "OBJECT=DataField_1\n"
+        'DataFieldName="ColumnAmount"\n'
+        'DimList=("nTimes","nXtrack")\n'
+        "END_OBJECT=DataField_1\n"
+        "END_GROUP=DataField\n"
         "END_GROUP=SWATH_1\n"
         "END_GROUP=SwathStructure\n"
     )
+
     struct_da = xr.DataArray(odl)
     da = xr.DataArray(
         [[1.0] * 60] * 1496,
@@ -143,6 +150,12 @@ def test_struct_metadata_renames_dims_multi_swath():
         "END_GROUP=Dimension\n"
         "GROUP=DimensionMap\n"
         "END_GROUP=DimensionMap\n"
+        "GROUP=DataField\n"
+        "OBJECT=DataField_1\n"
+        'DataFieldName="ColumnAmount"\n'
+        'DimList=("nTimes","nXtrack")\n'
+        "END_OBJECT=DataField_1\n"
+        "END_GROUP=DataField\n"
         "END_GROUP=SWATH_1\n"
         # start of swath 2
         "GROUP=SWATH_2\n"
@@ -158,6 +171,12 @@ def test_struct_metadata_renames_dims_multi_swath():
         "Size=30\n"
         "END_OBJECT=Dimension_2\n"
         "END_GROUP=Dimension\n"
+        "GROUP=DataField\n"
+        "OBJECT=DataField_1\n"
+        'DataFieldName="ColumnAmount2"\n'
+        'DimList=("nTimes","nXtrack")\n'
+        "END_OBJECT=DataField_1\n"
+        "END_GROUP=DataField\n"
         "END_GROUP=SWATH_2\n"
         "END_GROUP=SwathStructure\n"
     )
@@ -169,18 +188,18 @@ def test_struct_metadata_renames_dims_multi_swath():
 
     da2 = xr.DataArray(
         [[1.0] * 30] * 1496,
-        dims=[phony(0), phony(1)],
+        dims=[phony(2), phony(3)],
     )
     dt = make_tree(
         {
             "/HDFEOS INFORMATION": xr.Dataset({"StructMetadata.0": struct_da}),
             "/HDFEOS/SWATHS/MySWATH/Data Fields": xr.Dataset({"ColumnAmount": da}),
-            "/HDFEOS/SWATHS/MySWATH2/Data Fields": xr.Dataset({"ColumnAmount": da2}),
+            "/HDFEOS/SWATHS/MySWATH2/Data Fields": xr.Dataset({"ColumnAmount2": da2}),
         }
     )
     result = rename_phony_dims(dt)
     swath1_dims = result["/HDFEOS/SWATHS/MySWATH/Data Fields"].ds["ColumnAmount"].dims
-    swath2_dims = result["/HDFEOS/SWATHS/MySWATH2/Data Fields"].ds["ColumnAmount"].dims
+    swath2_dims = result["/HDFEOS/SWATHS/MySWATH2/Data Fields"].ds["ColumnAmount2"].dims
 
     # have the names been recovered?
     assert swath1_dims == ("nTimes", "nXtrack")
@@ -190,7 +209,7 @@ def test_struct_metadata_renames_dims_multi_swath():
         result["/HDFEOS/SWATHS/MySWATH/Data Fields"].ds["ColumnAmount"].shape
     )
     swath2_dim_shape = (
-        result["/HDFEOS/SWATHS/MySWATH2/Data Fields"].ds["ColumnAmount"].shape
+        result["/HDFEOS/SWATHS/MySWATH2/Data Fields"].ds["ColumnAmount2"].shape
     )
 
     # are dimensions in differnet swaths, with different sizes but
@@ -216,6 +235,12 @@ def test_struct_grid_metadata_renames_dims():
         "END_GROUP=Dimension\n"
         "GROUP=DimensionMap\n"
         "END_GROUP=DimensionMap\n"
+        "GROUP=DataField\n"
+        "OBJECT=DataField_1\n"
+        'DataFieldName="ColumnAmount"\n'
+        'DimList=("nTimes","nXtrack")\n'
+        "END_OBJECT=DataField_1\n"
+        "END_GROUP=DataField\n"
         "END_GROUP=GRID_1\n"
         "END_GROUP=GridStructure\n"
     )
