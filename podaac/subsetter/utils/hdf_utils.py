@@ -8,7 +8,6 @@ Utility functions for handling HDF files, and dimension recovery
 
 import re
 import warnings
-from collections import defaultdict
 
 import numpy as np
 import xarray as xr
@@ -19,11 +18,6 @@ _PHONY_RE = re.compile(r"^phony_dim_(\d+)$")
 
 def _is_phony(dim: str) -> bool:
     return _PHONY_RE.match(dim) is not None
-
-
-def _phony_index(dim: str) -> int:
-    m = _PHONY_RE.match(dim)
-    return int(m.group(1)) if m else -1
 
 
 def rename_phony_dims(dt: DataTree) -> DataTree:
@@ -45,14 +39,17 @@ def rename_phony_dims(dt: DataTree) -> DataTree:
         A new tree with renamed dimensions.
     """
     mapping = _mapping_from_dimension_names(dt)
+    if mapping:
+        dt = _apply_mapping(dt, mapping)
 
-    if not mapping:
-        mapping = _mapping_from_struct_metadata(dt)
+    struct_text = _find_struct_metadata(dt)
+    if struct_text:
+        scope_field_dimlists = _parse_odl_field_dimlists(struct_text)
+        if scope_field_dimlists:
+            dt = _apply_from_field_dimlists(dt, scope_field_dimlists)
 
-    if not mapping:
-        return dt
-
-    return _apply_mapping(dt, mapping)
+    # null condition
+    return dt
 
 
 def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
@@ -84,6 +81,8 @@ def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
                 continue
 
             for phony, real in zip(da.dims, real_names):
+                # guard for incorrectly specified HDFEOS data
+                # which might not have phony_dims being populated
                 if not _is_phony(phony):
                     continue
                 existing = mapping.get(phony)
@@ -111,7 +110,6 @@ def _find_struct_metadata(dt: DataTree) -> str | None:
         for var_name in ds.data_vars:
             if "StructMetadata" in var_name:
                 raw = ds[var_name].values
-                # may be bytes, numpy bytes_, or already a string
                 if isinstance(raw, (bytes, np.bytes_)):
                     return raw.decode("utf-8", errors="replace")
                 if hasattr(raw, "item"):
@@ -140,19 +138,18 @@ def _find_scope_roots(dt: DataTree) -> list[DataTree]:
     return candidates
 
 
-def _parse_odl_scope_dimensions(odl_text: str) -> dict[str, dict[str, int]]:
+def _parse_odl_field_dimlists(odl_text: str) -> dict[str, dict[str, list[str]]]:
     """
-    Parse the ODL block and return a per-scope dimension mapping:
-        {scope_name: {dim_name: size}}
+    Parse the ODL block and return a per-scope, per-field dim list:
+        {scope_name: {field_name: [dim_name, ...]}}
 
     Handles both SwathStructure (SWATH_N / SwathName) and GridStructure
-    (GRID_N / GridName) blocks. Each scope is parsed independently so that
-    two scopes sharing a dimension name but with different sizes never
-    overwrite each other.
+    (GRID_N / GridName) blocks. The DimList order matches the axis
+    order of the variable as stored in the file, so it can be zipped
+    directly against the variable's actual (phony) dims.
     """
-    result: dict[str, dict[str, int]] = {}
+    result: dict[str, dict[str, list[str]]] = {}
 
-    # split on any SWATH_N or GRID_N end-group boundary
     scope_blocks = re.split(r"END_GROUP\s*=\s*(?:SWATH|GRID)_\d+", odl_text)
 
     for block in scope_blocks:
@@ -160,125 +157,33 @@ def _parse_odl_scope_dimensions(odl_text: str) -> dict[str, dict[str, int]]:
         if not name_match:
             continue
         scope_name = name_match.group(1).strip()
+        field_dimlists: dict[str, list[str]] = {}
 
-        dim_group_match = re.search(
-            r"GROUP\s*=\s*Dimension(.+?)END_GROUP\s*=\s*Dimension",
-            block,
-            re.DOTALL,
-        )
-        if not dim_group_match:
-            continue
+        # GeoField and DataField blocks both use the same OBJECT structure
+        for field_block in re.split(r"END_OBJECT\s*=\s*(?:Geo|Data)Field_\d+", block):
+            field_name_match = re.search(
+                r'(?:GeoFieldName|DataFieldName)\s*=\s*"([^"]+)"', field_block
+            )
+            dimlist_match = re.search(r"DimList\s*=\s*\(([^)]+)\)", field_block)
+            if not field_name_match or not dimlist_match:
+                continue
 
-        named_dims: dict[str, int] = {}
-        for obj_block in re.split(
-            r"END_OBJECT\s*=\s*Dimension_\d+", dim_group_match.group(1)
-        ):
-            dim_name_match = re.search(r'DimensionName\s*=\s*"([^"]+)"', obj_block)
-            size_match = re.search(r"\bSize\s*=\s*(\d+)", obj_block)
-            if dim_name_match and size_match:
-                named_dims[dim_name_match.group(1).strip()] = int(size_match.group(1))
+            field_name = field_name_match.group(1).strip()
+            dim_names = [
+                d.strip().strip('"') for d in dimlist_match.group(1).split(",")
+            ]
+            field_dimlists[field_name] = dim_names
 
-        if named_dims:
-            result[scope_name] = named_dims
+        if field_dimlists:
+            result[scope_name] = field_dimlists
 
     return result
-
-
-def _mapping_from_struct_metadata(dt: DataTree) -> dict[str, str]:
-    """
-    Locate the StructMetadata.0 variable (typically at /HDFEOS
-    INFORMATION), parse its ODL (Object Description Language) content
-    to extract every named dimension and its size, then match those
-    against the phony dims in the tree by size.
-
-    Returns an empty dict if no StructMetadata.0 is found or parsing
-    fails.
-    """
-    struct_text = _find_struct_metadata(dt)
-    if not struct_text:
-        return {}
-
-    swath_dims = _parse_odl_scope_dimensions(struct_text)
-    if not swath_dims:
-        return {}
-
-    mapping: dict[str, str] = {}
-
-    scope_roots = _find_scope_roots(dt)
-    if not scope_roots:
-        scope_roots = [dt]
-
-    for scope_root in scope_roots:
-        # extract the swath name from the path, e.g.
-        # "/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1" -> "OMI Ground Pixel Corners UV-1"
-        swath_name = scope_root.path.rstrip("/").split("/")[-1]
-        named_dims = swath_dims.get(swath_name)
-
-        if not named_dims:
-            # swath name not found in ODL
-            continue
-
-        size_to_names: dict[int, list[str]] = defaultdict(list)
-        for name, size in named_dims.items():
-            size_to_names[size].append(name)
-
-        scope_mapping = _match_phony_to_named(scope_root, size_to_names, named_dims)
-        mapping.update(scope_mapping)
-
-    return mapping
-
-
-def _match_phony_to_named(
-    dt: DataTree,
-    size_to_names: dict[int, list[str]],
-    named_dims: dict[str, int],
-) -> dict[str, str]:
-    """
-    For every phony dim in the tree, look up its size in ``size_to_names``.
-
-    - If only one real name has that size, the mapping is unambiguous.
-    - If multiple real names share the same size, we use the *position* of
-      the phony dim within its group's sorted dimension list to pick among
-      the candidates (ordered as they appear in the ODL block).
-    """
-    # ordered list of all named dims so we can use index as a tiebreaker
-    ordered_named = list(named_dims.keys())
-
-    mapping: dict[str, str] = {}
-
-    for node in dt.subtree:
-        ds = node.ds
-        if ds is None:
-            continue
-
-        # phony dims in this group sorted by their index (N in
-        # phony_dim_N)
-        local_phonies = sorted([d for d in ds.dims if _is_phony(d)], key=_phony_index)
-
-        for phony in local_phonies:
-            size = ds.dims[phony]
-            candidates = size_to_names.get(size, [])
-            if not candidates:
-                continue
-            if len(candidates) == 1:
-                mapping[phony] = candidates[0]
-            else:
-                # use the position of this phony dim among same-size dims in
-                # this group to index into the ordered candidate list.
-                same_size_in_group = [p for p in local_phonies if ds.dims[p] == size]
-                pos = same_size_in_group.index(phony)
-                # sort candidates by their order in the odl block
-                ordered_candidates = sorted(candidates, key=ordered_named.index)
-                if pos < len(ordered_candidates):
-                    mapping[phony] = ordered_candidates[pos]
-
-    return mapping
 
 
 def _apply_mapping(dt: DataTree, mapping: dict[str, str]) -> DataTree:
     """
     Walk the tree, apply rename_dims to every group dataset that contains
-    any of the phony dims in ``mapping``, then reconstruct the entire tree
+    any of the phony dims in mapping, then reconstruct the entire tree
     from a flat path -> dataset dict using DataTree.from_dict.
 
     This avoids any direct node copying and is the idiomatic way to rebuild
@@ -292,6 +197,70 @@ def _apply_mapping(dt: DataTree, mapping: dict[str, str]) -> DataTree:
         local_mapping = {k: v for k, v in mapping.items() if k in ds.dims}
         if local_mapping:
             ds = ds.rename_dims(local_mapping)
+
+        path_to_ds[node.path] = ds
+
+    return DataTree.from_dict(path_to_ds)
+
+
+def _find_scope_for_node(node: DataTree, scope_roots: list[DataTree]) -> str | None:
+    """
+    Return the scope name (last path component of the scope root) that this
+    node lives under, or None if the node is not under any known scope root.
+    """
+    for scope_root in scope_roots:
+        scope_path = scope_root.path.rstrip("/")
+        if node.path == scope_path or node.path.startswith(scope_path + "/"):
+            return scope_path.split("/")[-1]
+    return None
+
+
+def _apply_from_field_dimlists(
+    dt: DataTree,
+    scope_field_dimlists: dict[str, dict[str, list[str]]],
+) -> DataTree:
+    """
+    Walk every node in the tree. For each variable in the node, look up its
+    real dim names by scope name + variable name directly from the ODL field
+    dimlists, then rename only that variable's dims within that node.
+
+    This never builds a global phony to real mapping, so two variables with the
+    same name in different scopes are always resolved against their own scope's
+    DimList entries independently.
+    """
+    scope_roots = _find_scope_roots(dt)
+    path_to_ds: dict[str, xr.Dataset] = {}
+
+    for node in dt.subtree:
+        ds = node.ds if node.ds is not None else xr.Dataset()
+
+        scope_name = _find_scope_for_node(node, scope_roots)
+        field_dimlists = scope_field_dimlists.get(scope_name, {}) if scope_name else {}
+
+        if field_dimlists:
+            local_mapping: dict[str, str] = {}
+
+            for var_name, da in ds.items():
+                odl_dims = field_dimlists.get(var_name)
+                if odl_dims is None or len(odl_dims) != len(da.dims):
+                    continue
+                for current_dim, real_name in zip(da.dims, odl_dims):
+                    # guard for incorrectly specified HDFEOS data
+                    # which might not have phony_dims being populated
+                    if not _is_phony(current_dim):
+                        continue
+                    existing = local_mapping.get(current_dim)
+                    if existing is not None and existing != real_name:
+                        warnings.warn(
+                            f"Conflicting ODL DimList for {current_dim!r} in "
+                            f"{node.path!r}: {existing!r} vs {real_name!r}. "
+                            f"Keeping {existing!r}."
+                        )
+                    else:
+                        local_mapping[current_dim] = real_name
+
+            if local_mapping:
+                ds = ds.rename_dims(local_mapping)
 
         path_to_ds[node.path] = ds
 
