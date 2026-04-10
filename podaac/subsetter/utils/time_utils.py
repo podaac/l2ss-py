@@ -237,3 +237,21 @@ def check_time_units(unit_str: str) -> str:
     if unit in get_args(NPDatetimeUnitOptions):
         unit_str_list[0] = _numpy_to_netcdf_timeunit(unit)
     return " ".join(unit_str_list)
+
+
+def is_cf_time(da):
+    """
+    Check whether a DataArray contains CF-compliant time values.
+
+    This function attempts to decode the input DataArray values using
+    CF conventions via `xarray.coding.times.decode_cf_datetime`. If decoding
+    succeeds, the variable is considered CF-time compatible.
+    """
+    try:
+        xr.coding.times.decode_cf_datetime(
+            da.values,
+            units=da.attrs.get("units", "")
+        )
+        return True
+    except Exception:  # pylint: disable=broad-except
+        return False

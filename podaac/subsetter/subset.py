@@ -391,14 +391,13 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 time_encoding[group_path][var_name] = {}
                 if calendar:
                     time_encoding[group_path][var_name]['calendar'] = calendar
-                if units:
-                    if time not in ['/solar_time', '/HDFEOS/SWATHS/MOP02/Geolocation Fields/Time']:
-                        time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
+                if units and time_utils.is_cf_time(time_var):
+                    time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
                 if dtype and units:
                     time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
                     time_calendar_attributes[time] = calendar
-
+                print(time_encoding)
     if len(time_var_names) == 1 and (min_time or max_time) and time_var_names[0] == '/solar_time':
         args['decode_times'] = False
 
