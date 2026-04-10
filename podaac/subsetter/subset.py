@@ -362,6 +362,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         args['decode_times'] = False
 
     time_encoding = {}
+    time_attribute_updates = {}
     time_calendar_attributes = {}
 
     if args['decode_times']:
@@ -387,17 +388,20 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
                 if group_path not in time_encoding:
                     time_encoding[group_path] = {}
+                if group_path not in time_attribute_updates:
+                    time_attribute_updates[group_path] = {}
 
                 time_encoding[group_path][var_name] = {}
+                time_attribute_updates[group_path][var_name] = {}
                 if calendar:
                     time_encoding[group_path][var_name]['calendar'] = calendar
+                    time_attribute_updates[group_path][var_name]['calendar'] = calendar
                 if units and time_utils.is_cf_time(time_var):
-                    time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
+                    time_attribute_updates[group_path][var_name]['units'] = time_utils.check_time_units(units)
                 if dtype and units:
                     time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
                     time_calendar_attributes[time] = calendar
-                print(time_encoding)
     if len(time_var_names) == 1 and (min_time or max_time) and time_var_names[0] == '/solar_time':
         args['decode_times'] = False
 
@@ -534,7 +538,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             else:
                 raise
 
-        metadata_utils.ensure_time_units(output_file, time_encoding)
+        metadata_utils.ensure_time_units(output_file, time_attribute_updates)
 
         # ensure all the dimensions are on the root node when we pixel subset
         if pixel_subset:
