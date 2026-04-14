@@ -92,7 +92,11 @@ def vertical_subset(
             vert_mask_combined = vert_mask & mask_nan & mask_fill
 
             # Find first and last valid indices along the vertical axis
-            valid_indices = [i for i in range(vertical_data.shape[vert_axis]) if np.any(np.take(vert_mask_combined, i, axis=vert_axis))]
+            valid_indices = [
+                i
+                for i in range(vertical_data.shape[vert_axis])
+                if np.any(np.take(vert_mask_combined, i, axis=vert_axis))
+            ]
             if valid_indices:
                 first_valid = valid_indices[0]
                 last_valid = valid_indices[-1]
@@ -186,7 +190,8 @@ def get_vert_values(tree: xr.DataTree, vert_dim: str) -> np.ndarray:
     Returns
     -------
     numpy.ndarray
-        Array of vertical values. If a coordinate exists, use its values. If index-only, returns np.arange(N) from the first node where the dimension exists.
+        Array of vertical values. If a coordinate exists, use its values. If index-only,
+        returns np.arange(N) from the first node where the dimension exists.
 
     Raises
     ------

@@ -27,8 +27,7 @@ import numpy as np
 import xarray as xr
 from shapely.geometry import Point
 
-from podaac.subsetter import datatree_subset
-from podaac.subsetter import tree_time_converting as tree_time_converting
+from podaac.subsetter import datatree_subset, tree_time_converting
 from podaac.subsetter.utils import (
     coordinate_utils,
     file_utils,
@@ -46,7 +45,14 @@ SERVICE_NAME = "l2ss-py"
 _HDF_EXTENSIONS: list[str] = [".hdf5", ".he5", ".h5", ".hdf"]
 
 
-def subset_with_shapefile_multi(dataset: xr.Dataset, lat_var_names: list[str], lon_var_names: list[str], shapefile: str, cut: bool, pixel_subset: bool) -> xr.Dataset:
+def subset_with_shapefile_multi(
+    dataset: xr.Dataset,
+    lat_var_names: list[str],
+    lon_var_names: list[str],
+    shapefile: str,
+    cut: bool,
+    pixel_subset: bool,
+) -> xr.Dataset:
     """
     Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
 
@@ -197,11 +203,20 @@ def subset_with_bbox(
             if time_data is not None and time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
                 temporal_cond = mask_utils.align_time_to_lon_dim(time_data, lon_data, temporal_cond)
 
-        operation = oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) & (lat_data >= lat_bounds[0]) & (lat_data <= lat_bounds[1]) & temporal_cond
+        operation = (
+            oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1]))
+            & (lat_data >= lat_bounds[0])
+            & (lat_data <= lat_bounds[1])
+            & temporal_cond
+        )
 
         # We want the lon lat time path to be the same
         # timeMidScan_datetime is a time made for ges disc collection in a ScanTime group
-        if lat_path == lon_path == time_path or (time_var_name is not None and "timeMidScan_datetime" in time_var_name) or (lon_path == lat_path and time_var_name is None):
+        if (
+            lat_path == lon_path == time_path
+            or (time_var_name is not None and "timeMidScan_datetime" in time_var_name)
+            or (lon_path == lat_path and time_var_name is None)
+        ):
             subset_dictionary[lat_path] = operation
         elif lat_path == lon_path and len(time_var_names) == 1:
             subset_dictionary[lat_path] = operation
@@ -209,7 +224,16 @@ def subset_with_bbox(
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
 
     if vertical_var is not None:
-        return vertical_subset(dataset, return_dataset, lat_var_names, lon_var_names, vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max, cut=cut)
+        return vertical_subset(
+            dataset,
+            return_dataset,
+            lat_var_names,
+            lon_var_names,
+            vertical_var=vertical_var,
+            vertical_min=vertical_min,
+            vertical_max=vertical_max,
+            cut=cut,
+        )
 
     return return_dataset
 
@@ -332,7 +356,9 @@ def subset(
             with nc.Dataset(file_to_subset, "r") as nc_dataset:
                 for time_variable in (v for v in nc_dataset.variables.keys() if "time" in v):
                     time_var = nc_dataset[time_variable]
-                    if (getattr(time_var, "_FillValue", None) == fill_value_f8 and time_var.dtype in float_dtypes) or (getattr(time_var, "long_name", None) == "reference time of sst file"):
+                    if (getattr(time_var, "_FillValue", None) == fill_value_f8 and time_var.dtype in float_dtypes) or (
+                        getattr(time_var, "long_name", None) == "reference time of sst file"
+                    ):
                         args["mask_and_scale"] = True
                         if getattr(time_var, "long_name", None) == "reference time of sst file":
                             args["mask_and_scale"] = file_utils.test_access_sst_dtime_values(nc_dataset)
@@ -424,7 +450,9 @@ def subset(
             keep_variables = variables_utils.normalize_candidate_paths_against_dtree(keep_variables, all_vars)
 
             all_data_variables = datatree_subset.get_vars_with_paths(dataset)
-            drop_variables = [var for var in all_data_variables if var not in keep_variables and var.upper() not in keep_variables]
+            drop_variables = [
+                var for var in all_data_variables if var not in keep_variables and var.upper() not in keep_variables
+            ]
 
             dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
 
@@ -433,7 +461,9 @@ def subset(
         time_var_names = variables_utils.normalize_candidate_paths_against_dtree(time_var_names, all_vars)
 
         if shapefile:
-            subsetted_dataset = subset_with_shapefile_multi(dataset, lat_var_names, lon_var_names, shapefile, cut, pixel_subset)
+            subsetted_dataset = subset_with_shapefile_multi(
+                dataset, lat_var_names, lon_var_names, shapefile, cut, pixel_subset
+            )
         elif bbox is not None:
             subsetted_dataset = subset_with_bbox(
                 dataset=dataset,
@@ -497,7 +527,15 @@ def subset(
         encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(subsetted_dataset, lat_var_names, lon_var_names)
 
-        metadata_utils.update_netcdf_attrs(output_file, subsetted_dataset, lon_var_names, lat_var_names, spatial_bounds_array, stage_file_name_subsetted_true, stage_file_name_subsetted_false)
+        metadata_utils.update_netcdf_attrs(
+            output_file,
+            subsetted_dataset,
+            lon_var_names,
+            lat_var_names,
+            spatial_bounds_array,
+            stage_file_name_subsetted_true,
+            stage_file_name_subsetted_false,
+        )
 
         try:
             subsetted_dataset.to_netcdf(output_file, encoding=encoding)

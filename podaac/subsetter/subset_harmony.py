@@ -121,7 +121,9 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
         self.data_dir = os.getenv(DATA_DIRECTORY_ENV, "/home/dockeruser/data")
 
-    def process_item(self, item: pystac.Item, source: harmony_service_lib.message.Source) -> pystac.Item:  # pylint: disable=too-many-branches
+    def process_item(
+        self, item: pystac.Item, source: harmony_service_lib.message.Source
+    ) -> pystac.Item:  # pylint: disable=too-many-branches
         """
         Performs variable and bounding box subsetting on the input STAC Item's data, returning
         an output STAC item
@@ -148,7 +150,9 @@ class L2SubsetterService(BaseHarmonyAdapter):
         try:
             # Get the data file
             asset = next(v for k, v in item.assets.items() if "data" in (v.roles or []))
-            input_filename = download(asset.href, temp_dir, logger=self.logger, access_token=self.message.accessToken, cfg=self.config)
+            input_filename = download(
+                asset.href, temp_dir, logger=self.logger, access_token=self.message.accessToken, cfg=self.config
+            )
 
             message = self.message
 
@@ -163,7 +167,13 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 harmony_bbox = message.subset.bbox
 
             if message.subset and message.subset.shape:
-                subset_params["shapefile"] = download(message.subset.shape.href, temp_dir, logger=self.logger, access_token=self.message.accessToken, cfg=self.config)
+                subset_params["shapefile"] = download(
+                    message.subset.shape.href,
+                    temp_dir,
+                    logger=self.logger,
+                    access_token=self.message.accessToken,
+                    cfg=self.config,
+                )
 
             if message.temporal:
                 subset_params["min_time"] = message.temporal.start
@@ -222,10 +232,20 @@ class L2SubsetterService(BaseHarmonyAdapter):
 
             # Stage the output file with a conventional filename
             mime = "application/x-netcdf4"
-            operations = {"variable_subset": subset_params.get("variables"), "is_subsetted": bool(result_bbox is not None)}
+            operations = {
+                "variable_subset": subset_params.get("variables"),
+                "is_subsetted": bool(result_bbox is not None),
+            }
             staged_filename = generate_output_filename(asset.href, original_file_extension, **operations)
 
-            url = stage(subset_params["output_file"], staged_filename, mime, location=message.stagingLocation, logger=self.logger, cfg=self.config)
+            url = stage(
+                subset_params["output_file"],
+                staged_filename,
+                mime,
+                location=message.stagingLocation,
+                logger=self.logger,
+                cfg=self.config,
+            )
 
             # Update the STAC record
             asset = Asset(url, title=staged_filename, media_type=mime, roles=["data"])

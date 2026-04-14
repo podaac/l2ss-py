@@ -95,7 +95,9 @@ def update_coord_everywhere(node, coord_name, new_values):
         update_coord_everywhere(child, coord_name, new_values)
 
 
-def convert_to_datetime(data_tree: xr.Dataset, time_vars: list, instrument_type: str) -> tuple[xr.Dataset, datetime.datetime]:
+def convert_to_datetime(
+    data_tree: xr.Dataset, time_vars: list, instrument_type: str
+) -> tuple[xr.Dataset, datetime.datetime]:
     """
     Convert time variables in a data tree from seconds since the start date to datetime format.
     Handles nested group structures with time variables specified as '/group1/group2/var'.
@@ -129,7 +131,9 @@ def convert_to_datetime(data_tree: xr.Dataset, time_vars: list, instrument_type:
                 # add seconds since the start time to the start time to get the time at the data point
                 new_values = date_time_array.astype("datetime64[ns]") + group[var_name].astype("timedelta64[s]").values
                 try:
-                    group[var_name].values = date_time_array.astype("datetime64[ns]") + group[var_name].astype("timedelta64[s]").values
+                    group[var_name].values = (
+                        date_time_array.astype("datetime64[ns]") + group[var_name].astype("timedelta64[s]").values
+                    )
                 except ValueError:
                     pass
                 update_coord_everywhere(data_tree, var_name, new_values)
@@ -139,7 +143,10 @@ def convert_to_datetime(data_tree: xr.Dataset, time_vars: list, instrument_type:
             utc_var_name = compute_utc_name(group)
             if utc_var_name:
                 start_seconds = group[var_name].values[0]
-                new_values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5]) for i in group[utc_var_name].values]
+                new_values = [
+                    datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5])
+                    for i in group[utc_var_name].values
+                ]
                 start_date = new_values[0] - np.timedelta64(int(start_seconds), "s")
                 update_coord_everywhere(data_tree, var_name, new_values)
                 return data_tree, start_date

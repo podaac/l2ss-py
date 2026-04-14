@@ -75,16 +75,16 @@ requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.black]
-line-length = 200
+line-length = 120
 target-version = ["py312"]
 
 [tool.ruff]
-line-length = 200
+line-length = 120
 target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"] 
-ignore = []
+ignore = ["B905"]
 
 [tool.ruff.format]
 quote-style = "double"

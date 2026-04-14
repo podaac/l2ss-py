@@ -289,14 +289,18 @@ def update_netcdf_attrs(
             final_eastmost = max(lons_easternmost, key=lambda lon: lon if lon >= 0 else lon + 360)
             set_attr_with_type(dataset, "geospatial_lon_max", final_eastmost)
         dataset.attrs["geospatial_bounds_crs"] = "EPSG:4326"
-        geospatial_bounds = spatial_utils.create_geospatial_bounds(dataset, lon_var_names, lat_var_names) or spatial_utils.create_geospatial_bounding_box(
-            spatial_bounds_array, final_eastmost, final_westmost
-        )
+        geospatial_bounds = spatial_utils.create_geospatial_bounds(
+            dataset, lon_var_names, lat_var_names
+        ) or spatial_utils.create_geospatial_bounding_box(spatial_bounds_array, final_eastmost, final_westmost)
         dataset.attrs["geospatial_bounds"] = geospatial_bounds
 
     # Set product name based on conditions
     has_spatial_bounds = spatial_bounds_array is not None and spatial_bounds_array.size > 0
-    product_name = stage_file_name_subsetted_true if has_spatial_bounds and stage_file_name_subsetted_true else stage_file_name_subsetted_false if stage_file_name_subsetted_false else output_file
+    product_name = (
+        stage_file_name_subsetted_true
+        if has_spatial_bounds and stage_file_name_subsetted_true
+        else stage_file_name_subsetted_false if stage_file_name_subsetted_false else output_file
+    )
 
     set_attr_with_type(dataset, "product_name", product_name)
 

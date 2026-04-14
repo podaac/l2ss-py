@@ -24,7 +24,10 @@ def create_geospatial_bounding_box(spatial_bounds_array, east, west):
     if west:
         lon_max = west
 
-    wkt_polygon = f"POLYGON (({lon_min:.5f} {lat_min:.5f}, {lon_max:.5f} {lat_min:.5f}, " f"{lon_max:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_min:.5f}))"
+    wkt_polygon = (
+        f"POLYGON (({lon_min:.5f} {lat_min:.5f}, {lon_max:.5f} {lat_min:.5f}, "
+        f"{lon_max:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_min:.5f}))"
+    )
     return wkt_polygon
 
 
@@ -44,12 +47,27 @@ def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
         return None
     nrows, ncols = lon.shape
     points = [
-        (float(coordinate_utils.remove_scale_offset(lon[0, 0], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[0, 0], lat_scale, lat_offset))),
-        (float(coordinate_utils.remove_scale_offset(lon[nrows - 1, 0], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[nrows - 1, 0], lat_scale, lat_offset))),
-        (float(coordinate_utils.remove_scale_offset(lon[nrows - 1, ncols - 1], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[nrows - 1, ncols - 1], lat_scale, lat_offset))),
-        (float(coordinate_utils.remove_scale_offset(lon[0, ncols - 1], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[0, ncols - 1], lat_scale, lat_offset))),
+        (
+            float(coordinate_utils.remove_scale_offset(lon[0, 0], lon_scale, lon_offset)),
+            float(coordinate_utils.remove_scale_offset(lat[0, 0], lat_scale, lat_offset)),
+        ),
+        (
+            float(coordinate_utils.remove_scale_offset(lon[nrows - 1, 0], lon_scale, lon_offset)),
+            float(coordinate_utils.remove_scale_offset(lat[nrows - 1, 0], lat_scale, lat_offset)),
+        ),
+        (
+            float(coordinate_utils.remove_scale_offset(lon[nrows - 1, ncols - 1], lon_scale, lon_offset)),
+            float(coordinate_utils.remove_scale_offset(lat[nrows - 1, ncols - 1], lat_scale, lat_offset)),
+        ),
+        (
+            float(coordinate_utils.remove_scale_offset(lon[0, ncols - 1], lon_scale, lon_offset)),
+            float(coordinate_utils.remove_scale_offset(lat[0, ncols - 1], lat_scale, lat_offset)),
+        ),
     ]
-    if any(np.isnan(point[0]) or np.isnan(point[1]) or point[0] == lon_fill_value or point[1] == lat_fill_value for point in points):
+    if any(
+        np.isnan(point[0]) or np.isnan(point[1]) or point[0] == lon_fill_value or point[1] == lat_fill_value
+        for point in points
+    ):
         return None
     sorted_points = _ensure_counter_clockwise(points)
     wkt_polygon = (

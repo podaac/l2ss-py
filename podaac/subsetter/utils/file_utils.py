@@ -55,7 +55,7 @@ def test_access_sst_dtime_values(nc_dataset):
     try:
         with xr.open_dataset(xr.backends.NetCDF4DataStore(nc_dataset), **args) as dataset:
             for var_name in dataset.variables:
-                dataset[var_name].values  # pylint: disable=pointless-statement
+                dataset[var_name].values  # noqa: B018  # pylint: disable=pointless-statement
     except (TypeError, ValueError, KeyError):
         return False
     return True

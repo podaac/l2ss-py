@@ -165,7 +165,9 @@ def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
     return False
 
 
-def get_coordinate_variable_names(dataset: xr.Dataset, lat_var_names: list = None, lon_var_names: list = None, time_var_names: list = None) -> tuple[list[str], list[str], list[str]]:
+def get_coordinate_variable_names(
+    dataset: xr.Dataset, lat_var_names: list = None, lon_var_names: list = None, time_var_names: list = None
+) -> tuple[list[str], list[str], list[str]]:
     """
     Retrieve coordinate variables for this dataset. If coordinate
     variables are provided, use those, Otherwise, attempt to determine

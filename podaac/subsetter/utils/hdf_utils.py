@@ -89,7 +89,11 @@ def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
                 if existing is not None and existing != real:
                     # if two variables disagree on what this phony dim
                     # should be called then keep the first assignment and warn.
-                    warnings.warn(f"Conflicting DimensionNames for {phony!r}: " f"{existing!r} vs {real!r}.  Keeping {existing!r}.")
+                    warnings.warn(
+                        f"Conflicting DimensionNames for {phony!r}: "
+                        f"{existing!r} vs {real!r}.  Keeping {existing!r}.",
+                        stacklevel=2,
+                    )
                 else:
                     mapping[phony] = real
 
@@ -244,7 +248,12 @@ def _apply_from_field_dimlists(
                         continue
                     existing = local_mapping.get(current_dim)
                     if existing is not None and existing != real_name:
-                        warnings.warn(f"Conflicting ODL DimList for {current_dim!r} in " f"{node.path!r}: {existing!r} vs {real_name!r}. " f"Keeping {existing!r}.")
+                        warnings.warn(
+                            f"Conflicting ODL DimList for {current_dim!r} in "
+                            f"{node.path!r}: {existing!r} vs {real_name!r}. "
+                            f"Keeping {existing!r}.",
+                            stacklevel=2,
+                        )
                     else:
                         local_mapping[current_dim] = real_name
 

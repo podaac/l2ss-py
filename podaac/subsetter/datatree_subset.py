@@ -220,7 +220,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         The filtered DataTree with all nodes processed
     """
 
-    def process_node(node: DataTree, path: str, empty_paths) -> tuple[xr.Dataset, dict[str, DataTree]]:  # pylint: disable=too-many-branches
+    def process_node(
+        node: DataTree, path: str, empty_paths
+    ) -> tuple[xr.Dataset, dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
 
@@ -288,16 +290,28 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 new_type = variable.dtype
                 indexed_var = indexed_ds[variable_name]
 
-                if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(indexers.keys()).intersection(dataset[variable_name].dims):
+                if (
+                    partial_dim_in_in_vars
+                    and (indexers.keys() - dataset[variable_name].dims)
+                    and set(indexers.keys()).intersection(dataset[variable_name].dims)
+                ):
 
                     missing_dim = sorted(indexers.keys() - dataset[variable_name].dims)[0]
-                    var_indexers = {dim_name: dim_value for dim_name, dim_value in indexers.items() if dim_name in dataset[variable_name].dims}
+                    var_indexers = {
+                        dim_name: dim_value
+                        for dim_name, dim_value in indexers.items()
+                        if dim_name in dataset[variable_name].dims
+                    }
 
                     var_cond = cond.any(axis=cond.dims.index(missing_dim)).isel(**var_indexers)
                     indexed_var = dataset[variable_name].isel(**var_indexers)
                     new_dataset[variable_name] = indexed_var.where(var_cond)
                     variable = new_dataset[variable_name]
-                elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(indexers.keys()).intersection(new_dataset[variable_name].dims):
+                elif (
+                    partial_dim_in_in_vars
+                    and (indexers.keys() - dataset[variable_name].dims)
+                    and set(indexers.keys()).intersection(new_dataset[variable_name].dims)
+                ):
                     new_dataset[variable_name] = indexed_var
 
                     new_dataset[variable_name].attrs = indexed_var.attrs
@@ -305,7 +319,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 # Check if variable has no _FillValue. If so, use original data
                 if "_FillValue" not in variable.attrs or len(indexed_var.shape) == 0:
                     if original_type != new_type:
-                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable, str(original_type), dask="allowed", keep_attrs=True)
+                        new_dataset[variable_name] = xr.apply_ufunc(
+                            cast_type, variable, str(original_type), dask="allowed", keep_attrs=True
+                        )
 
                     # Replace nans with values from original dataset. If the
                     # variable has more than one dimension, copy the entire
@@ -328,7 +344,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                         fill_value = np.timedelta64("nat")
                     new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
                     if original_type != new_type:
-                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name], str(original_type), dask="allowed", keep_attrs=True)
+                        new_dataset[variable_name] = xr.apply_ufunc(
+                            cast_type, new_dataset[variable_name], str(original_type), dask="allowed", keep_attrs=True
+                        )
             processed_ds = new_dataset
             dc.sync_dims_inplace(dataset, processed_ds)
         else:
@@ -561,7 +579,9 @@ def find_matching_coords(dataset: xr.Dataset, match_list: list[str]) -> list[str
     list (str)
         List of matching coordinate variables names
     """
-    coord_attrs = [var.attrs["coordinates"] for var_name, var in dataset.data_vars.items() if "coordinates" in var.attrs]
+    coord_attrs = [
+        var.attrs["coordinates"] for var_name, var in dataset.data_vars.items() if "coordinates" in var.attrs
+    ]
     coord_attrs = list(set(coord_attrs))
     match_coord_vars = []
     for coord_attr in coord_attrs:
@@ -594,11 +614,19 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
         return None
 
     def method_2(path, ds):
-        pattern = re.compile(r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?", re.IGNORECASE)
+        pattern = re.compile(
+            r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?", re.IGNORECASE
+        )
         for var_name, var in ds.variables.items():
             if var_name in total_time_vars:
                 continue
-            if any([var.attrs.get("standard_name") == "time", var.attrs.get("axis") == "T", ("units" in var.attrs and pattern.match(var.attrs["units"]))]):
+            if any(
+                [
+                    var.attrs.get("standard_name") == "time",
+                    var.attrs.get("axis") == "T",
+                    ("units" in var.attrs and pattern.match(var.attrs["units"])),
+                ]
+            ):
                 if var.size > 1:
                     return f"{path}/{var_name}"
         return None
@@ -675,7 +703,9 @@ def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     return (value * scale) - offset
 
 
-def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: list[str], lon_var_names: list[str]) -> np.ndarray | None:
+def tree_get_spatial_bounds(
+    datatree: xr.Dataset, lat_var_names: list[str], lon_var_names: list[str]
+) -> np.ndarray | None:
     """
     Get the spatial bounds for this dataset tree. These values are masked and scaled.
 
@@ -869,7 +899,18 @@ def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
     group_encodings = {}
 
     # Types that should have compression
-    compress_types = {"float32", "float64", "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"}  # Floating point  # Signed integers  # Unsigned integers
+    compress_types = {
+        "float32",
+        "float64",
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+    }  # Floating point  # Signed integers  # Unsigned integers
 
     def process_node(node: DataTree, group_path: str):
         # Initialize encoding dict for this group
