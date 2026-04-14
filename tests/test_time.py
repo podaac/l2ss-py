@@ -1,11 +1,11 @@
-import pytest
-import xarray as xr
+
 import numpy as np
-from datetime import datetime
-import re
+import xarray as xr
+
+from podaac.subsetter import subset
 from podaac.subsetter.datatree_subset import compute_time_variable_name_tree, find_matching_coords
 from podaac.subsetter.utils import time_utils
-from podaac.subsetter import subset
+
 
 def create_test_dataset(coords=None, data_vars=None, attrs=None):
     """Helper function to create test datasets as a DataTree

@@ -3,6 +3,7 @@ run_subsetter.py
 
 This script runs L2SS-Py on the given granule.
 """
+
 import argparse
 import logging
 import os
@@ -22,92 +23,30 @@ def parse_args(args: list) -> tuple:
     tuple
         input_file, output_file, bbox, variables, min_time, max_time
     """
-    parser = argparse.ArgumentParser(description='Run l2ss-py')
+    parser = argparse.ArgumentParser(description="Run l2ss-py")
+    parser.add_argument("input_file", type=str, help="File to subset")
+    parser.add_argument("output_file", type=str, help="Output file")
+    parser.add_argument("--bbox", type=float, default=[-180, -90, 180, 90], nargs=4, action="store", help="Bounding box in the form min_lon min_lat max_lon max_lat")
     parser.add_argument(
-        'input_file',
-        type=str,
-        help='File to subset'
-    )
-    parser.add_argument(
-        'output_file',
-        type=str,
-        help='Output file'
-    )
-    parser.add_argument(
-        '--bbox',
-        type=float,
-        default=[-180, -90, 180, 90],
-        nargs=4,
-        action='store',
-        help='Bounding box in the form min_lon min_lat max_lon max_lat'
-    )
-    parser.add_argument(
-        '--variables',
+        "--variables",
         type=str,
         default=None,
-        nargs='+',
-        help='Variables, only include if variable subset is desired. '
-             'Should be a space separated list of variable names e.g. '
-             'sst wind_dir sst_error ...'
+        nargs="+",
+        help="Variables, only include if variable subset is desired. " "Should be a space separated list of variable names e.g. " "sst wind_dir sst_error ...",
     )
-    parser.add_argument(
-        '--min-time',
-        type=str,
-        default=None,
-        help='Min time. Should be ISO-8601 format. Only include if '
-             'temporal subset is desired.'
-    )
-    parser.add_argument(
-        '--max-time',
-        type=str,
-        default=None,
-        help='Max time. Should be ISO-8601 format. Only include if '
-             'temporal subset is desired.'
-    )
-    parser.add_argument(
-        '--cut',
-        default=False,
-        action='store_true',
-        help='If provided, scanline will be cut'
-    )
-    parser.add_argument(
-        '--shapefile',
-        type=str,
-        default=None,
-        help='Path to either shapefile or geojson file used to subset '
-             'the provided input granule'
-    )
-    parser.add_argument(
-        '--pixel_subset',
-        default=False,
-        action='store_true',
-        help='To pixel cut based the lon lat on the bounding box'
-    )
-    parser.add_argument(
-        '--vertical-var',
-        type=str,
-        default=None,
-        help='Name of the vertical variable to subset by (e.g., depth, altitude)'
-    )
-    parser.add_argument(
-        '--vertical-min',
-        type=float,
-        default=None,
-        help='Minimum value for vertical subsetting (inclusive)'
-    )
-    parser.add_argument(
-        '--vertical-max',
-        type=float,
-        default=None,
-        help='Maximum value for vertical subsetting (inclusive)'
-    )
+    parser.add_argument("--min-time", type=str, default=None, help="Min time. Should be ISO-8601 format. Only include if " "temporal subset is desired.")
+    parser.add_argument("--max-time", type=str, default=None, help="Max time. Should be ISO-8601 format. Only include if " "temporal subset is desired.")
+    parser.add_argument("--cut", default=False, action="store_true", help="If provided, scanline will be cut")
+    parser.add_argument("--shapefile", type=str, default=None, help="Path to either shapefile or geojson file used to subset " "the provided input granule")
+    parser.add_argument("--pixel_subset", default=False, action="store_true", help="To pixel cut based the lon lat on the bounding box")
+    parser.add_argument("--vertical-var", type=str, default=None, help="Name of the vertical variable to subset by (e.g., depth, altitude)")
+    parser.add_argument("--vertical-min", type=float, default=None, help="Minimum value for vertical subsetting (inclusive)")
+    parser.add_argument("--vertical-max", type=float, default=None, help="Maximum value for vertical subsetting (inclusive)")
 
     args = parser.parse_args(args=args)
     bbox = np.array([[args.bbox[0], args.bbox[2]], [args.bbox[1], args.bbox[3]]])
 
-    return args.input_file, args.output_file, bbox, args.variables, \
-        args.min_time, args.max_time, args.cut, args.shapefile, args.pixel_subset, \
-        args.vertical_var, args.vertical_min, args.vertical_max
+    return args.input_file, args.output_file, bbox, args.variables, args.min_time, args.max_time, args.cut, args.shapefile, args.pixel_subset, args.vertical_var, args.vertical_min, args.vertical_max
 
 
 def run_subsetter(args: list) -> None:
@@ -116,7 +55,7 @@ def run_subsetter(args: list) -> None:
     """
     input_file, output_file, bbox, variables, min_time, max_time, cut, shapefile, pixel_subset, vertical_var, vertical_min, vertical_max = parse_args(args)
 
-    logging.info('Executing subset on %s...', input_file)
+    logging.info("Executing subset on %s...", input_file)
     subset.subset(
         file_to_subset=input_file,
         bbox=bbox,
@@ -130,20 +69,16 @@ def run_subsetter(args: list) -> None:
         pixel_subset=pixel_subset,
         vertical_var=vertical_var,
         vertical_min=vertical_min,
-        vertical_max=vertical_max
+        vertical_max=vertical_max,
     )
-    logging.info('Subset complete. Result in %s', output_file)
+    logging.info("Subset complete. Result in %s", output_file)
 
 
 def main() -> None:
     """Entry point to the script"""
-    logging.basicConfig(
-        stream=sys.stdout,
-        format='[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s',
-        level=logging.DEBUG
-    )
+    logging.basicConfig(stream=sys.stdout, format="[%(asctime)s] {%(filename)s:%(lineno)d} %(levelname)s - %(message)s", level=logging.DEBUG)
     run_subsetter(sys.argv[1:])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

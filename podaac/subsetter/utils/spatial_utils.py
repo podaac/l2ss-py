@@ -8,6 +8,7 @@ Utility functions for geospatial calculations and polygon operations.
 
 import numpy as np
 from shapely.geometry import MultiPolygon, Point, Polygon
+
 from podaac.subsetter.utils import coordinate_utils
 
 
@@ -23,10 +24,7 @@ def create_geospatial_bounding_box(spatial_bounds_array, east, west):
     if west:
         lon_max = west
 
-    wkt_polygon = (
-        f"POLYGON (({lon_min:.5f} {lat_min:.5f}, {lon_max:.5f} {lat_min:.5f}, "
-        f"{lon_max:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_min:.5f}))"
-    )
+    wkt_polygon = f"POLYGON (({lon_min:.5f} {lat_min:.5f}, {lon_max:.5f} {lat_min:.5f}, " f"{lon_max:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_max:.5f}, {lon_min:.5f} {lat_min:.5f}))"
     return wkt_polygon
 
 
@@ -35,13 +33,13 @@ def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
     for lon_var_name, lat_var_name in zip(lon_var_names, lat_var_names):
         lon = dataset[lon_var_name]
         lat = dataset[lat_var_name]
-        lon_fill_value = lon.attrs.get('_FillValue', None)
-        lat_fill_value = lat.attrs.get('_FillValue', None)
+        lon_fill_value = lon.attrs.get("_FillValue", None)
+        lat_fill_value = lat.attrs.get("_FillValue", None)
         break
-    lon_scale = lon.attrs.get('scale_factor', 1.0)
-    lon_offset = lon.attrs.get('add_offset', 0.0)
-    lat_scale = lat.attrs.get('scale_factor', 1.0)
-    lat_offset = lat.attrs.get('add_offset', 0.0)
+    lon_scale = lon.attrs.get("scale_factor", 1.0)
+    lon_offset = lon.attrs.get("add_offset", 0.0)
+    lat_scale = lat.attrs.get("scale_factor", 1.0)
+    lat_offset = lat.attrs.get("add_offset", 0.0)
     if lon.ndim != 2 or lat.ndim != 2:
         return None
     nrows, ncols = lon.shape
@@ -49,7 +47,7 @@ def create_geospatial_bounds(dataset, lon_var_names, lat_var_names):
         (float(coordinate_utils.remove_scale_offset(lon[0, 0], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[0, 0], lat_scale, lat_offset))),
         (float(coordinate_utils.remove_scale_offset(lon[nrows - 1, 0], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[nrows - 1, 0], lat_scale, lat_offset))),
         (float(coordinate_utils.remove_scale_offset(lon[nrows - 1, ncols - 1], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[nrows - 1, ncols - 1], lat_scale, lat_offset))),
-        (float(coordinate_utils.remove_scale_offset(lon[0, ncols - 1], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[0, ncols - 1], lat_scale, lat_offset)))
+        (float(coordinate_utils.remove_scale_offset(lon[0, ncols - 1], lon_scale, lon_offset)), float(coordinate_utils.remove_scale_offset(lat[0, ncols - 1], lat_scale, lat_offset))),
     ]
     if any(np.isnan(point[0]) or np.isnan(point[1]) or point[0] == lon_fill_value or point[1] == lat_fill_value for point in points):
         return None
@@ -86,7 +84,7 @@ def get_east_west_lon(dataset, lon_var_name):
     lon_2d = dataset[lon_var_name]
     if lon_2d is None:
         return None, None
-    fill_value = lon_2d.attrs.get('_FillValue', None)
+    fill_value = lon_2d.attrs.get("_FillValue", None)
     lon_flat = lon_2d.values.flatten()
     if fill_value is not None:
         lon_flat = lon_flat[lon_flat != fill_value]
@@ -144,10 +142,7 @@ def translate_longitude(geometry):
 
         exterior = translate_coordinates(polygon.exterior.coords)
 
-        interiors = [
-            translate_coordinates(ring.coords)
-            for ring in polygon.interiors
-        ]
+        interiors = [translate_coordinates(ring.coords) for ring in polygon.interiors]
 
         return Polygon(exterior, interiors)
 

@@ -1,13 +1,7 @@
-import operator
-import shutil
-import tempfile
-import warnings
 import urllib.parse
 from os import listdir
-from os.path import dirname, isfile, join, realpath
-from unittest import TestCase
+from os.path import isfile, join
 
-import netCDF4 as nc
 import numpy as np
 import pytest
 import xarray as xr
@@ -41,7 +35,7 @@ def compare_java(test_file, cut, data_dir, subset_output_dir, request):
     file, bbox = next(iter([b for b in bbox_map if b[0] in test_file]))
     java_file = next(iter([f for f in java_files if file in f]))
 
-    output_file = "{}_{}".format(urllib.parse.quote_plus(request.node.name), test_file)
+    output_file = f"{urllib.parse.quote_plus(request.node.name)}_{test_file}"
     subset.subset(
         file_to_subset=join(data_dir, test_file),
         bbox=np.array(bbox),

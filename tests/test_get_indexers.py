@@ -1,8 +1,10 @@
-import pytest
+import operator
+
 import numpy as np
 import xarray as xr
-import operator
+
 from podaac.subsetter.datatree_subset import get_indexers_from_nd
+
 
 def create_lon_lat_condition_dataset(
     lon_bounds, lat_bounds, 

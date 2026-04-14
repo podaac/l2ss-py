@@ -17,23 +17,22 @@ subset_harmony.py
 
 Implementation of harmony-service-lib that invokes the Level 2 subsetter.
 """
+
 import argparse
 import os
-import subprocess
 import shutil
-from tempfile import mkdtemp
-import traceback
-from typing import List, Union
+import subprocess
 import sys
-
-import pystac
-from pystac import Asset
+import traceback
+from tempfile import mkdtemp
 
 import harmony_service_lib
 import numpy as np
+import pystac
 from harmony_service_lib import BaseHarmonyAdapter
-from harmony_service_lib.util import download, stage, generate_output_filename, bbox_to_geometry
 from harmony_service_lib.exceptions import HarmonyException, NoDataException
+from harmony_service_lib.util import bbox_to_geometry, download, generate_output_filename, stage
+from pystac import Asset
 
 from podaac.subsetter import subset
 from podaac.subsetter.subset import SERVICE_NAME
@@ -43,6 +42,7 @@ DATA_DIRECTORY_ENV = "DATA_DIRECTORY"
 
 class L2SSException(HarmonyException):
     """L2SS Exception class for custom error messages to see in harmony api calls."""
+
     def __init__(self, original_exception):
         # Ensure we can extract traceback information
         if original_exception.__traceback__ is None:
@@ -62,17 +62,16 @@ class L2SSException(HarmonyException):
         error_msg = str(original_exception)
 
         # Format the error message to be more readable
-        readable_message = (f"Error in file '{filename}', line {lineno}, in function '{funcname}': "
-                            f"{error_msg}")
+        readable_message = f"Error in file '{filename}', line {lineno}, in function '{funcname}': " f"{error_msg}"
 
         # Call the parent class constructor with the formatted message and category
-        super().__init__(readable_message, 'podaac/l2-subsetter')
+        super().__init__(readable_message, "podaac/l2-subsetter")
 
         # Store the original exception for potential further investigation
         self.original_exception = original_exception
 
 
-def podaac_to_harmony_bbox(bbox: np.ndarray) -> Union[np.ndarray, float]:
+def podaac_to_harmony_bbox(bbox: np.ndarray) -> np.ndarray | float:
     """
     Convert PO.DAAC bbox ((west, east), (south, north))
     to Harmony bbox (west, south, east, north)
@@ -108,8 +107,7 @@ def harmony_to_podaac_bbox(bbox: list) -> np.ndarray:
     np.array
         PO.DAAC bbox
     """
-    return np.array(((bbox[0], bbox[2]),
-                     (bbox[1], bbox[3])))
+    return np.array(((bbox[0], bbox[2]), (bbox[1], bbox[3])))
 
 
 class L2SubsetterService(BaseHarmonyAdapter):
@@ -121,7 +119,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
     def __init__(self, message, catalog=None, config=None):
         super().__init__(message, catalog, config)
 
-        self.data_dir = os.getenv(DATA_DIRECTORY_ENV, '/home/dockeruser/data')
+        self.data_dir = os.getenv(DATA_DIRECTORY_ENV, "/home/dockeruser/data")
 
     def process_item(self, item: pystac.Item, source: harmony_service_lib.message.Source) -> pystac.Item:  # pylint: disable=too-many-branches
         """
@@ -149,12 +147,8 @@ class L2SubsetterService(BaseHarmonyAdapter):
         self.prepare_output_dir(output_dir)
         try:
             # Get the data file
-            asset = next(v for k, v in item.assets.items() if 'data' in (v.roles or []))
-            input_filename = download(asset.href,
-                                      temp_dir,
-                                      logger=self.logger,
-                                      access_token=self.message.accessToken,
-                                      cfg=self.config)
+            asset = next(v for k, v in item.assets.items() if "data" in (v.roles or []))
+            input_filename = download(asset.href, temp_dir, logger=self.logger, access_token=self.message.accessToken, cfg=self.config)
 
             message = self.message
 
@@ -169,99 +163,76 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 harmony_bbox = message.subset.bbox
 
             if message.subset and message.subset.shape:
-                subset_params['shapefile'] = download(
-                    message.subset.shape.href,
-                    temp_dir,
-                    logger=self.logger,
-                    access_token=self.message.accessToken,
-                    cfg=self.config
-                )
+                subset_params["shapefile"] = download(message.subset.shape.href, temp_dir, logger=self.logger, access_token=self.message.accessToken, cfg=self.config)
 
             if message.temporal:
-                subset_params['min_time'] = message.temporal.start
-                subset_params['max_time'] = message.temporal.end
+                subset_params["min_time"] = message.temporal.start
+                subset_params["max_time"] = message.temporal.end
 
             if message.pixelSubset:
-                subset_params['pixel_subset'] = message.pixelSubset
+                subset_params["pixel_subset"] = message.pixelSubset
 
             if message.subset and message.subset.dimensions:
                 # Vertical dimension subsetting via a variable, only handle one for now
-                subset_params['vertical_var'] = message.subset.dimensions[0].name
-                subset_params['vertical_min'] = message.subset.dimensions[0].min
-                subset_params['vertical_max'] = message.subset.dimensions[0].max
+                subset_params["vertical_var"] = message.subset.dimensions[0].name
+                subset_params["vertical_min"] = message.subset.dimensions[0].min
+                subset_params["vertical_max"] = message.subset.dimensions[0].max
 
-            subset_params['bbox'] = harmony_to_podaac_bbox(harmony_bbox)
+            subset_params["bbox"] = harmony_to_podaac_bbox(harmony_bbox)
 
             try:
-                harmony_cut = message.extraArgs['cut']
+                harmony_cut = message.extraArgs["cut"]
                 if harmony_cut is None:
-                    subset_params['cut'] = True
+                    subset_params["cut"] = True
                 else:
-                    subset_params['cut'] = harmony_cut
+                    subset_params["cut"] = harmony_cut
             except (KeyError, AttributeError, TypeError):
-                subset_params['cut'] = True
+                subset_params["cut"] = True
 
             if source.variables:
-                subset_params['variables'] = [variable.name for variable in source.process('variables')]
+                subset_params["variables"] = [variable.name for variable in source.process("variables")]
 
             if source.coordinateVariables:
-                coordinate_variables = list(
-                    filter(lambda var: var.type and var.subtype, source.coordinateVariables)
-                )
+                coordinate_variables = list(filter(lambda var: var.type and var.subtype, source.coordinateVariables))
 
                 def filter_by_subtype(variables, subtype):
-                    return list(map(lambda var: var.name, filter(
-                        lambda var: var.subtype == subtype, variables
-                    )))
-                subset_params['lat_var_names'] = filter_by_subtype(coordinate_variables, 'LATITUDE')
-                subset_params['lon_var_names'] = filter_by_subtype(coordinate_variables, 'LONGITUDE')
-                subset_params['time_var_names'] = filter_by_subtype(coordinate_variables, 'TIME')
+                    return list(map(lambda var: var.name, filter(lambda var: var.subtype == subtype, variables)))
 
-            subset_params['output_file'] = f'{output_dir}/{os.path.basename(input_filename)}'
-            subset_params['file_to_subset'] = input_filename
+                subset_params["lat_var_names"] = filter_by_subtype(coordinate_variables, "LATITUDE")
+                subset_params["lon_var_names"] = filter_by_subtype(coordinate_variables, "LONGITUDE")
+                subset_params["time_var_names"] = filter_by_subtype(coordinate_variables, "TIME")
 
-            operations = {
-                "variable_subset": subset_params.get('variables'),
-                "is_subsetted": True
-            }
+            subset_params["output_file"] = f"{output_dir}/{os.path.basename(input_filename)}"
+            subset_params["file_to_subset"] = input_filename
+
+            operations = {"variable_subset": subset_params.get("variables"), "is_subsetted": True}
 
             original_file_extension = os.path.splitext(input_filename)[1]
 
             staged_filename_true = generate_output_filename(asset.href, original_file_extension, **operations)
 
-            operations = {
-                "variable_subset": subset_params.get('variables'),
-                "is_subsetted": False
-            }
+            operations = {"variable_subset": subset_params.get("variables"), "is_subsetted": False}
             staged_filename_false = generate_output_filename(asset.href, original_file_extension, **operations)
 
-            subset_params['stage_file_name_subsetted_true'] = staged_filename_true
-            subset_params['stage_file_name_subsetted_false'] = staged_filename_false
+            subset_params["stage_file_name_subsetted_true"] = staged_filename_true
+            subset_params["stage_file_name_subsetted_false"] = staged_filename_false
 
-            self.logger.info('Calling l2ss-py subset with params %s', subset_params)
+            self.logger.info("Calling l2ss-py subset with params %s", subset_params)
             result_bbox = subset.subset(**subset_params)
 
             # Stage the output file with a conventional filename
-            mime = 'application/x-netcdf4'
-            operations = {
-                "variable_subset": subset_params.get('variables'),
-                "is_subsetted": bool(result_bbox is not None)
-            }
+            mime = "application/x-netcdf4"
+            operations = {"variable_subset": subset_params.get("variables"), "is_subsetted": bool(result_bbox is not None)}
             staged_filename = generate_output_filename(asset.href, original_file_extension, **operations)
 
-            url = stage(subset_params['output_file'],
-                        staged_filename,
-                        mime,
-                        location=message.stagingLocation,
-                        logger=self.logger,
-                        cfg=self.config)
+            url = stage(subset_params["output_file"], staged_filename, mime, location=message.stagingLocation, logger=self.logger, cfg=self.config)
 
             # Update the STAC record
-            asset = Asset(url, title=staged_filename, media_type=mime, roles=['data'])
-            result.assets['data'] = asset
+            asset = Asset(url, title=staged_filename, media_type=mime, roles=["data"])
+            result.assets["data"] = asset
             if result_bbox is not None:
                 if message.subset:
-                    message.subset.process('bbox')
+                    message.subset.process("bbox")
                     bounding_box_array = np.array(podaac_to_harmony_bbox(result_bbox))
                     if not np.all(np.isnan(bounding_box_array)):
                         result.bbox = podaac_to_harmony_bbox(result_bbox)
@@ -294,10 +265,10 @@ class L2SubsetterService(BaseHarmonyAdapter):
         output_dir : string
             the directory to delete and recreate
         """
-        self.cmd('rm', '-rf', output_dir)
-        self.cmd('mkdir', '-p', output_dir)
+        self.cmd("rm", "-rf", output_dir)
+        self.cmd("mkdir", "-p", output_dir)
 
-    def cmd(self, *args) -> List[str]:
+    def cmd(self, *args) -> list[str]:
         """
         Logs and then runs command.
 
@@ -309,7 +280,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
         -------
         Command output
         """
-        self.logger.info("%s %s", args[0], " ".join(["'{}'".format(arg) for arg in args[1:]]))  # pylint: disable=C0209
+        self.logger.info("%s %s", args[0], " ".join([f"'{arg}'" for arg in args[1:]]))  # pylint: disable=C0209
         result_str = subprocess.check_output(args).decode("utf-8")
         return result_str.split("\n")
 
@@ -326,8 +297,7 @@ def main(config: harmony_service_lib.util.Config = None) -> None:
     -------
     None
     """
-    parser = argparse.ArgumentParser(prog=SERVICE_NAME,
-                                     description='Run the l2_subsetter service')
+    parser = argparse.ArgumentParser(prog=SERVICE_NAME, description="Run the l2_subsetter service")
     harmony_service_lib.setup_cli(parser)
     args = parser.parse_args()
     if harmony_service_lib.is_harmony_cli(args):

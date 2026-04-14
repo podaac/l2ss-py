@@ -24,43 +24,32 @@ subsetting functionality itself, and should provide coverage on the
 following files:
     - podaac.subsetter.subset.py
 """
+import gc as garbage_collection
 import json
 import operator
 import os
 import shutil
 import tempfile
-import urllib.parse
 from os import listdir
-from os.path import dirname, join, realpath, isfile, basename
+from os.path import basename, dirname, isfile, join, realpath
 from pathlib import Path
-from unittest import TestCase
 
 import geopandas as gpd
+import h5py
 import importlib_metadata
 import netCDF4 as nc
-import h5py
 import numpy as np
-import warnings
 import pandas as pd
 import pytest
 import xarray as xr
+from harmony_service_lib.exceptions import NoDataException
 from jsonschema import validate
 from shapely.geometry import Point
-from unittest.mock import patch
 
-from podaac.subsetter import subset
-from podaac.subsetter import datatree_subset
-from podaac.subsetter.subset import SERVICE_NAME
+from podaac.subsetter import datatree_subset, subset
 from podaac.subsetter.datatree_subset import get_indexers_from_nd
-from harmony_service_lib.exceptions import NoDataException
-
-from podaac.subsetter.utils import mask_utils
-from podaac.subsetter.utils import coordinate_utils
-from podaac.subsetter.utils import metadata_utils
-from podaac.subsetter.utils import time_utils
-from podaac.subsetter.utils import file_utils
-
-import gc as garbage_collection
+from podaac.subsetter.subset import SERVICE_NAME
+from podaac.subsetter.utils import coordinate_utils, file_utils, time_utils
 
 GROUP_DELIM = '__'
 
@@ -250,15 +239,15 @@ def test_history_metadata_create(data_dir, subset_output_dir, request):
     test_file = next(filter(
         lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
         , TEST_DATA_FILES))
-    output_file = "{}_{}".format(request.node.name, test_file)
+    output_file = f"{request.node.name}_{test_file}"
 
     # Remove the 'history' metadata from the granule
     in_nc = xr.open_dataset(join(data_dir, test_file))
     del in_nc.attrs['history']
-    in_nc.to_netcdf(join(subset_output_dir, 'int_{}'.format(output_file)), 'w')
+    in_nc.to_netcdf(join(subset_output_dir, f'int_{output_file}'), 'w')
 
     subset.subset(
-        file_to_subset=join(subset_output_dir, "int_{}".format(output_file)),
+        file_to_subset=join(subset_output_dir, f"int_{output_file}"),
         bbox=np.array(((-180, 180), (-90.0, 90))),
         output_file=join(subset_output_dir, output_file)
     )
@@ -327,7 +316,7 @@ def test_data_1D(data_dir, subset_output_dir, request):
     Test that subsetting a 1-D granule does not result in failure.
     """
     merged_jason_filename = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
-    output_file = "{}_{}".format(request.node.name, merged_jason_filename)
+    output_file = f"{request.node.name}_{merged_jason_filename}"
 
     subset.subset(
         file_to_subset=join(data_dir, merged_jason_filename),
@@ -604,7 +593,7 @@ def test_temporal_subset_ascat(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2015-07-02T09:00:00'
     max_time = '2015-07-02T10:00:00'
 
@@ -651,7 +640,7 @@ def test_temporal_subset_modis_a(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'MODIS_A-JPL-L2P-v2014.0.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2019-08-05T06:57:00'
     max_time = '2019-08-05T06:58:00'
     # Actual min is 2019-08-05T06:55:01.000000000
@@ -708,7 +697,7 @@ def test_temporal_subset_s6(data_dir, subset_output_dir, request):
         os.path.join(data_dir, 'sentinel_6', file),
         os.path.join(subset_output_dir, file)
     )
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2020-12-07T01:20:00'
     max_time = '2020-12-07T01:25:00'
     # Actual min is 2020-12-07T01:15:01.000000000
@@ -743,7 +732,7 @@ def test_subset_jason(data_dir, subset_output_dir, request):
     """TODO: Give description to this test function."""
     bbox = np.array(((-180, 0), (-90, 90)))
     file = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = "2002-01-15T06:07:06Z"
     max_time = "2002-01-15T06:30:16Z"
 
@@ -771,7 +760,7 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     sndr_spatial = [(-180,-150), (-15,180), (-180,30)]
     for sndr_file, box in zip(sndr_files, sndr_spatial):
         bbox = np.array(((box[0], box[1]), (-90, 90)))
-        output_file = "{}_{}".format(request.node.name, sndr_file)
+        output_file = f"{request.node.name}_{sndr_file}"
         shutil.copyfile(
             os.path.join(SNDR_dir, sndr_file),
             os.path.join(subset_output_dir, sndr_file)
@@ -806,7 +795,7 @@ def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     sndr_file = 'SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc'
 
     bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, sndr_file)
+    output_file = f"{request.node.name}_{sndr_file}"
     shutil.copyfile(
         os.path.join(SNDR_dir, sndr_file),
         os.path.join(subset_output_dir, sndr_file)
@@ -836,7 +825,7 @@ def test_duplicate_dims_tropomi(data_dir, subset_output_dir, request):
     trop_file = 'S5P_OFFL_L2__AER_LH_20210704T005246_20210704T023416_19290_02_020200_20210708T023111.nc'
 
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, trop_file)
+    output_file = f"{request.node.name}_{trop_file}"
     shutil.copyfile(
         os.path.join(TROP_dir, trop_file),
         os.path.join(subset_output_dir, trop_file)
@@ -865,7 +854,7 @@ def test_duplicate_dims_tempo_ozone(data_dir, subset_output_dir, request):
     tempo_ozone_file = 'TEMPO_O3PROF-PROXY_L2_V01_20130831T222959Z_S014G06.nc'
 
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, tempo_ozone_file)
+    output_file = f"{request.node.name}_{tempo_ozone_file}"
     shutil.copyfile(
         os.path.join(TEMPO_dir, tempo_ozone_file),
         os.path.join(subset_output_dir, tempo_ozone_file)
@@ -892,7 +881,7 @@ def test_no_null_time_values_in_time_and_space_subset_for_tempo(data_dir, subset
     tempo_no2_file = 'TEMPO_NO2_L2_V01_20231206T131913Z_S002G04.nc'
 
     bbox = np.array(((-87, -83), (28.5, 33.7)))
-    output_file = "{}_{}".format(request.node.name, tempo_no2_file)
+    output_file = f"{request.node.name}_{tempo_no2_file}"
     shutil.copyfile(
         os.path.join(TEMPO_dir, tempo_no2_file),
         os.path.join(subset_output_dir, tempo_no2_file)
@@ -921,7 +910,7 @@ def test_omi_novars_subset(data_dir, subset_output_dir, request):
     omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
 
     bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
+    output_file = f"{request.node.name}_{omi_file}"
     shutil.copyfile(
         os.path.join(omi_dir, omi_file),
         os.path.join(subset_output_dir, omi_file)
@@ -1052,7 +1041,7 @@ def test_temporal_merged_topex(data_dir, subset_output_dir, request):
         os.path.join(data_dir, file),
         os.path.join(subset_output_dir, file)
     )
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '1992-01-01T00:00:00'
     max_time = '1992-11-01T00:00:00'
     # Actual min is 2020-12-07T01:15:01.000000000
@@ -1121,7 +1110,7 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2015-07-02T09:00:00'
     max_time = '2015-07-02T10:00:00'
     variables = [
@@ -1224,7 +1213,7 @@ def test_omi_pixcor(data_dir, subset_output_dir, request):
     omi_file = 'OMI-Aura_L2-OMPIXCOR_2020m0116t1207-o82471_v003-2020m0116t174929.he5'
     omi_file_input = 'input' + omi_file
     bbox = np.array(((-180, 180), (-30, 30)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
+    output_file = f"{request.node.name}_{omi_file}"
 
     shutil.copyfile(
         os.path.join(omi_dir, omi_file),
@@ -1251,7 +1240,7 @@ def test_MLS_levels(data_dir, subset_output_dir, request):
     mls_file = 'MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5'
     mls_file_input = 'input' + mls_file
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, mls_file)
+    output_file = f"{request.node.name}_{mls_file}"
 
     shutil.copyfile(
         os.path.join(mls_dir, mls_file),
@@ -1286,7 +1275,7 @@ def test_he5_timeattrs_output(data_dir, subset_output_dir, request):
     omi_file = 'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'
     omi_file_input = 'input' + omi_file
     bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
+    output_file = f"{request.node.name}_{omi_file}"
     shutil.copyfile(
         os.path.join(omi_dir, omi_file),
         os.path.join(subset_output_dir, omi_file)
@@ -1324,7 +1313,7 @@ def test_he5_timeattrs_output(data_dir, subset_output_dir, request):
             if np.array_equal(inattrs[key], outattrs[key]):
                 pass
             else:
-                raise AssertionError('Attributes for {} do not equal each other'.format(key))
+                raise AssertionError(f'Attributes for {key} do not equal each other')
         else:
             assert inattrs[key] == outattrs[key]
 
@@ -1333,7 +1322,7 @@ def test_temporal_subset_lines(data_dir, subset_output_dir, request):
     """TODO: Give description to this test function."""
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2012-11-11T23:59:10'
     max_time = '2012-11-12T00:20:10'
 
@@ -1361,7 +1350,7 @@ def test_grouped_empty_subset(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-10, 10), (-10, 10)))
     file = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
 
     shutil.copyfile(os.path.join(data_dir, 'sentinel_6', file),
                     os.path.join(subset_output_dir, file))
@@ -1415,7 +1404,7 @@ def test_empty_temporal_subset(data_dir, subset_output_dir, request):
     #  37.707:38.484
     bbox = np.array(((37.707, 38.484), (-13.265, -12.812)))
     file = '20190927000500-JPL-L2P_GHRSST-SSTskin-MODIS_A-D-v02.0-fv01.0.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2019-09-01'
     max_time = '2019-09-30'
 
@@ -1519,8 +1508,8 @@ def test_var_subsetting_tropomi(data_dir, subset_output_dir, request):
     variable_slash = ['/PRODUCT/methane_mixing_ratio']
     variable_noslash = ['PRODUCT/methane_mixing_ratio']
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file_slash = "{}_{}".format(request.node.name, trop_file)
-    output_file_noslash = "{}_noslash_{}".format(request.node.name, trop_file)
+    output_file_slash = f"{request.node.name}_{trop_file}"
+    output_file_noslash = f"{request.node.name}_noslash_{trop_file}"
     shutil.copyfile(
         os.path.join(trop_dir, trop_file),
         os.path.join(subset_output_dir, trop_file)
@@ -1553,7 +1542,7 @@ def test_tropomi_utc_time(data_dir, subset_output_dir, request):
     trop_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
     variable = ['/PRODUCT/time_utc', '/PRODUCT/corner']
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, trop_file)
+    output_file = f"{request.node.name}_{trop_file}"
     shutil.copyfile(
         os.path.join(trop_dir, trop_file),
         os.path.join(subset_output_dir, trop_file)
@@ -1781,7 +1770,7 @@ def test_subset_gpm_compute_new_var_data(fake_gpm_file, data_dir, subset_output_
     # Correct bbox with (min_lon, min_lat) and (max_lon, max_lat)
     bbox = np.array(((-180, 90), (-90, 90)))
 
-    output_file = f"gpm_test_subset.HDF5"  # Keep the extension
+    output_file = "gpm_test_subset.HDF5"  # Keep the extension
     subset_output_file = join(subset_output_dir, output_file)
     subset.subset(
         file_to_subset=fake_gpm_file,

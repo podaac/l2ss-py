@@ -4,18 +4,20 @@
 import datetime
 import logging
 import re
-from typing import Dict, List, Set, Tuple, Union
 
 import cf_xarray as cfxr
 import numpy as np
 import xarray as xr
-from xarray import DataTree
 from netCDF4 import date2num  # pylint: disable=no-name-in-module
+from xarray import DataTree
+
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter.utils import mask_utils
+
 try:
     from harmony_service_lib.exceptions import NoDataException
 except ImportError:
+
     class NoDataException(Exception):
         """Fallback exception if harmony_service_lib is not available."""
 
@@ -42,9 +44,7 @@ def get_indexers_from_1d(cond: xr.Dataset) -> dict:
     if not cols.any():
         logging.info("No data within the given bounding box.")
 
-    indexers = {
-        cond.dims[0]: np.where(cols)[0]
-    }
+    indexers = {cond.dims[0]: np.where(cols)[0]}
     return indexers
 
 
@@ -72,11 +72,11 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     if ndim == 2:
         x_axis, y_axis = 1, 0
     else:
-        if 'xtrack' in cond.dims and 'atrack' in cond.dims:
-            x_axis, y_axis = cond.dims.index('xtrack'), cond.dims.index('atrack')
+        if "xtrack" in cond.dims and "atrack" in cond.dims:
+            x_axis, y_axis = cond.dims.index("xtrack"), cond.dims.index("atrack")
             transpose = True
-        elif 'xdim_grid' in cond.dims and 'ydim_grid' in cond.dims:
-            x_axis, y_axis = cond.dims.index('xdim_grid'), cond.dims.index('ydim_grid')
+        elif "xdim_grid" in cond.dims and "ydim_grid" in cond.dims:
+            x_axis, y_axis = cond.dims.index("xdim_grid"), cond.dims.index("ydim_grid")
             dim_grid = x_axis == 1 and y_axis == 0
         else:
             x_axis, y_axis = 2, 1
@@ -104,10 +104,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
         elif not dim_grid:
             rows, cols = rows[0], cols[0]
 
-    indexers = {
-        cond_dims[y_axis]: np.where(rows)[0],
-        cond_dims[x_axis]: np.where(cols)[0]
-    }
+    indexers = {cond_dims[y_axis]: np.where(rows)[0], cond_dims[x_axis]: np.where(cols)[0]}
 
     return indexers
 
@@ -131,7 +128,7 @@ def get_sibling_or_parent_condition(condition_dict, path):
         Any: The condition found in the dictionary, or None if no match exists.
     """
     # Normalize the path by removing trailing slashes
-    path = path.rstrip('/')
+    path = path.rstrip("/")
 
     # First try to find parent match by walking up the tree
     current_path = path
@@ -145,7 +142,7 @@ def get_sibling_or_parent_condition(condition_dict, path):
     # If no parent found, look for sibling match with same immediate parent
     path_parts = path.split("/")
     for potential_path in condition_dict:
-        potential_path_clean = potential_path.rstrip('/')
+        potential_path_clean = potential_path.rstrip("/")
         potential_parts = potential_path_clean.split("/")
         if len(path_parts) == len(potential_parts):
             # Check if immediate parent matches
@@ -154,7 +151,7 @@ def get_sibling_or_parent_condition(condition_dict, path):
 
     # If no such sibling found, fall back to original sibling logic (common grandparent)
     for potential_path in condition_dict:
-        potential_path_clean = potential_path.rstrip('/')
+        potential_path_clean = potential_path.rstrip("/")
         potential_parts = potential_path_clean.split("/")
         if len(path_parts) == len(potential_parts):
             # Check if they share the same structure up to grandparent
@@ -222,7 +219,8 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     xarray.DataTree
         The filtered DataTree with all nodes processed
     """
-    def process_node(node: DataTree, path: str, empty_paths) -> Tuple[xr.Dataset, Dict[str, DataTree]]:  # pylint: disable=too-many-branches
+
+    def process_node(node: DataTree, path: str, empty_paths) -> tuple[xr.Dataset, dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
 
@@ -267,7 +265,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             partial_dim_in_in_vars = partial_dim_in_vars
 
             indexed_cond = cond.isel(**indexers)
-            indexed_ds = dataset.isel(**indexers, missing_dims='ignore')
+            indexed_ds = dataset.isel(**indexers, missing_dims="ignore")
 
             if pixel_subset:
                 new_dataset = indexed_ds
@@ -290,31 +288,24 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 new_type = variable.dtype
                 indexed_var = indexed_ds[variable_name]
 
-                if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
-                        indexers.keys()).intersection(dataset[variable_name].dims):
+                if partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(indexers.keys()).intersection(dataset[variable_name].dims):
 
                     missing_dim = sorted(indexers.keys() - dataset[variable_name].dims)[0]
-                    var_indexers = {
-                        dim_name: dim_value for dim_name, dim_value in indexers.items()
-                        if dim_name in dataset[variable_name].dims
-                    }
+                    var_indexers = {dim_name: dim_value for dim_name, dim_value in indexers.items() if dim_name in dataset[variable_name].dims}
 
                     var_cond = cond.any(axis=cond.dims.index(missing_dim)).isel(**var_indexers)
                     indexed_var = dataset[variable_name].isel(**var_indexers)
                     new_dataset[variable_name] = indexed_var.where(var_cond)
                     variable = new_dataset[variable_name]
-                elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(
-                        indexers.keys()).intersection(new_dataset[variable_name].dims):
+                elif partial_dim_in_in_vars and (indexers.keys() - dataset[variable_name].dims) and set(indexers.keys()).intersection(new_dataset[variable_name].dims):
                     new_dataset[variable_name] = indexed_var
 
                     new_dataset[variable_name].attrs = indexed_var.attrs
                     variable.attrs = indexed_var.attrs
                 # Check if variable has no _FillValue. If so, use original data
-                if '_FillValue' not in variable.attrs or len(indexed_var.shape) == 0:
+                if "_FillValue" not in variable.attrs or len(indexed_var.shape) == 0:
                     if original_type != new_type:
-                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable,
-                                                                    str(original_type), dask='allowed',
-                                                                    keep_attrs=True)
+                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, variable, str(original_type), dask="allowed", keep_attrs=True)
 
                     # Replace nans with values from original dataset. If the
                     # variable has more than one dimension, copy the entire
@@ -323,23 +314,21 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                     new_dataset[variable_name] = indexed_var
                     new_dataset[variable_name].attrs = indexed_var.attrs
                     variable.attrs = indexed_var.attrs
-                    new_dataset[variable_name].encoding['_FillValue'] = None
-                    variable.encoding['_FillValue'] = None
+                    new_dataset[variable_name].encoding["_FillValue"] = None
+                    variable.encoding["_FillValue"] = None
 
                 else:
                     # Manually replace nans with FillValue
                     # If variable represents time, cast _FillValue to datetime
-                    fill_value = new_dataset[variable_name].attrs.get('_FillValue')
+                    fill_value = new_dataset[variable_name].attrs.get("_FillValue")
 
                     if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
-                        fill_value = np.datetime64('nat')
+                        fill_value = np.datetime64("nat")
                     if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
-                        fill_value = np.timedelta64('nat')
+                        fill_value = np.timedelta64("nat")
                     new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
                     if original_type != new_type:
-                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name],
-                                                                    str(original_type), dask='allowed',
-                                                                    keep_attrs=True)
+                        new_dataset[variable_name] = xr.apply_ufunc(cast_type, new_dataset[variable_name], str(original_type), dask="allowed", keep_attrs=True)
             processed_ds = new_dataset
             dc.sync_dims_inplace(dataset, processed_ds)
         else:
@@ -361,7 +350,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 # --- Align parent and child datasets before attaching child ---
                 if indexers is None and child_indexers:
                     indexers = child_indexers
-                    processed_ds = processed_ds.isel(**child_indexers, missing_dims='ignore')
+                    processed_ds = processed_ds.isel(**child_indexers, missing_dims="ignore")
 
                 # Create new DataTree for the processed child
                 child_tree = DataTree(name=child_name, dataset=child_ds)
@@ -379,7 +368,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
     empty_paths = find_fully_empty_paths(tree)
     # Start processing from root
-    root_ds, children, _ = process_node(tree, '', empty_paths)
+    root_ds, children, _ = process_node(tree, "", empty_paths)
 
     # Create new root tree preserving the original name and attributes
     result_tree = DataTree(name=tree.name, dataset=root_ds)
@@ -394,7 +383,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     return result_tree
 
 
-def check_partial_dim_overlap_node(dataset: xr.Dataset, indexers: Dict) -> bool:
+def check_partial_dim_overlap_node(dataset: xr.Dataset, indexers: dict) -> bool:
     """
     Check if any variables in the dataset have partial dimension overlap with indexers.
     """
@@ -446,7 +435,7 @@ def cast_type(data: xr.DataArray, dtype_str: str) -> xr.DataArray:
     return data.astype(dtype_str)
 
 
-def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[str]]:
+def compute_coordinate_variable_names_from_tree(tree) -> tuple[list[str], list[str]]:
     """
     Recursively search for latitude and longitude coordinate variables in a DataTree
     and return their full paths.
@@ -468,17 +457,13 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
     def find_coords_in_dataset(dataset: xr.Dataset, path: str):
         """Find latitude and longitude variable names in a single dataset and track full paths."""
 
-        possible_lat_coord_names = {'lat', 'latitude', 'y'}
-        possible_lon_coord_names = {'lon', 'longitude', 'x'}
+        possible_lat_coord_names = {"lat", "latitude", "y"}
+        possible_lon_coord_names = {"lon", "longitude", "x"}
 
         current_lat_coord_names = []
         current_lon_coord_names = []
 
-        possible_pairs = [
-            ('lat', 'lon'),
-            ('latitude', 'longitude'),
-            ('y', 'x')
-        ]
+        possible_pairs = [("lat", "lon"), ("latitude", "longitude"), ("y", "x")]
 
         current_lat_coord_names = []
         current_lon_coord_names = []
@@ -517,8 +502,8 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
 
             if not current_lat_coord_names or not current_lon_coord_names:
                 with cfxr.set_options(custom_criteria=custom_criteria):
-                    possible_lat_coords = dataset.cf.coordinates.get('latitude', [])
-                    possible_lon_coords = dataset.cf.coordinates.get('longitude', [])
+                    possible_lat_coords = dataset.cf.coordinates.get("latitude", [])
+                    possible_lon_coords = dataset.cf.coordinates.get("longitude", [])
                     if possible_lat_coords:
                         current_lat_coord_names.append(f"{path}/{possible_lat_coords[0]}")
                     if possible_lon_coords:
@@ -554,7 +539,7 @@ def compute_coordinate_variable_names_from_tree(tree) -> Tuple[List[str], List[s
     return lon_coord_names, lat_coord_names
 
 
-def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str]:
+def find_matching_coords(dataset: xr.Dataset, match_list: list[str]) -> list[str]:
     """
     As a backup for finding a coordinate var, look at the 'coordinates'
     metadata attribute of all data vars in the granule. Return any
@@ -576,18 +561,12 @@ def find_matching_coords(dataset: xr.Dataset, match_list: List[str]) -> List[str
     list (str)
         List of matching coordinate variables names
     """
-    coord_attrs = [
-        var.attrs['coordinates'] for var_name, var in dataset.data_vars.items()
-        if 'coordinates' in var.attrs
-    ]
+    coord_attrs = [var.attrs["coordinates"] for var_name, var in dataset.data_vars.items() if "coordinates" in var.attrs]
     coord_attrs = list(set(coord_attrs))
     match_coord_vars = []
     for coord_attr in coord_attrs:
-        coords = coord_attr.split(' ')
-        match_vars = [
-            coord for coord in coords
-            if any(coord_cand in coord for coord_cand in match_list)
-        ]
+        coords = coord_attr.split(" ")
+        match_vars = [coord for coord in coords if any(coord_cand in coord for coord_cand in match_list)]
         if match_vars and match_vars[0] in dataset:
             # Check if the var actually exists in the dataset
             match_coord_vars.append(match_vars[0])
@@ -609,34 +588,27 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
 
     def method_1(path, ds):
         for coord_name in ds.coords:
-            if 'time' == coord_name.lower() and coord_name not in total_time_vars:
+            if "time" == coord_name.lower() and coord_name not in total_time_vars:
                 if ds[coord_name].squeeze().dims == lat_var.squeeze().dims:
                     return f"{path}/{coord_name}"
         return None
 
     def method_2(path, ds):
-        pattern = re.compile(
-            r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?",
-            re.IGNORECASE
-        )
+        pattern = re.compile(r"(days?|hours?|hr|minutes?|min|seconds?|sec|s) since \d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?", re.IGNORECASE)
         for var_name, var in ds.variables.items():
             if var_name in total_time_vars:
                 continue
-            if any([
-                var.attrs.get("standard_name") == "time",
-                var.attrs.get("axis") == "T",
-                ("units" in var.attrs and pattern.match(var.attrs["units"]))
-            ]):
+            if any([var.attrs.get("standard_name") == "time", var.attrs.get("axis") == "T", ("units" in var.attrs and pattern.match(var.attrs["units"]))]):
                 if var.size > 1:
                     return f"{path}/{var_name}"
         return None
 
     def method_3(path, ds):
         # Only proceed if both 'time' and 'sst_dtime' exist in the dataset variables
-        if 'time' in ds.variables and 'sst_dtime' in ds.variables:
-            time_var = ds['time']
+        if "time" in ds.variables and "sst_dtime" in ds.variables:
+            time_var = ds["time"]
             # Check the long_name attribute for the 'time' variable
-            if time_var.attrs.get('long_name', None) == "reference time of sst file":
+            if time_var.attrs.get("long_name", None) == "reference time of sst file":
                 return f"{path}/time"
         return None
 
@@ -648,7 +620,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             dims = ds[var_name].squeeze().dims
             if not dims:
                 continue
-            if 'time' == var_name.lower() and dims[0] in lat_dims:
+            if "time" == var_name.lower() and dims[0] in lat_dims:
                 return f"{path}/{var_name}"
         return None
 
@@ -660,7 +632,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             dims = ds[var_name].squeeze().dims
             if not dims:
                 continue
-            if 'time' in var_name.lower() and dims[0] in lat_dims:
+            if "time" in var_name.lower() and dims[0] in lat_dims:
                 return f"{path}/{var_name}"
         return None
 
@@ -673,7 +645,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             if not dims:
                 continue
             var_basename = var_name.strip(GROUP_DELIM).split(GROUP_DELIM)[-1].lower()
-            if var_basename in {'time', 'timemidscan'} and dims[0] in lat_dims:
+            if var_basename in {"time", "timemidscan"} and dims[0] in lat_dims:
                 return f"{path}/{var_name}"
         return None
 
@@ -692,7 +664,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
                 if result == "/sample_time":
                     # Check if '/solar_time' exists in the dataset
                     if "/solar_time" in [f"/{v}" for v in ds.variables]:
-                        print('returning solar time')
+                        print("returning solar time")
                         return "/solar_time"
                 return result
     return None
@@ -703,7 +675,7 @@ def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     return (value * scale) - offset
 
 
-def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_var_names: List[str]) -> Union[np.ndarray, None]:
+def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: list[str], lon_var_names: list[str]) -> np.ndarray | None:
     """
     Get the spatial bounds for this dataset tree. These values are masked and scaled.
 
@@ -737,19 +709,19 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
             lon_attrs = lon_data.attrs
 
             # Extract metadata with defaults
-            lat_scale = lat_attrs.get('scale_factor', 1.0)
-            lon_scale = lon_attrs.get('scale_factor', 1.0)
-            lat_offset = lat_attrs.get('add_offset', 0.0)
-            lon_offset = lon_attrs.get('add_offset', 0.0)
-            lon_valid_min = lon_attrs.get('valid_min', None)
+            lat_scale = lat_attrs.get("scale_factor", 1.0)
+            lon_scale = lon_attrs.get("scale_factor", 1.0)
+            lat_offset = lat_attrs.get("add_offset", 0.0)
+            lon_offset = lon_attrs.get("add_offset", 0.0)
+            lon_valid_min = lon_attrs.get("valid_min", None)
 
             # Flatten and mask data
             lats = lat_data.values.flatten()
             lons = lon_data.values.flatten()
 
             # Apply fill value masks if present
-            lat_fill = lat_attrs.get('_FillValue')
-            lon_fill = lon_attrs.get('_FillValue')
+            lat_fill = lat_attrs.get("_FillValue")
+            lon_fill = lon_attrs.get("_FillValue")
 
             if lat_fill is not None:
                 lats = lats[lats != lat_fill]
@@ -795,13 +767,10 @@ def tree_get_spatial_bounds(datatree: xr.Dataset, lat_var_names: List[str], lon_
         return None
 
     # Calculate overall bounds using numpy operations
-    return np.array([
-        [min(min_lons), max(max_lons)],
-        [min(min_lats), max(max_lats)]
-    ])
+    return np.array([[min(min_lons), max(max_lons)], [min(min_lats), max(max_lats)]])
 
 
-def get_vars_with_paths(tree: DataTree) -> List[str]:
+def get_vars_with_paths(tree: DataTree) -> list[str]:
     """
     Get all variables and coordinates with their full paths from a DataTree
 
@@ -827,21 +796,21 @@ def get_vars_with_paths(tree: DataTree) -> List[str]:
     """
     paths = []
 
-    def collect_vars(node: DataTree, current_path: str = '') -> None:
+    def collect_vars(node: DataTree, current_path: str = "") -> None:
         # Add data variables from current node
         for var_name in node.ds.data_vars:
-            paths.append(f'{current_path}/{var_name}')
+            paths.append(f"{current_path}/{var_name}")
 
         # Recursively process child nodes
         for child_name in node.children:
-            new_path = f'{current_path}/{child_name}' if current_path else f'/{child_name}'
+            new_path = f"{current_path}/{child_name}" if current_path else f"/{child_name}"
             collect_vars(node[child_name], new_path)
 
     collect_vars(tree)
     return sorted(paths)  # Sort for consistent ordering
 
 
-def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataTree:
+def drop_vars_by_path(tree: DataTree, var_paths: str | list[str]) -> DataTree:
     """
     Drop variables from a DataTree using paths in the format '/group/var' or '/var' for root level
 
@@ -866,20 +835,20 @@ def drop_vars_by_path(tree: DataTree, var_paths: Union[str, List[str]]) -> DataT
 
     for path in var_paths:
         # Split the path into group path and variable name
-        parts = path.strip('/').split('/')
+        parts = path.strip("/").split("/")
 
         if len(parts) == 1:
             # Root level variable
             var_name = parts[0]
             # Modify the dataset in-place using xarray's drop_vars
-            tree.ds = tree.ds.drop_vars([var_name], errors='ignore')
+            tree.ds = tree.ds.drop_vars([var_name], errors="ignore")
         else:
             # Group variable
-            group_path = '/'.join(parts[:-1])
+            group_path = "/".join(parts[:-1])
             var_name = parts[-1]
             try:
                 node = tree[group_path]
-                node.ds = node.ds.drop_vars([var_name], errors='ignore')
+                node.ds = node.ds.drop_vars([var_name], errors="ignore")
             except KeyError:
                 pass
 
@@ -900,11 +869,7 @@ def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
     group_encodings = {}
 
     # Types that should have compression
-    compress_types = {
-        'float32', 'float64',  # Floating point
-        'int8', 'int16', 'int32', 'int64',  # Signed integers
-        'uint8', 'uint16', 'uint32', 'uint64'  # Unsigned integers
-    }
+    compress_types = {"float32", "float64", "int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"}  # Floating point  # Signed integers  # Unsigned integers
 
     def process_node(node: DataTree, group_path: str):
         # Initialize encoding dict for this group
@@ -914,14 +879,12 @@ def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
         for var_name in node.ds.data_vars:
             var = node.ds[var_name]
 
-            encoding = {
-                "_FillValue": var.encoding.get('_FillValue')
-            }
+            encoding = {"_FillValue": var.encoding.get("_FillValue")}
 
             # Add compression only for specific dtypes
             if var.dtype.name in compress_types:
-                encoding['zlib'] = True
-                encoding['complevel'] = 5
+                encoding["zlib"] = True
+                encoding["complevel"] = 5
 
             # Only add to var_encodings if we have any encoding settings
             if encoding:
@@ -933,11 +896,11 @@ def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
 
         # Process child groups
         for child_name, child in node.children.items():
-            child_path = f"{group_path}/{child_name}" if group_path != '/' else f"/{child_name}"
+            child_path = f"{group_path}/{child_name}" if group_path != "/" else f"/{child_name}"
             process_node(child, child_path)
 
     # Start processing from root with '/'
-    process_node(datasets, '/')
+    process_node(datasets, "/")
 
     def deep_merge(dict1, dict2):
         merged = dict1.copy()
@@ -969,7 +932,8 @@ def clean_inherited_coords(dt: DataTree) -> DataTree:
     DataTree
         The cleaned DataTree where each node only has its unique coordinates
     """
-    def get_ancestor_coords(node: DataTree) -> Set[str]:
+
+    def get_ancestor_coords(node: DataTree) -> set[str]:
         """Get all coordinate names from ancestor nodes."""
         ancestor_coords = set()
         current = node.parent
@@ -993,7 +957,7 @@ def clean_inherited_coords(dt: DataTree) -> DataTree:
                 # Try to drop the dimensions are different could throw an exception when dropping
                 if coords_to_drop:
                     try:
-                        node.ds = node.ds.drop_vars(coords_to_drop, errors='ignore')
+                        node.ds = node.ds.drop_vars(coords_to_drop, errors="ignore")
                     except Exception:  # pylint: disable=broad-exception-caught
                         pass
     return dt
@@ -1007,8 +971,8 @@ def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
 
     def convert_to_int(value, unit_type):
         if isinstance(value, np.timedelta64):
-            ns_per_unit = {'day': 24 * 60 * 60 * 1e9, 'hour': 60 * 60 * 1e9, 'minute': 60 * 1e9}
-            return int(value.astype('int64') / ns_per_unit[unit_type])
+            ns_per_unit = {"day": 24 * 60 * 60 * 1e9, "hour": 60 * 60 * 1e9, "minute": 60 * 1e9}
+            return int(value.astype("int64") / ns_per_unit[unit_type])
         return int(value)
 
     if not any(time_name in var for var in ds.variables):
@@ -1025,11 +989,11 @@ def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
                 dt = datetime.datetime(
                     int(ds["Year"].values[i]),
                     int(ds["Month"].values[i]),
-                    convert_to_int(ds["DayOfMonth"].values[i], 'day'),
-                    hour=convert_to_int(ds["Hour"].values[i], 'hour'),
-                    minute=convert_to_int(ds["Minute"].values[i], 'minute'),
+                    convert_to_int(ds["DayOfMonth"].values[i], "day"),
+                    hour=convert_to_int(ds["Hour"].values[i], "hour"),
+                    minute=convert_to_int(ds["Minute"].values[i], "minute"),
                     second=int(ds["Second"].values[i]),
-                    microsecond=microsecond
+                    microsecond=microsecond,
                 )
                 new_time_list.append(date2num(dt, time_unit_out))
                 new_time_list_dt.append(dt)  # keep actual datetime
@@ -1049,7 +1013,7 @@ def apply_indexers_to_tree(node: DataTree, indexers: dict) -> DataTree:
     """
     ds = node.ds
     if ds is not None:
-        ds = ds.isel(**indexers, missing_dims='ignore')
+        ds = ds.isel(**indexers, missing_dims="ignore")
     new_node = DataTree(name=node.name, dataset=ds)
     for child_name, child_node in node.children.items():
         new_node[child_name] = apply_indexers_to_tree(child_node, indexers)

@@ -1,17 +1,11 @@
-import shutil
-import tempfile
-import os
-from os import listdir
-from os.path import dirname, isfile, join, realpath
-from pathlib import Path
-from unittest import TestCase
+from os.path import join
 
 import pytest
 import xarray as xr
+from conftest import data_files
 
-from podaac.subsetter import subset
 from podaac.subsetter import datatree_subset
-from conftest import data_files 
+
 
 @pytest.mark.parametrize("test_file", data_files())
 def test_get_time_variable_name(test_file, data_dir):

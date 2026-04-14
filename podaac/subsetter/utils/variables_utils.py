@@ -5,11 +5,11 @@ variables_utils.py
 
 Utility functions to get variables and normalize variables for a granule files.
 """
-from typing import List
+
 import xarray as xr
 
 
-def get_all_variable_names_from_dtree(dtree: xr.DataTree) -> List[str]:
+def get_all_variable_names_from_dtree(dtree: xr.DataTree) -> list[str]:
     """
     Recursively extract all variable names (with full paths) from an xarray DataTree.
 
@@ -50,9 +50,7 @@ def _normalize_for_matching(path: str) -> str:
     return path.lstrip("/").replace(" ", "").replace("_", "").lower()
 
 
-def normalize_candidate_paths_against_dtree(
-    candidates: List[str], all_vars: List[str]
-) -> List[str]:
+def normalize_candidate_paths_against_dtree(candidates: list[str], all_vars: list[str]) -> list[str]:
     """
     Normalize and match candidate variable paths to actual variable paths from a DataTree.
 
@@ -78,9 +76,7 @@ def normalize_candidate_paths_against_dtree(
         - Unmatched candidates are returned unchanged.
     """
     # Build normalized lookup: no slashes, underscores/spaces ignored
-    norm_to_real = {
-        _normalize_for_matching(real_path): real_path for real_path in all_vars
-    }
+    norm_to_real = {_normalize_for_matching(real_path): real_path for real_path in all_vars}
 
     resolved = []
     for cand in candidates:

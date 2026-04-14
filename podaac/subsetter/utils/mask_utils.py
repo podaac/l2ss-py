@@ -5,6 +5,7 @@ mask_utils.py
 Utilities for creating and applying masks for subsetting operations.
 Place all mask creation, manipulation, and application functions here.
 """
+
 import xarray as xr
 
 
@@ -48,6 +49,7 @@ def align_dims_cond_only(dataset: xr.Dataset, cond: xr.Dataset) -> xr.Dataset:
     Align dims in `cond` to match `dataset` only if they are unaligned but sizes match.
     Works for both Dataset and DataArray.
     """
+
     # Helper to get dim sizes
     def get_sizes(obj):
         if isinstance(obj, xr.Dataset):
