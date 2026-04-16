@@ -1,3 +1,6 @@
+# Automate the triage of issues by team as they are labeled with team:<team_name>.
+# This workflow will update the status in the main podaac project to "triaged" and add the issue to the corresponding team project if it exists.
+# This helps ensure that issues are properly categorized and visible to the right teams without requiring manual triage in the "needs:triage" column.
 name: Team Assignment
 
 on:
