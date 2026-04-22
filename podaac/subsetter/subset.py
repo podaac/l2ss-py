@@ -18,6 +18,7 @@ subset.py
 Functions related to subsetting a NetCDF file.
 """
 
+import copy
 import os
 from itertools import zip_longest
 
@@ -374,7 +375,6 @@ def subset(
     time_calendar_attributes = {}
 
     if args["decode_times"]:
-        # Get time encoding
         with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
 
             lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
@@ -398,8 +398,7 @@ def subset(
                 if calendar:
                     time_encoding[group_path][var_name]["calendar"] = calendar
                 if units:
-                    if time not in ["/solar_time", "/HDFEOS/SWATHS/MOP02/Geolocation Fields/Time"]:
-                        time_encoding[group_path][var_name]["units"] = time_utils.check_time_units(units)
+                    time_encoding[group_path][var_name]["units"] = time_utils.check_time_units(units)
                 if dtype and units:
                     time_encoding[group_path][var_name]["dtype"] = dtype
                 if calendar:
@@ -537,14 +536,40 @@ def subset(
             stage_file_name_subsetted_false,
         )
 
+        def write_with_illegal_name_recovery(current_encoding):
+            try:
+                subsetted_dataset.to_netcdf(output_file, encoding=current_encoding)
+            except AttributeError as e:
+                if "NetCDF: Name contains illegal characters" in str(e):
+                    metadata_utils.fix_illegal_datatree_attrs(subsetted_dataset)
+                    subsetted_dataset.to_netcdf(output_file, encoding=current_encoding)
+                else:
+                    raise
+
         try:
-            subsetted_dataset.to_netcdf(output_file, encoding=encoding)
-        except AttributeError as e:
-            if "NetCDF: Name contains illegal characters" in str(e):
-                metadata_utils.fix_illegal_datatree_attrs(subsetted_dataset)
-                subsetted_dataset.to_netcdf(output_file, encoding=encoding)
-            else:
+            write_with_illegal_name_recovery(encoding)
+        except ValueError as e:
+            err_msg = str(e)
+            if "unexpected encoding parameters for 'netCDF4' backend" not in err_msg:
                 raise
+
+            fallback_encoding = copy.deepcopy(encoding)
+            removed_time_unit_encodings = False
+
+            for group_path, group_vars in time_encoding.items():
+                for var_name in group_vars:
+                    var_encoding = fallback_encoding.get(group_path, {}).get(var_name)
+                    if not var_encoding:
+                        continue
+                    # Some xarray/netCDF4 versions reject CF-like time attrs in encoding;
+                    # keep them in attributes and retry without encoding-level units/calendar.
+                    removed_time_unit_encodings = (
+                        var_encoding.pop("units", None) is not None or removed_time_unit_encodings
+                    )
+
+            if not removed_time_unit_encodings:
+                raise
+            write_with_illegal_name_recovery(fallback_encoding)
 
         metadata_utils.ensure_time_units(output_file, time_encoding)
 

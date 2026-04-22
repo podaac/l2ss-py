@@ -79,6 +79,7 @@ jobs:
         run: |
           poetry run pylint podaac
           poetry run flake8 podaac
+          poetry run poetry run ruff check podaac/
       - name: Test and coverage
         run: |
           poetry run pytest -v \
