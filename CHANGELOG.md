@@ -7,9 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 - Updated readme documentation
+- [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
 ### Changed
 - Changed way Cygnss collection finds time variable
-- Update time encoding with units
 ### Deprecated
 ### Removed
 ### Fixed
