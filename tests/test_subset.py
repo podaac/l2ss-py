@@ -1699,14 +1699,71 @@ def test_subset_gpm_mhs_compute_new_var_data(fake_gpm_2agprofmetopbmhs_08_file, 
     assert int(dtree["S1/ScanTime"].variables["timeMidScan"][0]) == 1456356716
 
 
-def test_subset_omibro_single_swath(fake_omibro_file, subset_output_dir):
+def test_omi_novars_subset(fake_omi_bro_file, subset_output_dir):
 
-    with xr.open_datatree(fake_omibro_file, engine="netcdf4") as dtree:
+    expected_data_vars = frozenset(
+        {
+            "AMFCloudFraction",
+            "AMFCloudPressure",
+            "AdjustedSceneAlbedo",
+            "AirMassFactor",
+            "AirMassFactorDiagnosticFlag",
+            "AirMassFactorGeometric",
+            "AverageColumnAmount",
+            "AverageColumnUncertainty",
+            "AverageFittingRMS",
+            "ColumnAmount",
+            "ColumnAmountDestriped",
+            "ColumnUncertainty",
+            "FitConvergenceFlag",
+            "FittingRMS",
+            "MainDataQualityFlag",
+            "MaximumColumnAmount",
+            "PixelArea",
+            "PixelCornerLatitudes",
+            "PixelCornerLongitudes",
+            "RadianceReferenceColumnAmount",
+            "RadianceReferenceColumnUncertainty",
+            "RadianceReferenceColumnXTRFit",
+            "RadianceReferenceConvergenceFlag",
+            "RadianceReferenceFittingRMS",
+            "RadianceReferenceLatitudeRange",
+            "RadianceWavCalConvergenceFlag",
+            "RadianceWavCalLatitudeRange",
+            "SlantColumnAmount",
+            "SlantColumnAmountDestriped",
+            "SlantColumnUncertainty",
+            "SlantFitConvergenceFlag",
+            "SlantFittingRMS",
+            "SolarWavCalConvergenceFlag",
+        }
+    )
+
+    expected_geo_vars = frozenset(
+        {
+            "Latitude",
+            "Longitude",
+            "SolarAzimuthAngle",
+            "SolarZenithAngle",
+            "SpacecraftAltitude",
+            "TerrainHeight",
+            "Time",
+            "TimeUTC",
+            "ViewingAzimuthAngle",
+            "ViewingZenithAngle",
+            "XTrackQualityFlags",
+            "XTrackQualityFlagsExpanded",
+        }
+    )
+
+    with xr.open_datatree(fake_omi_bro_file, engine="netcdf4") as dtree:
         for node in dtree.subtree:
             ds = node.ds
             if isinstance(ds, xr.Dataset) and ds.dims:
                 for dim in ds.dims:
-                    assert "phony" in dim, f"expected phony dim before subset, got: {dim}"
+                    assert "phony" in dim, (
+                        f"expected phony dim before subset, got: {dim}"
+                    )
                 for var in ds.values():
                     assert "dimensionnames" not in var.attrs, (
                         "omibro fixture should not have dimensionnames attrs - "
@@ -1717,7 +1774,7 @@ def test_subset_omibro_single_swath(fake_omibro_file, subset_output_dir):
 
     subset_output_file = join(subset_output_dir, "omibro_test_subset.hdf5")
     subset.subset(
-        file_to_subset=fake_omibro_file,
+        file_to_subset=fake_omi_bro_file,
         bbox=bbox,
         output_file=subset_output_file,
     )
@@ -1731,9 +1788,22 @@ def test_subset_omibro_single_swath(fake_omibro_file, subset_output_dir):
                 assert "phony" not in dim, f"unexpected phony dim after subset: {dim}"
 
     data_ds = dtree["HDFEOS/SWATHS/OMI Total Column Amount BrO/Data Fields"].ds
-    assert "AMFCloudFraction" in data_ds
-    amf_dims = data_ds["AMFCloudFraction"].dims
-    assert amf_dims == ("nTimes", "nXtrack")
+    geo_ds = dtree["HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields"].ds
+
+    missing_data_vars = expected_data_vars - set(data_ds.data_vars)
+    missing_geo_vars = expected_geo_vars - set(geo_ds.data_vars)
+
+    assert not missing_data_vars, (
+        f"missing data field variables after subset: {sorted(missing_data_vars)}"
+    )
+    assert not missing_geo_vars, (
+        f"missing geolocation field variables after subset: {sorted(missing_geo_vars)}"
+    )
+
+    assert data_ds["AMFCloudFraction"].dims == ("nTimes", "nXtrack")
+    assert geo_ds["Latitude"].dims == ("nTimes", "nXtrack")
+    assert geo_ds["Longitude"].dims == ("nTimes", "nXtrack")
+    assert geo_ds["Time"].dims == ("nTimes",)
 
 
 def test_subset_omipixcor_multi_swath(fake_omipixcor_file, subset_output_dir):
