@@ -1349,32 +1349,24 @@ def test_grouped_empty_subset(data_dir, subset_output_dir, request):
        #assert spatial_bounds is None
 
 
-def test_get_time_OMI(data_dir, subset_output_dir):
+def test_get_time_OMI(fake_omi_bro_file, data_dir, subset_output_dir):
     """
-    Test that code get time variables for OMI .he5 files"
+    Test that the code can get time variables for OMI .he5 files"
     """
-    omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
 
-    shutil.copyfile(os.path.join(data_dir, 'OMI', omi_file),
-                    os.path.join(subset_output_dir, omi_file))
+    args = {"decode_coords": False, "mask_and_scale": False, "decode_times": False}
 
-    file = os.path.join(subset_output_dir, omi_file)
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': False,
-        'decode_times': False
-    }
-
-    with xr.open_datatree(
-            file,
-            **args
-    ) as dataset:
-        lon_var_names, lat_var_names =  datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
+    with xr.open_datatree(fake_omi_bro_file, **args) as dataset:
+        lon_var_names, lat_var_names = (
+            datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
+        )
         time_var_names = []
         for lat_var_name in lat_var_names:
-            time_var_names.append(datatree_subset.compute_time_variable_name_tree(
+            time_var_names.append(
+                datatree_subset.compute_time_variable_name_tree(
                     dataset, dataset[lat_var_name], time_var_names
-                ))
+                )
+            )
         assert "Time" in time_var_names[0]
         assert "Latitude" in lat_var_names[0]
 
