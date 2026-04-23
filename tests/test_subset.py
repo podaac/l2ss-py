@@ -1215,42 +1215,54 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
 
 
 
-def test_MLS_levels(data_dir, subset_output_dir, request):
+def test_MLS_levels(fake_mls_aura_l2gp_oh_file, tmp_path):
     """
     Test that the unique groups are determined before bounding box
     subsetting
     """
-    mls_dir = join(data_dir, 'MLS')
-    mls_file = 'MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5'
-    mls_file_input = 'input' + mls_file
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, mls_file)
 
-    shutil.copyfile(
-        os.path.join(mls_dir, mls_file),
-        os.path.join(subset_output_dir, mls_file)
-    )
+    subset_output_file = tmp_path / "mls_test_subset.nc"
 
     subset.subset(
-        file_to_subset=os.path.join(subset_output_dir, mls_file),
+        file_to_subset=fake_mls_aura_l2gp_oh_file,
         bbox=bbox,
-        output_file=os.path.join(subset_output_dir, output_file)
+        output_file=subset_output_file,
     )
 
-    in_ds = h5py.File(os.path.join(mls_dir, mls_file), "r")
-    out_ds = h5py.File(os.path.join(subset_output_dir, output_file), "r")
+    assert os.path.exists(subset_output_file), (
+        f"subset output file was not created at {subset_output_file}"
+    )
+    assert os.path.getsize(subset_output_file) > 0, (
+        f"subset output file is empty at {subset_output_file}"
+    )
 
-    # check that the variable shapes are conserved in MLS
-    for i in list(in_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields']):
-        var_in_shape = in_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields'][i].shape
-        var_out_shape = out_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields'][i].shape
-        assert var_in_shape == var_out_shape
+    with xr.open_datatree(fake_mls_aura_l2gp_oh_file, engine="netcdf4") as in_dt, \
+         xr.open_datatree(str(subset_output_file), engine="netcdf4") as out_dt:
 
-    for i in list(in_ds['HDFEOS']['SWATHS']['CO']['Data Fields']):
-        var_in_shape = in_ds['HDFEOS']['SWATHS']['CO']['Data Fields'][i].shape
-        var_out_shape = out_ds['HDFEOS']['SWATHS']['CO']['Data Fields'][i].shape
-        assert var_in_shape == var_out_shape
+        in_geo  = in_dt["/HDFEOS/SWATHS/OH/Geolocation Fields"].ds
+        out_geo = out_dt["/HDFEOS/SWATHS/OH/Geolocation Fields"].ds
 
+        for var_name in in_geo.data_vars:
+            assert var_name in out_geo.data_vars, (
+                f"geolocation variable {var_name!r} missing from subsetted output"
+            )
+            assert in_geo[var_name].shape == out_geo[var_name].shape, (
+                f"shape mismatch for geolocation variable {var_name!r}: "
+                f"{in_geo[var_name].shape} != {out_geo[var_name].shape}"
+            )
+
+        in_data  = in_dt["/HDFEOS/SWATHS/OH/Data Fields"].ds
+        out_data = out_dt["/HDFEOS/SWATHS/OH/Data Fields"].ds
+
+        for var_name in in_data.data_vars:
+            assert var_name in out_data.data_vars, (
+                f"data variable {var_name!r} missing from subsetted output"
+            )
+            assert in_data[var_name].shape == out_data[var_name].shape, (
+                f"shape mismatch for data variable {var_name!r}: "
+                f"{in_data[var_name].shape} != {out_data[var_name].shape}"
+            )
 
 def test_he5_timeattrs_output(data_dir, subset_output_dir, request):
     """Test that the time attributes in the output match the attributes of the input for OMI test files"""
