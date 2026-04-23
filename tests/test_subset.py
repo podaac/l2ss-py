@@ -1661,7 +1661,9 @@ def test_subset_gpm_compute_new_var_data(fake_gpm_2adprenv_07_file, data_dir, su
             assert int(dtree[group].ds.variables["timeMidScan"][:][0]) == 1306403820
 
 
-def test_subset_gpm_mhs_compute_new_var_data(fake_gpm_2agprofmetopbmhs_08_file, subset_output_dir):
+def test_subset_gpm_mhs_compute_new_var_data(
+    fake_gpm_2agprofmetopbmhs_08_file, subset_output_dir
+):
     """
     Tests that a GPM v08 file with NetCDF4 format can run through subset and produce correct variables
     """
@@ -1862,38 +1864,42 @@ def test_temporal_subset_tempo(data_dir, subset_output_dir, request):
     subset_output_file = join(subset_output_dir, output_file)
     bbox = np.array(((-180, 180), (-90, 90)))
 
-    min_time = '2024-01-10T17:02:55.500000Z'
-    max_time = '2024-01-10T17:03:31.900000Z'
+    min_time = "2024-01-10T17:02:55.500000Z"
+    max_time = "2024-01-10T17:03:31.900000Z"
 
     subset.subset(
         file_to_subset=join(data_dir, tempo_file),
-        bbox = bbox,
-        min_time = min_time,
-        max_time = max_time,
-        output_file=subset_output_file
-    )    
+        bbox=bbox,
+        min_time=min_time,
+        max_time=max_time,
+        output_file=subset_output_file,
+    )
 
     dtree = xr.open_datatree(subset_output_file, decode_times=False)
 
-    assert dtree['/geolocation/time'].attrs['calendar'] == "gregorian"
-    assert dtree['/geolocation/time'].attrs['units'] == "seconds since 1980-01-06T00:00:00Z"
-    assert dtree['/geolocation/time'].dtype == np.float64
+    assert dtree["/geolocation/time"].attrs["calendar"] == "gregorian"
+    assert (
+        dtree["/geolocation/time"].attrs["units"]
+        == "seconds since 1980-01-06T00:00:00Z"
+    )
+    assert dtree["/geolocation/time"].dtype == np.float64
 
-    assert dtree['/geolocation/time'].values[0] == 1388941375.536457
-    assert dtree['/geolocation/time'].values[1] ==   1388941378.569526
-    assert dtree['/geolocation/time'].values[2] ==  1388941381.602584
-    assert dtree['/geolocation/time'].values[3] ==  1388941384.635648
-    assert dtree['/geolocation/time'].values[4] ==  1388941387.6687133
-    assert dtree['/geolocation/time'].values[5] ==  1388941390.701774
-    assert dtree['/geolocation/time'].values[6] ==  1388941393.734837
-    assert dtree['/geolocation/time'].values[7] ==  1388941396.7679
-    assert dtree['/geolocation/time'].values[8] ==  1388941399.800967
-    assert dtree['/geolocation/time'].values[9] ==  1388941402.834026
-    assert dtree['/geolocation/time'].values[10] ==  1388941405.867095
-    assert dtree['/geolocation/time'].values[11] == 1388941408.900158
+    assert dtree["/geolocation/time"].values[0] == 1388941375.536457
+    assert dtree["/geolocation/time"].values[1] == 1388941378.569526
+    assert dtree["/geolocation/time"].values[2] == 1388941381.602584
+    assert dtree["/geolocation/time"].values[3] == 1388941384.635648
+    assert dtree["/geolocation/time"].values[4] == 1388941387.6687133
+    assert dtree["/geolocation/time"].values[5] == 1388941390.701774
+    assert dtree["/geolocation/time"].values[6] == 1388941393.734837
+    assert dtree["/geolocation/time"].values[7] == 1388941396.7679
+    assert dtree["/geolocation/time"].values[8] == 1388941399.800967
+    assert dtree["/geolocation/time"].values[9] == 1388941402.834026
+    assert dtree["/geolocation/time"].values[10] == 1388941405.867095
+    assert dtree["/geolocation/time"].values[11] == 1388941408.900158
+
 
 # --- Constants for Expected Values ---
-EXPECTED_1 = 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
+EXPECTED_1 = "bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True"
 EXPECTED_2 = "{'bbox': [[-180.0, 180.0], [-90.0, 90.0]], 'cut': True, 'pixel_subset': False, 'variables': []}"
 EXPECTED_PARAMETERS = {
     "bbox": [[-180.0, 180.0], [-90.0, 90.0]],
