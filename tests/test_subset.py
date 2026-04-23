@@ -1264,52 +1264,50 @@ def test_MLS_levels(fake_mls_aura_l2gp_oh_file, tmp_path):
                 f"{in_data[var_name].shape} != {out_data[var_name].shape}"
             )
 
-def test_he5_timeattrs_output(data_dir, subset_output_dir, request):
+def test_he5_timeattrs_output(fake_omi_bro_file, tmp_path):
     """Test that the time attributes in the output match the attributes of the input for OMI test files"""
 
-    omi_dir = join(data_dir, 'OMI')
-    omi_file = 'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'
-    omi_file_input = 'input' + omi_file
-    bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file)
-    )
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file_input)
-    )
+    output_file = tmp_path / "omi_bro_timeattrs.he5"
 
-    min_time = '2020-01-16T12:30:00Z'
-    max_time = '2020-01-16T12:40:00Z'
+    min_time = "2020-01-16T12:30:00Z"
+    max_time = "2020-01-16T12:40:00Z"
     bbox = np.array(((-180, 180), (-90, 90)))
-    nc_dataset_input = nc.Dataset(os.path.join(subset_output_dir, omi_file_input))
-    incut_set = nc_dataset_input.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups[
-        'Geolocation Fields']
+    nc_dataset_input = nc.Dataset(fake_omi_bro_file)
+    incut_set = (
+        nc_dataset_input.groups["HDFEOS"]
+        .groups["SWATHS"]
+        .groups["OMI Total Column Amount BrO"]
+        .groups["Geolocation Fields"]
+    )
     xr_dataset_input = xr.open_dataset(xr.backends.NetCDF4DataStore(incut_set))
-    inattrs = xr_dataset_input['Time'].attrs
+    inattrs = xr_dataset_input["Time"].attrs
 
     subset.subset(
-        file_to_subset=os.path.join(subset_output_dir, omi_file),
+        file_to_subset=fake_omi_bro_file,
         bbox=bbox,
-        output_file=os.path.join(subset_output_dir, output_file),
+        output_file=output_file,
         min_time=min_time,
-        max_time=max_time
+        max_time=max_time,
     )
 
-    output_ncdataset = nc.Dataset(os.path.join(subset_output_dir, output_file))
-    outcut_set = output_ncdataset.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups[
-        'Geolocation Fields']
+    output_ncdataset = nc.Dataset(output_file)
+    outcut_set = (
+        output_ncdataset.groups["HDFEOS"]
+        .groups["SWATHS"]
+        .groups["OMI Total Column Amount BrO"]
+        .groups["Geolocation Fields"]
+    )
     xrout_dataset = xr.open_dataset(xr.backends.NetCDF4DataStore(outcut_set))
-    outattrs = xrout_dataset['Time'].attrs
+    outattrs = xrout_dataset["Time"].attrs
 
     for key in inattrs.keys():
         if isinstance(inattrs[key], np.ndarray):
             if np.array_equal(inattrs[key], outattrs[key]):
                 pass
             else:
-                raise AssertionError('Attributes for {} do not equal each other'.format(key))
+                raise AssertionError(
+                    "Attributes for {} do not equal each other".format(key)
+                )
         else:
             assert inattrs[key] == outattrs[key]
 

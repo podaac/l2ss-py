@@ -1589,12 +1589,19 @@ def fake_omi_bro_file(tmp_path_factory):
         ] = np.array([np.int16(np.int16(-30000))], dtype=np.int16)
 
         # HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields/Time
+        # 2020-01-16T12:30:00Z  <-> 2020-01-16T12:40:00Z in seconds since 1993-01-01 (TAI)
+        # (2020-01-16T12:30:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853331400.0
+        # (2020-01-16T12:40:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853332000.0
+        tai_start = 853331400.0
+        tai_end   = 853332000.0
+
         hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields_time = (
             hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields.create_dataset(
                 "Time",
-                data=np.linspace(0.0, 1000000000.0, dim_0_1997).astype(np.float64),
+                data=np.linspace(tai_start, tai_end, dim_0_1997).astype(np.float64),
             )
         )
+
         hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields_time.attrs[
             "MissingValue"
         ] = np.array([np.float64(np.float64(-1e30))], dtype=np.float64)
@@ -1624,15 +1631,15 @@ def fake_omi_bro_file(tmp_path_factory):
         ] = np.array([np.float64(np.float64(-1e30))], dtype=np.float64)
 
         # HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields/TimeUTC
+        # TimeUTC stores [year, month, day, hour, minute, second] per scan line
+        # all scan lines share the same start time for simplicity
+        utc_row   = np.array([2020, 1, 16, 12, 30, 0], dtype=np.int16)
+        utc_data  = np.tile(utc_row, (dim_0_1997, 1))
+
         hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields_timeutc = (
             hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields.create_dataset(
                 "TimeUTC",
-                data=np.arange(dim_0_1997 * dim_1_6, dtype=np.int16).reshape(
-                    (
-                        dim_0_1997,
-                        dim_1_6,
-                    )
-                ),
+                data=utc_data.astype(np.int16),
             )
         )
         hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields_timeutc.attrs[
