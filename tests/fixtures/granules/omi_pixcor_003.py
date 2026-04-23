@@ -24,6 +24,36 @@ def fake_omi_pixcor_file(tmp_path_factory):
     dim_2_30 = 10
     dim_2_60 = 14
 
+
+    # TimeUTC stores [year, month, day, hour, minute, second] per scan line
+    # all scan lines share the same start time for simplicity
+    tai_start = np.datetime64("2020-01-16T12:30:00", "s")
+    tai_end = np.datetime64("2020-01-16T12:40:00", "s")
+    timestamps = np.array(
+        [
+            tai_start + np.timedelta64(int(s), "s")
+            for s in np.linspace(0, 600, dim_0_1643)
+        ]
+    )
+
+    # 2020-01-16T12:30:00Z  <-> 2020-01-16T12:40:00Z in seconds since 1993-01-01 (TAI)
+    # (2020-01-16T12:30:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853331400.0
+    # (2020-01-16T12:40:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853332000.0
+    tai_start = (
+        tai_start - np.datetime64("1993-01-01")
+    ).astype(np.float64)
+    tai_end = (
+        tai_end - np.datetime64("1993-01-01")
+    ).astype(np.float64)
+
+    # convert each timestamp to a 27-char string and then to a (nTimes, 27) byte array
+    utc_strings = np.array([str(t).replace(" ", "T") + ".000000Z" for t in timestamps])
+
+    utc_data = np.array(
+        [[c.encode("ascii") for c in row] for row in utc_strings],
+        dtype="|S1",
+    )
+
     with h5py.File(filepath, "w") as f:
         # create groups
         hdfeos = f.require_group("HDFEOS")
@@ -547,7 +577,7 @@ def fake_omi_pixcor_file(tmp_path_factory):
         # HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Geolocation Fields/Time
         hdfeos_swaths_omi_ground_pixel_corners_uv_1_geolocation_fields_time = hdfeos_swaths_omi_ground_pixel_corners_uv_1_geolocation_fields.create_dataset(
             "Time",
-            data=np.linspace(0.0, 1000000000.0, dim_0_1643).astype(np.float64),
+            data=np.linspace(tai_start, tai_end, dim_0_1643).astype(np.float64),
         )
         hdfeos_swaths_omi_ground_pixel_corners_uv_1_geolocation_fields_time.attrs[
             "MissingValue"
@@ -580,14 +610,7 @@ def fake_omi_pixcor_file(tmp_path_factory):
         # HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Geolocation Fields/TimeUTC
         hdfeos_swaths_omi_ground_pixel_corners_uv_1_geolocation_fields_timeutc = hdfeos_swaths_omi_ground_pixel_corners_uv_1_geolocation_fields.create_dataset(
             "TimeUTC",
-            data=np.full(
-                (
-                    dim_0_1643,
-                    dim_1_27,
-                ),
-                b"",
-                dtype=np.dtype("|S1"),
-            ),
+            data=utc_data,
         )
         hdfeos_swaths_omi_ground_pixel_corners_uv_1_geolocation_fields_timeutc.attrs[
             "MissingValue"
@@ -1032,7 +1055,7 @@ def fake_omi_pixcor_file(tmp_path_factory):
         # HDFEOS/SWATHS/OMI Ground Pixel Corners UV-2/Geolocation Fields/Time
         hdfeos_swaths_omi_ground_pixel_corners_uv_2_geolocation_fields_time = hdfeos_swaths_omi_ground_pixel_corners_uv_2_geolocation_fields.create_dataset(
             "Time",
-            data=np.linspace(0.0, 1000000000.0, dim_0_1643).astype(np.float64),
+            data=np.linspace(tai_start, tai_end, dim_0_1643).astype(np.float64),
         )
         hdfeos_swaths_omi_ground_pixel_corners_uv_2_geolocation_fields_time.attrs[
             "MissingValue"
@@ -1065,14 +1088,7 @@ def fake_omi_pixcor_file(tmp_path_factory):
         # HDFEOS/SWATHS/OMI Ground Pixel Corners UV-2/Geolocation Fields/TimeUTC
         hdfeos_swaths_omi_ground_pixel_corners_uv_2_geolocation_fields_timeutc = hdfeos_swaths_omi_ground_pixel_corners_uv_2_geolocation_fields.create_dataset(
             "TimeUTC",
-            data=np.full(
-                (
-                    dim_0_1643,
-                    dim_1_27,
-                ),
-                b"",
-                dtype=np.dtype("|S1"),
-            ),
+            data=utc_data,
         )
         hdfeos_swaths_omi_ground_pixel_corners_uv_2_geolocation_fields_timeutc.attrs[
             "MissingValue"
@@ -1517,7 +1533,7 @@ def fake_omi_pixcor_file(tmp_path_factory):
         # HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Geolocation Fields/Time
         hdfeos_swaths_omi_ground_pixel_corners_vis_geolocation_fields_time = hdfeos_swaths_omi_ground_pixel_corners_vis_geolocation_fields.create_dataset(
             "Time",
-            data=np.linspace(0.0, 1000000000.0, dim_0_1643).astype(np.float64),
+            data=np.linspace(tai_start, tai_end, dim_0_1643).astype(np.float64),
         )
         hdfeos_swaths_omi_ground_pixel_corners_vis_geolocation_fields_time.attrs[
             "MissingValue"
@@ -1550,14 +1566,7 @@ def fake_omi_pixcor_file(tmp_path_factory):
         # HDFEOS/SWATHS/OMI Ground Pixel Corners VIS/Geolocation Fields/TimeUTC
         hdfeos_swaths_omi_ground_pixel_corners_vis_geolocation_fields_timeutc = hdfeos_swaths_omi_ground_pixel_corners_vis_geolocation_fields.create_dataset(
             "TimeUTC",
-            data=np.full(
-                (
-                    dim_0_1643,
-                    dim_1_27,
-                ),
-                b"",
-                dtype=np.dtype("|S1"),
-            ),
+            data=utc_data,
         )
         hdfeos_swaths_omi_ground_pixel_corners_vis_geolocation_fields_timeutc.attrs[
             "MissingValue"

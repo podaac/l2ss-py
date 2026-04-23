@@ -16,6 +16,13 @@ def fake_mls_aura_l2gp_oh_file(tmp_path_factory):
     dim_0_49 = 2
     dim_1_49 = 2
 
+
+    # 2020-01-16T12:30:00Z  <-> 2020-01-16T12:40:00Z in seconds since 1993-01-01 (TAI)
+    # (2020-01-16T12:30:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853331400.0
+    # (2020-01-16T12:40:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853332000.0
+    tai_start = 853331400.0
+    tai_end = 853332000.0
+
     with h5py.File(filepath, "w") as f:
         # create groups
         hdfeos = f.require_group("HDFEOS")
@@ -511,13 +518,14 @@ def fake_mls_aura_l2gp_oh_file(tmp_path_factory):
             np.array([np.float32(np.float32(-999.99))], dtype=np.float32)
         )
 
-        # HDFEOS/SWATHS/OH/Geolocation Fields/Time
+
         hdfeos_swaths_oh_geolocation_fields_time = (
             hdfeos_swaths_oh_geolocation_fields.create_dataset(
                 "Time",
-                data=np.linspace(0.0, 1000000000.0, dim_0_3495).astype(np.float64),
+                data=np.linspace(tai_start, tai_end, dim_0_3495).astype(np.float64),
             )
         )
+        print(np.linspace(tai_start, tai_end, dim_0_3495).astype(np.float64))
         hdfeos_swaths_oh_geolocation_fields_time.attrs["MissingValue"] = np.array(
             [np.float64(np.float64(-999.989990234375))], dtype=np.float64
         )
@@ -526,27 +534,29 @@ def fake_mls_aura_l2gp_oh_file(tmp_path_factory):
             "Aura-Shared"
         )
         hdfeos_swaths_oh_geolocation_fields_time.attrs["Units"] = "s"
+        hdfeos_swaths_oh_geolocation_fields_time.attrs["units"] = "seconds since 1993-01-01T00:00:00Z"
+
         hdfeos_swaths_oh_geolocation_fields_time.attrs["_FillValue"] = np.array(
             [np.float64(np.float64(-999.989990234375))], dtype=np.float64
         )
 
-        # HDFEOS/SWATHS/OH/nLevels
-        hdfeos_swaths_oh_nlevels = hdfeos_swaths_oh.create_dataset(
-            "nLevels",
-            data=np.arange(dim_0_49, dtype=np.float32),
-        )
+        # # HDFEOS/SWATHS/OH/nLevels
+        # hdfeos_swaths_oh_nlevels = hdfeos_swaths_oh.create_dataset(
+        #     "nLevels",
+        #     data=np.arange(dim_0_49, dtype=np.float32),
+        # )
 
-        # HDFEOS/SWATHS/OH/nTimes
-        hdfeos_swaths_oh_ntimes = hdfeos_swaths_oh.create_dataset(
-            "nTimes",
-            data=np.arange(dim_0_3495, dtype=np.float32),
-        )
+        # # HDFEOS/SWATHS/OH/nTimes
+        # hdfeos_swaths_oh_ntimes = hdfeos_swaths_oh.create_dataset(
+        #     "nTimes",
+        #     data=np.arange(dim_0_3495, dtype=np.float32),
+        # )
 
-        # HDFEOS/SWATHS/OH/nTimesTotal
-        hdfeos_swaths_oh_ntimestotal = hdfeos_swaths_oh.create_dataset(
-            "nTimesTotal",
-            data=np.arange(dim_0_3495, dtype=np.float32),
-        )
+        # # HDFEOS/SWATHS/OH/nTimesTotal
+        # hdfeos_swaths_oh_ntimestotal = hdfeos_swaths_oh.create_dataset(
+        #     "nTimesTotal",
+        #     data=np.arange(dim_0_3495, dtype=np.float32),
+        # )
 
         # HDFEOS/SWATHS/OH-APriori/Data Fields/Convergence
         hdfeos_swaths_oh_apriori_data_fields_convergence = (
@@ -835,7 +845,7 @@ def fake_mls_aura_l2gp_oh_file(tmp_path_factory):
         hdfeos_swaths_oh_apriori_geolocation_fields_time = (
             hdfeos_swaths_oh_apriori_geolocation_fields.create_dataset(
                 "Time",
-                data=np.linspace(0.0, 1000000000.0, dim_0_3495).astype(np.float64),
+                data=np.linspace(tai_start, tai_end, dim_0_3495).astype(np.float64),
             )
         )
         hdfeos_swaths_oh_apriori_geolocation_fields_time.attrs["MissingValue"] = (
@@ -846,27 +856,31 @@ def fake_mls_aura_l2gp_oh_file(tmp_path_factory):
             "UniqueFieldDefinition"
         ] = "Aura-Shared"
         hdfeos_swaths_oh_apriori_geolocation_fields_time.attrs["Units"] = "s"
+        hdfeos_swaths_oh_apriori_geolocation_fields_time.attrs["units"] = "seconds since 1993-01-01T00:00:00Z"
         hdfeos_swaths_oh_apriori_geolocation_fields_time.attrs["_FillValue"] = np.array(
             [np.float64(np.float64(-999.989990234375))], dtype=np.float64
         )
 
-        # HDFEOS/SWATHS/OH-APriori/nLevels
-        hdfeos_swaths_oh_apriori_nlevels = hdfeos_swaths_oh_apriori.create_dataset(
-            "nLevels",
-            data=np.arange(dim_0_49, dtype=np.float32),
-        )
+        # # HDFEOS/SWATHS/OH-APriori/nLevels
+        # hdfeos_swaths_oh_apriori_nlevels = hdfeos_swaths_oh_apriori.create_dataset(
+        #     "nLevels",
+        #     data=np.arange(dim_0_49, dtype=np.float32),
+        # )
+        # #hdfeos_swaths_oh_apriori_nlevels.make_scale()
 
-        # HDFEOS/SWATHS/OH-APriori/nTimes
-        hdfeos_swaths_oh_apriori_ntimes = hdfeos_swaths_oh_apriori.create_dataset(
-            "nTimes",
-            data=np.arange(dim_0_3495, dtype=np.float32),
-        )
+        # # HDFEOS/SWATHS/OH-APriori/nTimes
+        # hdfeos_swaths_oh_apriori_ntimes = hdfeos_swaths_oh_apriori.create_dataset(
+        #     "nTimes",
+        #     data=np.arange(dim_0_3495, dtype=np.float32),
+        # )
+        # #hdfeos_swaths_oh_apriori_ntimes.make_scale()
 
-        # HDFEOS/SWATHS/OH-APriori/nTimesTotal
-        hdfeos_swaths_oh_apriori_ntimestotal = hdfeos_swaths_oh_apriori.create_dataset(
-            "nTimesTotal",
-            data=np.arange(dim_0_3495, dtype=np.float32),
-        )
+        # # HDFEOS/SWATHS/OH-APriori/nTimesTotal
+        # hdfeos_swaths_oh_apriori_ntimestotal = hdfeos_swaths_oh_apriori.create_dataset(
+        #     "nTimesTotal",
+        #     data=np.arange(dim_0_3495, dtype=np.float32),
+        # )
+        # #hdfeos_swaths_oh_apriori_ntimestotal.make_scale()
 
         # HDFEOS INFORMATION/coremetadata.0
         hdfeos_information_coremetadata_0 = hdfeos_information.create_dataset(

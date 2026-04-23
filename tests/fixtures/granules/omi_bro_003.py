@@ -22,6 +22,36 @@ def fake_omi_bro_file(tmp_path_factory):
     dim_1_60 = 14
     dim_1_61 = 18
 
+
+    # TimeUTC stores [year, month, day, hour, minute, second] per scan line
+    # all scan lines share the same start time for simplicity
+    tai_start = np.datetime64("2020-01-16T12:30:00", "s")
+    tai_end = np.datetime64("2020-01-16T12:40:00", "s")
+    timestamps = np.array(
+        [
+            tai_start + np.timedelta64(int(s), "s")
+            for s in np.linspace(0, 600, dim_0_1997)
+        ]
+    )
+
+    # 2020-01-16T12:30:00Z  <-> 2020-01-16T12:40:00Z in seconds since 1993-01-01 (TAI)
+    # (2020-01-16T12:30:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853331400.0
+    # (2020-01-16T12:40:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853332000.0
+    tai_start = (
+        tai_start - np.datetime64("1993-01-01")
+    ).astype(np.float64)
+    tai_end = (
+        tai_end - np.datetime64("1993-01-01")
+    ).astype(np.float64)
+
+    # convert each timestamp to a 27-char string and then to a (nTimes, 27) byte array
+    utc_strings = np.array([str(t).replace(" ", "T") + ".000000Z" for t in timestamps])
+
+    utc_data = np.array(
+        [[c.encode("ascii") for c in row] for row in utc_strings],
+        dtype="|S1",
+    )
+
     with h5py.File(filepath, "w") as f:
         # create groups
         hdfeos = f.require_group("HDFEOS")
@@ -1588,13 +1618,6 @@ def fake_omi_bro_file(tmp_path_factory):
             "_FillValue"
         ] = np.array([np.int16(np.int16(-30000))], dtype=np.int16)
 
-        # HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields/Time
-        # 2020-01-16T12:30:00Z  <-> 2020-01-16T12:40:00Z in seconds since 1993-01-01 (TAI)
-        # (2020-01-16T12:30:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853331400.0
-        # (2020-01-16T12:40:00Z - 1993-01-01T00:00:00Z).total_seconds() = 853332000.0
-        tai_start = 853331400.0
-        tai_end   = 853332000.0
-
         hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields_time = (
             hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields.create_dataset(
                 "Time",
@@ -1630,16 +1653,11 @@ def fake_omi_bro_file(tmp_path_factory):
             "_FillValue"
         ] = np.array([np.float64(np.float64(-1e30))], dtype=np.float64)
 
-        # HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields/TimeUTC
-        # TimeUTC stores [year, month, day, hour, minute, second] per scan line
-        # all scan lines share the same start time for simplicity
-        utc_row   = np.array([2020, 1, 16, 12, 30, 0], dtype=np.int16)
-        utc_data  = np.tile(utc_row, (dim_0_1997, 1))
 
         hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields_timeutc = (
             hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields.create_dataset(
                 "TimeUTC",
-                data=utc_data.astype(np.int16),
+                data=utc_data,
             )
         )
         hdfeos_swaths_omi_total_column_amount_bro_geolocation_fields_timeutc.attrs[

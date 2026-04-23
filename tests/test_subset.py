@@ -1169,50 +1169,93 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
     # subset should be present.
     assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
 
-@pytest.mark.skip(reason="Test flattens data which we do not have to do anymore")
-def test_temporal_he5file_subset(data_dir, subset_output_dir):
+    assert set(np.append(["lat", "lon", "time"], variables)) == set(
+        out_ds.data_vars.keys()
+    )
+
+@pytest.mark.parametrize("fixture_name, time_var_path", [
+    (
+        "fake_omipixcor_file",
+        "/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Geolocation Fields/TimeUTC",
+    ),
+    (
+        "fake_omibro_file",
+        "/HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields/TimeUTC",
+    ),
+    (
+        "fake_mls_aura_l2gp_oh_file",
+        "/HDFEOS/SWATHS/OH/Geolocation Fields/Time",
+    ),
+])
+def test_temporal_he5file_subset(
+    fixture_name: str,
+    time_var_path: str,
+    fake_omi_pixcor_file: Path,
+    fake_omi_bro_file: Path,
+    fake_mls_aura_l2gp_oh_file: Path,
+    tmp_path: Path,
+):
     """
-    Test that the time type changes to datetime for subsetting
+    Test that temporal subsetting correctly filters scan lines to only those
+    that fall within the requested time range.
     """
+    min_time = "2020-01-16T12:31:00Z"
+    max_time = "2020-01-16T12:39:00Z"
 
-    OMI_file_names = [('OMI','OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'),
-                      ('OMI','OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'),
-                      ('MLS','MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5')]
-    OMI_copy_file = 'OMI_copy_testing_2.he5'
-    for i in OMI_file_names:
-        shutil.copyfile(os.path.join(data_dir, i[0], i[1]),
-                        os.path.join(subset_output_dir, OMI_copy_file))
-        min_time = '2020-01-16T12:30:00Z'
-        max_time = '2020-01-16T12:40:00Z'
+    time_min = np.datetime64("2020-01-16T12:31:00", "ns")
+    time_max = np.datetime64("2020-01-16T12:39:00", "ns")
 
-        nc_dataset, has_groups, hdf_type = file_utils.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
-        assert has_groups == True
-        assert i[0] == hdf_type
-        args = {
-            'decode_coords': False,
-            'mask_and_scale': False,
-            'decode_times': False
-        }
+    fixture_map: dict[str, Path] = {
+        "fake_omipixcor_file":        fake_omi_pixcor_file,
+        "fake_omibro_file":           fake_omi_bro_file,
+        "fake_mls_aura_l2gp_oh_file": fake_mls_aura_l2gp_oh_file,
+    }
+    fixture_path = fixture_map[fixture_name]
+    output_path  = tmp_path / f"{fixture_path.stem}_temporal_subset.he5"
 
-        if min_time or max_time:
-            args['decode_times'] = True
+    subset.subset(
+        file_to_subset=str(fixture_path),
+        bbox = np.array(((-180, 180), (-90, 90))),
+        output_file=str(output_path),
+        min_time=min_time,
+        max_time=max_time,
+    )
 
-        with xr.open_dataset(
-                xr.backends.NetCDF4DataStore(nc_dataset),
-                **args
-        ) as dataset:
-            _, _, time_var_names = coordinate_utils.get_coordinate_variable_names(
-                dataset=dataset,
-                lat_var_names=None,
-                lon_var_names=None,
-                time_var_names=None
-            )
-            if 'BRO' in i:
-                assert any('utc' in x.lower() for x in time_var_names)
-            
-            dataset, _ = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
-            assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
+    assert output_path.exists(), (
+        f"subset output file was not created at {output_path}"
+    )
+    assert output_path.stat().st_size > 0, (
+        f"subset output file is empty at {output_path}"
+    )
 
+    group_path, var_name = time_var_path.rsplit("/", 1)
+
+    with xr.open_datatree(str(output_path), engine="netcdf4") as dt:
+
+        for node in dt.subtree:
+            ds = node.ds
+            if ds is None:
+                continue
+            for dim in ds.dims:
+                assert "phony" not in dim, (
+                    f"unexpected phony dim {dim!r} in {node.path} after subset"
+                )
+
+        assert group_path in dt.groups, (
+            f"expected group {group_path!r} not found in subsetted output"
+        )
+
+        ds = dt[group_path].ds
+        assert var_name in ds, (
+            f"expected variable {var_name!r} not found in {group_path} after subset"
+        )
+
+        values = ds[var_name].values.ravel().astype(np.datetime64)
+        assert (values >= time_min).all() and (values <= time_max).all(), (
+            f"time values outside [{time_max}, {time_min}] found in "
+            f"{time_var_path} after temporal subset. "
+            f"min={values.min()}, max={values.max()}"
+        )
 
 
 def test_MLS_levels(fake_mls_aura_l2gp_oh_file, tmp_path):
