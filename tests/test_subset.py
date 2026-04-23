@@ -1214,33 +1214,6 @@ def test_temporal_he5file_subset(data_dir, subset_output_dir):
             assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
 
 
-def test_omi_pixcor(data_dir, subset_output_dir, request):
-    """
-    OMI PIX COR collection has the same shape across groups but covers a different domain
-    group to group. Dimension names had to be changed in order for copying data back into
-    netCDF files. L2S developers not this collection was particularly tricky
-    """
-    omi_dir = join(data_dir, 'OMI')
-    omi_file = 'OMI-Aura_L2-OMPIXCOR_2020m0116t1207-o82471_v003-2020m0116t174929.he5'
-    omi_file_input = 'input' + omi_file
-    bbox = np.array(((-180, 180), (-30, 30)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
-
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file)
-    )
-
-    _ = subset.subset(
-        file_to_subset=os.path.join(subset_output_dir, omi_file),
-        bbox=bbox,
-        output_file=os.path.join(subset_output_dir, output_file)
-    )
-
-    out_nc = nc.Dataset(join(subset_output_dir, output_file))
-
-    assert out_nc
-
 
 def test_MLS_levels(data_dir, subset_output_dir, request):
     """
@@ -2059,6 +2032,200 @@ def test_subset_gpm_mhs_compute_new_var_data(fake_gpm_mhs_file, subset_output_di
 
     # timeMidScan created, and correct?
     assert int(dtree["S1/ScanTime"].variables["timeMidScan"][0]) == 1456356716
+
+
+@pytest.fixture(scope="session")
+def fake_omipixcor_file(tmp_path_factory):
+    """
+    Create fake OMPIXCOR data at run time which mirrors the multi-swath structure
+    of the OMPIXCOR_003 collection.
+
+    Two swaths share dimension names but have different nXtrack sizes, which is
+    the core edge case this collection exercises. libnetcdf will assign independent
+    phony dims across all groups:
+
+    Group: /HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Data Fields
+        Dimensions: (phony_dim_0: 1644, phony_dim_1: 30)
+        Data variables:
+            FoV75CornerLatitude  (phony_dim_0, phony_dim_1)
+
+    Group: /HDFEOS/SWATHS/OMI Ground Pixel Corners UV-2/Data Fields
+        Dimensions: (phony_dim_4: 1644, phony_dim_5: 60)
+        Data variables:
+            FoV75CornerLatitude  (phony_dim_4, phony_dim_5)
+    """
+    filepath = tmp_path_factory.mktemp("data") / "fake_omipixcor.he5"
+
+    with h5py.File(filepath, "w") as f:
+        n_times = 10
+        n_xtrack1 = 5
+        n_xtrack2 = 10
+
+        uv1_data = f.require_group(
+            "HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Data Fields"
+        )
+        uv1_geo = f.require_group(
+            "HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Geolocation Fields"
+        )
+        uv2_data = f.require_group(
+            "HDFEOS/SWATHS/OMI Ground Pixel Corners UV-2/Data Fields"
+        )
+        uv2_geo = f.require_group(
+            "HDFEOS/SWATHS/OMI Ground Pixel Corners UV-2/Geolocation Fields"
+        )
+        info = f.require_group("HDFEOS INFORMATION")
+
+        # UV-1 data fields
+        corner_lat_uv1 = uv1_data.create_dataset(
+            "FoV75CornerLatitude",
+            data=np.random.rand(n_times, n_xtrack1).astype(np.float32),
+        )
+        corner_lat_uv1.attrs["MissingValue"] = -1.0e30
+
+        # UV-1 geolocation fields
+        lat_uv1 = uv1_geo.create_dataset(
+            "Latitude",
+            data=np.linspace(-90, 90, n_times * n_xtrack1)
+            .reshape(n_times, n_xtrack1)
+            .astype(np.float32),
+        )
+        lon_uv1 = uv1_geo.create_dataset(
+            "Longitude",
+            data=np.linspace(-180, 180, n_times * n_xtrack1)
+            .reshape(n_times, n_xtrack1)
+            .astype(np.float32),
+        )
+
+        lat_uv1.attrs["Units"] = "degrees_north"
+        lat_uv1.attrs["_FillValue"] = -1.0e30
+        lon_uv1.attrs["Units"] = "degrees_east"
+        lon_uv1.attrs["_FillValue"] = -1.0e30
+
+        # UV-2 data fields
+        corner_lat_uv2 = uv2_data.create_dataset(
+            "FoV75CornerLatitude",
+            data=np.random.rand(n_times, n_xtrack2).astype(np.float32),
+        )
+        corner_lat_uv2.attrs["MissingValue"] = -1.0e30
+
+        # UV-2 geolocation fields
+        lat_uv2 = uv2_geo.create_dataset(
+            "Latitude",
+            data=np.linspace(-90, 90, n_times * n_xtrack2)
+            .reshape(n_times, n_xtrack2)
+            .astype(np.float32),
+        )
+        lon_uv2 = uv2_geo.create_dataset(
+            "Longitude",
+            data=np.linspace(-180, 180, n_times * n_xtrack2)
+            .reshape(n_times, n_xtrack2)
+            .astype(np.float32),
+        )
+
+        lat_uv2.attrs["Units"] = "degrees_north"
+        lat_uv2.attrs["_FillValue"] = -1.0e30
+        lon_uv2.attrs["Units"] = "degrees_east"
+        lon_uv2.attrs["_FillValue"] = -1.0e30
+
+        # make sure that the instrument is in the fake data to resolve
+        # `file_utils.get_hdf_type`
+        additional = f.require_group("HDFEOS/ADDITIONAL/FILE_ATTRIBUTES")
+        additional.attrs["InstrumentName"] = "OMI"
+
+        odl = (
+            "GROUP=SwathStructure\n"
+            "GROUP=SWATH_1\n"
+            'SwathName="OMI Ground Pixel Corners UV-1"\n'
+            "GROUP=GeoField\n"
+            "OBJECT=GeoField_1\n"
+            'GeoFieldName="Latitude"\n'
+            'DimList=("nTimes","nXtrack")\n'
+            "END_OBJECT=GeoField_1\n"
+            "OBJECT=GeoField_2\n"
+            'GeoFieldName="Longitude"\n'
+            'DimList=("nTimes","nXtrack")\n'
+            "END_OBJECT=GeoField_2\n"
+            "END_GROUP=GeoField\n"
+            "GROUP=DataField\n"
+            "OBJECT=DataField_1\n"
+            'DataFieldName="FoV75CornerLatitude"\n'
+            'DimList=("nTimes","nXtrack")\n'
+            "END_OBJECT=DataField_1\n"
+            "END_GROUP=DataField\n"
+            "END_GROUP=SWATH_1\n"
+            "GROUP=SWATH_2\n"
+            'SwathName="OMI Ground Pixel Corners UV-2"\n'
+            "GROUP=GeoField\n"
+            "OBJECT=GeoField_1\n"
+            'GeoFieldName="Latitude"\n'
+            'DimList=("nTimes","nXtrack")\n'
+            "END_OBJECT=GeoField_1\n"
+            "OBJECT=GeoField_2\n"
+            'GeoFieldName="Longitude"\n'
+            'DimList=("nTimes","nXtrack")\n'
+            "END_OBJECT=GeoField_2\n"
+            "END_GROUP=GeoField\n"
+            "GROUP=DataField\n"
+            "OBJECT=DataField_1\n"
+            'DataFieldName="FoV75CornerLatitude"\n'
+            'DimList=("nTimes","nXtrack")\n'
+            "END_OBJECT=DataField_1\n"
+            "END_GROUP=DataField\n"
+            "END_GROUP=SWATH_2\n"
+            "END_GROUP=SwathStructure\n"
+        )
+        info.create_dataset("StructMetadata.0", data=odl)
+
+    return filepath
+
+
+def test_subset_omipixcor_multi_swath(fake_omipixcor_file, subset_output_dir):
+
+    # verify that the file is read with phony dims as expected before subset
+    with xr.open_datatree(fake_omipixcor_file, engine="netcdf4") as dtree:
+        for node in dtree.subtree:
+            ds = node.ds
+            if isinstance(ds, xr.Dataset) and ds.dims:
+                for dim in ds.dims:
+                    assert "phony" in dim, (
+                        f"Expected phony dim before subset, got: {dim}"
+                    )
+
+    bbox = np.array(((-90.1, 90.1), (-45.1, 45.1)))
+
+    subset_output_file = join(subset_output_dir, "omipixcor_test_subset.he5")
+    subset.subset(
+        file_to_subset=fake_omipixcor_file,
+        bbox=bbox,
+        output_file=subset_output_file,
+    )
+
+    dtree = xr.open_datatree(subset_output_file)
+
+    # no phony dims should remain after subset
+    for node in dtree.subtree:
+        ds = node.ds
+        if isinstance(ds, xr.Dataset):
+            for dim in ds.dims:
+                assert "phony" not in dim, f"Unexpected phony dim after subset: {dim}"
+
+    # UV-1 and UV-2 share dim names but must retain their distinct sizes
+    uv1_var = dtree["/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Data Fields"].ds[
+        "FoV75CornerLatitude"
+    ]
+    uv2_var = dtree["/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-2/Data Fields"].ds[
+        "FoV75CornerLatitude"
+    ]
+    uv1_shape = uv1_var.shape
+    uv2_shape = uv2_var.shape
+
+    assert uv1_shape[1] != uv2_shape[1], (
+        "UV-1 and UV-2 nXtrack sizes should differ but both resolved to the same size"
+    )
+
+    # they retained differences, but are the requested variables dims the correct size?
+    assert uv1_shape == (6, 5)
+    assert uv2_shape == (6, 10)
 
 
 def test_temporal_subset_tempo(data_dir, subset_output_dir, request):
