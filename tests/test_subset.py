@@ -165,6 +165,25 @@ def data_files():
 TEST_DATA_FILES = data_files()
 
 
+def assert_phony_dims(dtree: xr.DataTree, *, present: bool) -> None:
+    """Simple helper func to check for phony dimes. If present = True,
+    then we validate that they are present. If False, then we validate
+    that they are not present.
+    """
+    for node in dtree.subtree:
+        ds = node.ds
+        if isinstance(ds, xr.Dataset) and ds.dims:
+            for dim in ds.dims:
+                if present:
+                    assert "phony" in dim, (
+                        f"Expected phony dim before subset, got: {dim}"
+                    )
+                else:
+                    assert "phony" not in dim, (
+                        f"Unexpected 'phony' dimension found: {dim}"
+                    )
+
+
 def test_bbox_conversion(data_dir):
     """
     Test that the bounding box conversion returns expected
@@ -912,38 +931,6 @@ def test_no_null_time_values_in_time_and_space_subset_for_tempo(data_dir, subset
     assert np.isnan(out_nc.groups['geolocation']['time'][:]).any() == False
 
 
-def test_omi_novars_subset(data_dir, subset_output_dir, request):
-    """
-    Check that the OMI variables are conserved when no variable are specified
-    the data field and lat/lon are in different groups
-    """
-    omi_dir = join(data_dir, 'OMI')
-    omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
-
-    bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file)
-    )
-    _ = subset.subset(
-        file_to_subset=join(subset_output_dir, omi_file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file),
-    )
-    # check if the box_test is
-
-    in_nc = nc.Dataset(join(omi_dir, omi_file))
-    out_nc = nc.Dataset(join(subset_output_dir, output_file))
-
-    for var_name, _ in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
-        'Geolocation Fields'].variables.items():
-        assert in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
-                   'Geolocation Fields'].variables[var_name].shape == \
-               out_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
-                   'Geolocation Fields'].variables[var_name].shape
-
-
 @pytest.mark.skip(reason='We no longer flatten groups but do we want to have same function copying the dims')
 def test_get_time_squeeze(data_dir, subset_output_dir):
     """test builtin squeeze method on the lat and time variables so
@@ -1173,13 +1160,14 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
         out_ds.data_vars.keys()
     )
 
+
 @pytest.mark.parametrize("fixture_name, time_var_path", [
     (
-        "fake_omipixcor_file",
+        "fake_omi_pixcor_file",
         "/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Geolocation Fields/TimeUTC",
     ),
     (
-        "fake_omibro_file",
+        "fake_omi_bro_file",
         "/HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields/TimeUTC",
     ),
     (
@@ -1206,46 +1194,36 @@ def test_temporal_he5file_subset(
     time_max = np.datetime64("2020-01-16T12:39:00", "ns")
 
     fixture_map: dict[str, Path] = {
-        "fake_omipixcor_file":        fake_omi_pixcor_file,
-        "fake_omibro_file":           fake_omi_bro_file,
+        "fake_omi_pixcor_file": fake_omi_pixcor_file,
+        "fake_omi_bro_file": fake_omi_bro_file,
         "fake_mls_aura_l2gp_oh_file": fake_mls_aura_l2gp_oh_file,
     }
     fixture_path = fixture_map[fixture_name]
-    output_path  = tmp_path / f"{fixture_path.stem}_temporal_subset.he5"
+    output_path = tmp_path / f"{fixture_path.stem}_temporal_subset.he5"
 
     subset.subset(
         file_to_subset=str(fixture_path),
-        bbox = np.array(((-180, 180), (-90, 90))),
+        bbox=np.array(((-180, 180), (-90, 90))),
         output_file=str(output_path),
         min_time=min_time,
         max_time=max_time,
     )
 
-    assert output_path.exists(), (
-        f"subset output file was not created at {output_path}"
-    )
+    assert output_path.exists(), f"subset output file was not created at {output_path}"
     assert output_path.stat().st_size > 0, (
         f"subset output file is empty at {output_path}"
     )
 
     group_path, var_name = time_var_path.rsplit("/", 1)
 
-    with xr.open_datatree(str(output_path), engine="netcdf4") as dt:
+    with xr.open_datatree(str(output_path), engine="netcdf4") as dtree:
+        assert_phony_dims(dtree, present=False)
 
-        for node in dt.subtree:
-            ds = node.ds
-            if ds is None:
-                continue
-            for dim in ds.dims:
-                assert "phony" not in dim, (
-                    f"unexpected phony dim {dim!r} in {node.path} after subset"
-                )
-
-        assert group_path in dt.groups, (
+        assert group_path in dtree.groups, (
             f"expected group {group_path!r} not found in subsetted output"
         )
 
-        ds = dt[group_path].ds
+        ds = dtree[group_path].ds
         assert var_name in ds, (
             f"expected variable {var_name!r} not found in {group_path} after subset"
         )
@@ -1257,8 +1235,7 @@ def test_temporal_he5file_subset(
             f"min={values.min()}, max={values.max()}"
         )
 
-
-def test_MLS_levels(fake_mls_aura_l2gp_oh_file, tmp_path):
+def test_MLS_levels(fake_mls_aura_l2gp_oh_file: Path, tmp_path: Path):
     """
     Test that the unique groups are determined before bounding box
     subsetting
@@ -1307,7 +1284,8 @@ def test_MLS_levels(fake_mls_aura_l2gp_oh_file, tmp_path):
                 f"{in_data[var_name].shape} != {out_data[var_name].shape}"
             )
 
-def test_he5_timeattrs_output(fake_omi_bro_file, tmp_path):
+
+def test_he5_timeattrs_output(fake_omi_bro_file: Path, tmp_path: Path):
     """Test that the time attributes in the output match the attributes of the input for OMI test files"""
 
     output_file = tmp_path / "omi_bro_timeattrs.he5"
@@ -1626,62 +1604,17 @@ def test_bad_time_unit(subset_output_dir):
     ds_test = xr.open_dataset(nc_out_location)
     ds_test.close()
 
-@pytest.mark.skip(reason="we no longer faltten groups so not sure if we need to test this flatten feature")
-def test_get_unique_groups():
-    """Test lat_var_names return the expected unique groups"""
 
-    input_lats_s6 = ['__data_01__latitude', '__data_20__c__latitude', '__data_20__ku__latitude']
 
-    unique_groups_s6, diff_counts_s6 = subset.get_base_group_names(input_lats_s6)
+def test_subset_gpm_compute_new_var_data(fake_gpm_2adprenv_07_file: Path, tmp_path: Path):
 
-    expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
-    expected_diff_counts_s6 = [0, 1, 1]
-
-    assert expected_groups_s6 == unique_groups_s6
-    assert expected_diff_counts_s6 == diff_counts_s6
-
-    input_lats_mls = ['__HDF__swaths__o3__geo__latitude',
-                        '__HDF__swaths__o3 columns__geo__latitude',
-                        '__HDF__swaths__o3-apiori__geo__latitude']
-
-    unique_groups_mls, diff_counts_mls = subset.get_base_group_names(input_lats_mls)
-
-    expected_groups_mls = ['__HDF__swaths__o3',
-                            '__HDF__swaths__o3 columns',
-                            '__HDF__swaths__o3-apiori']
-    expected_diff_counts_mls = [2, 2, 2]
-
-    assert expected_groups_mls == unique_groups_mls
-    assert expected_diff_counts_mls == diff_counts_mls
-
-    input_lats_single = ['__latitude', '__geolocation__latitude']
-
-    unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
-
-    expected_groups_single = ['__', '__geolocation']
-    expected_diff_counts_single = [-1, 0]
-    
-    assert expected_groups_single == unique_groups_single
-    assert expected_diff_counts_single == diff_counts_single
-
-def test_subset_gpm_compute_new_var_data(fake_gpm_2adprenv_07_file, data_dir, subset_output_dir, request):
-    with xr.open_datatree(fake_gpm_2adprenv_07_file) as dtree:
-        for node in dtree.subtree:
-            ds = node.ds
-            if isinstance(ds, xr.Dataset):
-                dims = ds.dims.keys()
-
-                # ensure that test data is being read by netcdf backend with phony dim names
-                # like we expect from GPM data from CMR
-                for dim in dims:
-                    assert 'phony' in dim, f"Unexpected non 'phony' dimension found: {dim}"
-
+    with xr.open_datatree(fake_gpm_2adprenv_07_file, engine="netCDF4") as dtree:
+        assert_phony_dims(dtree, present = True)
 
     # Correct bbox with (min_lon, min_lat) and (max_lon, max_lat)
     bbox = np.array(((-180, 90), (-90, 90)))
 
-    output_file = f"gpm_test_subset.HDF5"  # Keep the extension
-    subset_output_file = join(subset_output_dir, output_file)
+    subset_output_file = tmp_path / "gpm_test_subset.HDF5"
     subset.subset(
         file_to_subset=fake_gpm_2adprenv_07_file,
         bbox=bbox,
@@ -1692,14 +1625,7 @@ def test_subset_gpm_compute_new_var_data(fake_gpm_2adprenv_07_file, data_dir, su
     dtree = xr.open_datatree(subset_output_file)
 
     # Check the dimensions
-    for node in dtree.subtree:
-        ds = node.ds  # Get the dataset at this node
-        if isinstance(ds, xr.Dataset):
-            dims = ds.dims.keys()
-
-            # Ensure no 'phony' dimensions
-            for dim in dims:
-                assert 'phony' not in dim, f"Unexpected 'phony' dimension found: {dim}"
+    assert_phony_dims(dtree, present=False)
 
     for group in dtree.groups:
         if "ScanTime" in group:
@@ -1707,13 +1633,13 @@ def test_subset_gpm_compute_new_var_data(fake_gpm_2adprenv_07_file, data_dir, su
 
 
 def test_subset_gpm_mhs_compute_new_var_data(
-    fake_gpm_2agprofmetopbmhs_08_file, subset_output_dir
+    fake_gpm_2agprofmetopbmhs_08_file: Path, tmp_path: Path
 ):
     """
     Tests that a GPM v08 file with NetCDF4 format can run through subset and produce correct variables
     """
 
-    subset_output_file = Path(subset_output_dir) / "mhs_test_subset.nc"
+    subset_output_file = tmp_path / "mhs_test_subset.nc"
 
     # perform the subsetting operation on the fake data, make sure to
     # keep created timeMidScan var created by l2ss to compare
@@ -1746,7 +1672,7 @@ def test_subset_gpm_mhs_compute_new_var_data(
     assert int(dtree["S1/ScanTime"].variables["timeMidScan"][0]) == 1456356716
 
 
-def test_omi_novars_subset(fake_omi_bro_file, subset_output_dir):
+def test_omi_novars_subset(fake_omi_bro_file: Path, tmp_path: Path):
 
     expected_data_vars = frozenset(
         {
@@ -1804,22 +1730,11 @@ def test_omi_novars_subset(fake_omi_bro_file, subset_output_dir):
     )
 
     with xr.open_datatree(fake_omi_bro_file, engine="netcdf4") as dtree:
-        for node in dtree.subtree:
-            ds = node.ds
-            if isinstance(ds, xr.Dataset) and ds.dims:
-                for dim in ds.dims:
-                    assert "phony" in dim, (
-                        f"expected phony dim before subset, got: {dim}"
-                    )
-                for var in ds.values():
-                    assert "dimensionnames" not in var.attrs, (
-                        "omibro fixture should not have dimensionnames attrs - "
-                        "dimension recovery must come from structmetadata.0 only"
-                    )
+        assert_phony_dims(dtree, present=True)
 
     bbox = np.array(((-90.1, 90.1), (-45.1, 45.1)))
 
-    subset_output_file = join(subset_output_dir, "omibro_test_subset.hdf5")
+    subset_output_file = tmp_path / "omibro_test_subset.hdf5"
     subset.subset(
         file_to_subset=fake_omi_bro_file,
         bbox=bbox,
@@ -1828,11 +1743,7 @@ def test_omi_novars_subset(fake_omi_bro_file, subset_output_dir):
 
     dtree = xr.open_datatree(subset_output_file)
 
-    for node in dtree.subtree:
-        ds = node.ds
-        if isinstance(ds, xr.Dataset):
-            for dim in ds.dims:
-                assert "phony" not in dim, f"unexpected phony dim after subset: {dim}"
+    assert_phony_dims(dtree, present=False)
 
     data_ds = dtree["HDFEOS/SWATHS/OMI Total Column Amount BrO/Data Fields"].ds
     geo_ds = dtree["HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields"].ds
@@ -1853,35 +1764,24 @@ def test_omi_novars_subset(fake_omi_bro_file, subset_output_dir):
     assert geo_ds["Time"].dims == ("nTimes",)
 
 
-def test_subset_omipixcor_multi_swath(fake_omipixcor_file, subset_output_dir):
 
-    # verify that the file is read with phony dims as expected before subset
-    with xr.open_datatree(fake_omipixcor_file, engine="netcdf4") as dtree:
-        for node in dtree.subtree:
-            ds = node.ds
-            if isinstance(ds, xr.Dataset) and ds.dims:
-                for dim in ds.dims:
-                    assert "phony" in dim, (
-                        f"Expected phony dim before subset, got: {dim}"
-                    )
+def test_subset_omipixcor_multi_swath(fake_omi_pixcor_file: Path, tmp_path: Path):
+
+    with xr.open_datatree(fake_omi_pixcor_file, engine="netCDF4") as dtree:
+        assert_phony_dims(dtree, present=True)
 
     bbox = np.array(((-3, 5), (-45.1, 45.1)))
 
-    subset_output_file = join(subset_output_dir, "omipixcor_test_subset.he5")
+    subset_output_file = tmp_path / "omipixcor_test_subset.he5"
     subset.subset(
-        file_to_subset=fake_omipixcor_file,
+        file_to_subset=fake_omi_pixcor_file,
         bbox=bbox,
         output_file=subset_output_file,
     )
 
     dtree = xr.open_datatree(subset_output_file)
 
-    # no phony dims should remain after subset
-    for node in dtree.subtree:
-        ds = node.ds
-        if isinstance(ds, xr.Dataset):
-            for dim in ds.dims:
-                assert "phony" not in dim, f"Unexpected phony dim after subset: {dim}"
+    assert_phony_dims(dtree, present=False)
 
     # UV-1 and UV-2 share dim names but must retain their distinct sizes
     uv1_var = dtree["/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Data Fields"].ds[
