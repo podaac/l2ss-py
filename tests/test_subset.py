@@ -1608,7 +1608,7 @@ def test_bad_time_unit(subset_output_dir):
 
 def test_subset_gpm_compute_new_var_data(fake_gpm_2adprenv_07_file: Path, tmp_path: Path):
 
-    with xr.open_datatree(fake_gpm_2adprenv_07_file, engine="netCDF4") as dtree:
+    with xr.open_datatree(fake_gpm_2adprenv_07_file, engine="netcdf4") as dtree:
         assert_phony_dims(dtree, present = True)
 
     # Correct bbox with (min_lon, min_lat) and (max_lon, max_lat)
@@ -1767,7 +1767,7 @@ def test_omi_novars_subset(fake_omi_bro_file: Path, tmp_path: Path):
 
 def test_subset_omipixcor_multi_swath(fake_omi_pixcor_file: Path, tmp_path: Path):
 
-    with xr.open_datatree(fake_omi_pixcor_file, engine="netCDF4") as dtree:
+    with xr.open_datatree(fake_omi_pixcor_file, engine="netcdf4") as dtree:
         assert_phony_dims(dtree, present=True)
 
     bbox = np.array(((-3, 5), (-45.1, 45.1)))
