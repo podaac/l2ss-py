@@ -14,6 +14,12 @@ import os
 
 import pytest
 
+from .fixtures.granules.omi_bro_003 import fake_omi_bro_file
+from .fixtures.granules.omi_pixcor_003 import fake_omi_pixcor_file
+from .fixtures.granules.gpm_2agprofmetopbmhs_08 import fake_gpm_2agprofmetopbmhs_08_file
+from .fixtures.granules.gpm_2adprenv_07 import fake_gpm_2adprenv_07_file
+from .fixtures.granules.mls_aura_l2gp_06 import fake_mls_aura_l2gp_oh_file
+
 
 @pytest.fixture(scope='function')
 def mock_environ(tmp_path):

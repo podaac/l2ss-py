@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
 ### Changed
 - Changed way Cygnss collection finds time variable
+- Update time encoding with units
+- [issue/402] (https://github.com/podaac/l2ss-py/issues/402) Update tests which focus on HDF/EOS subsetting, add in pytest based granule fixtures:w
 ### Deprecated
 ### Removed
 ### Fixed
