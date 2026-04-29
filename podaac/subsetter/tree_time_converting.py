@@ -14,29 +14,29 @@ datetime.datetime
 """
 
 import datetime
-from typing import Tuple, Union
-import xarray as xr
+
 import numpy as np
+import xarray as xr
 
 
-def compute_utc_name(group: xr.Dataset) -> Union[str, None]:
+def compute_utc_name(group: xr.Dataset) -> str | None:
     """
     Get the name of the utc variable if it is there to determine origin time
     """
     for var_name in list(group.data_vars.keys()):
-        if 'utc' in var_name.lower() and 'time' in var_name.lower():
+        if "utc" in var_name.lower() and "time" in var_name.lower():
             return var_name
 
     return None
 
 
-def get_start_date(instrument_type: str) -> Union[datetime.datetime, None]:
+def get_start_date(instrument_type: str) -> datetime.datetime | None:
     """
     returns the start date based on the instrument type
     """
-    if instrument_type in ['OMI', 'MLS']:
+    if instrument_type in ["OMI", "MLS"]:
         start_date = datetime.datetime.strptime("1993-01-01T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
-    elif instrument_type in ['GPM']:
+    elif instrument_type in ["GPM"]:
         start_date = datetime.datetime.strptime("1980-01-06T00:00:00.00", "%Y-%m-%dT%H:%M:%S.%f")
     else:
         return None
@@ -62,7 +62,7 @@ def get_group_by_path(data_tree: xr.Dataset, path: str) -> xr.Dataset:
     str
         The variable name
     """
-    parts = path.strip('/').split('/')
+    parts = path.strip("/").split("/")
     current_group = data_tree
 
     # Navigate through all parts except the last (which is the variable name)
@@ -95,7 +95,9 @@ def update_coord_everywhere(node, coord_name, new_values):
         update_coord_everywhere(child, coord_name, new_values)
 
 
-def convert_to_datetime(data_tree: xr.Dataset, time_vars: list, instrument_type: str) -> Tuple[xr.Dataset, datetime.datetime]:
+def convert_to_datetime(
+    data_tree: xr.Dataset, time_vars: list, instrument_type: str
+) -> tuple[xr.Dataset, datetime.datetime]:
     """
     Convert time variables in a data tree from seconds since the start date to datetime format.
     Handles nested group structures with time variables specified as '/group1/group2/var'.
@@ -127,9 +129,11 @@ def convert_to_datetime(data_tree: xr.Dataset, time_vars: list, instrument_type:
                 # create array of the start time in datetime format
                 date_time_array = np.full(group[var_name].shape, start_date)
                 # add seconds since the start time to the start time to get the time at the data point
-                new_values = date_time_array.astype("datetime64[ns]") + group[var_name].astype('timedelta64[s]').values
+                new_values = date_time_array.astype("datetime64[ns]") + group[var_name].astype("timedelta64[s]").values
                 try:
-                    group[var_name].values = date_time_array.astype("datetime64[ns]") + group[var_name].astype('timedelta64[s]').values
+                    group[var_name].values = (
+                        date_time_array.astype("datetime64[ns]") + group[var_name].astype("timedelta64[s]").values
+                    )
                 except ValueError:
                     pass
                 update_coord_everywhere(data_tree, var_name, new_values)
@@ -139,9 +143,11 @@ def convert_to_datetime(data_tree: xr.Dataset, time_vars: list, instrument_type:
             utc_var_name = compute_utc_name(group)
             if utc_var_name:
                 start_seconds = group[var_name].values[0]
-                new_values = [datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5])
-                              for i in group[utc_var_name].values]
-                start_date = new_values[0] - np.timedelta64(int(start_seconds), 's')
+                new_values = [
+                    datetime.datetime(i[0], i[1], i[2], hour=i[3], minute=i[4], second=i[5])
+                    for i in group[utc_var_name].values
+                ]
+                start_date = new_values[0] - np.timedelta64(int(start_seconds), "s")
                 update_coord_everywhere(data_tree, var_name, new_values)
                 return data_tree, start_date
         else:

@@ -56,6 +56,9 @@ sphinx-rtd-theme = "^3.0.2"
 pytest-rerunfailures = "^16.0"
 pytest-xdist = "^3.6.1"
 myst-parser = "^5.0.0"
+black = "^26.3.1"
+ruff = "^0.15.10"
+pre-commit = "^4.5.1"
 
 [tool.pytest.ini_options]
 junit_family = "xunit2"
@@ -70,3 +73,19 @@ l2ss-py = 'podaac.subsetter.run_subsetter:main'
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ["py312"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"] 
+ignore = ["B905"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

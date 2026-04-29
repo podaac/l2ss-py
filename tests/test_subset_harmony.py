@@ -24,7 +24,7 @@ import shutil
 import sys
 import tempfile
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Any
 from unittest.mock import patch
 
 # Third-party imports
@@ -32,6 +32,7 @@ import numpy as np
 import pystac
 import pytest
 from harmony_service_lib.exceptions import NoDataException
+
 # Local/Project imports
 from harmony_service_lib.message import Message
 
@@ -48,7 +49,7 @@ def temp_dir(request):
 
 
 @pytest.fixture
-def test_env_vars(temp_dir: str) -> Dict[str, str]:
+def test_env_vars(temp_dir: str) -> dict[str, str]:
     """Set up test environment variables."""
     return {
         'DATA_DIRECTORY': temp_dir,
@@ -63,7 +64,7 @@ def test_env_vars(temp_dir: str) -> Dict[str, str]:
 
 
 @pytest.fixture
-def harmony_message_base() -> Dict[str, Any]:
+def harmony_message_base() -> dict[str, Any]:
     """Create base Harmony message for tests."""
     return {
         "accessToken": "fake-token",
@@ -81,7 +82,7 @@ def harmony_message_base() -> Dict[str, Any]:
     }
 
 
-def create_test_stac_item(test_dir: str, bbox: List[float]) -> pystac.Item:
+def create_test_stac_item(test_dir: str, bbox: list[float]) -> pystac.Item:
     """Create a STAC item for testing."""
     test_granule = os.path.join(
         test_dir,
@@ -135,8 +136,8 @@ def create_test_catalog(item: pystac.Item) -> pystac.Catalog:
 def test_service_invoke(
         mock_environ,
         temp_dir: str,
-        test_env_vars: Dict[str, str],
-        harmony_message_base: Dict[str, Any],
+        test_env_vars: dict[str, str],
+        harmony_message_base: dict[str, Any],
         with_coord_vars: bool
 ):
     """Test service invoke with and without coordinate variables."""
@@ -216,8 +217,8 @@ def test_service_invoke(
 def test_service_invoke_pixel_subset(
         mock_environ,
         temp_dir: str,
-        test_env_vars: Dict[str, str],
-        harmony_message_base: Dict[str, Any],
+        test_env_vars: dict[str, str],
+        harmony_message_base: dict[str, Any],
         with_coord_vars: bool
 ):
     """Test service invoke with and without coordinate variables."""
@@ -296,8 +297,8 @@ def test_service_invoke_pixel_subset(
 
 def test_harmony_exception_raised(mock_environ,
                                   temp_dir: str,
-                                  test_env_vars: Dict[str, str],
-                                  harmony_message_base: Dict[str, Any]):
+                                  test_env_vars: dict[str, str],
+                                  harmony_message_base: dict[str, Any]):
     """Test that a HarmonyException is raised by the subset_harmony module."""
 
     input_json = harmony_message_base.copy()
@@ -329,13 +330,14 @@ def test_harmony_exception_raised(mock_environ,
 
 def test_service_invoke_vertical_dimension(mock_environ, temp_dir, test_env_vars, harmony_message_base):
     """Test Harmony service vertical dimension subsetting using a STAC item."""
-    import xarray as xr
-    import numpy as np
     import os
-    import types
-    import pystac
     from datetime import datetime
+
+    import numpy as np
+    import pystac
+    import xarray as xr
     from harmony_service_lib.message import Message
+
     from podaac.subsetter.subset_harmony import L2SubsetterService
 
     # Create dummy dataset with vertical dimension

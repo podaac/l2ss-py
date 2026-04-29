@@ -4,21 +4,21 @@ vertical_subset.py
 
 Contains vertical subsetting logic for NetCDF/xarray DataTree datasets.
 """
-from typing import List, Optional, Union
+
 import numpy as np
 import xarray as xr
 
 
 def vertical_subset(
-    dataset: Union[xr.Dataset, xr.DataTree],
-    return_dataset: Union[xr.Dataset, xr.DataTree],
-    lat_var_names: List[str],
-    lon_var_names: List[str],
-    vertical_var: Optional[str] = None,
-    vertical_min: Optional[float] = None,
-    vertical_max: Optional[float] = None,
-    cut: bool = True
-) -> Union[xr.Dataset, xr.DataTree]:
+    dataset: xr.Dataset | xr.DataTree,
+    return_dataset: xr.Dataset | xr.DataTree,
+    lat_var_names: list[str],
+    lon_var_names: list[str],
+    vertical_var: str | None = None,
+    vertical_min: float | None = None,
+    vertical_max: float | None = None,
+    cut: bool = True,
+) -> xr.Dataset | xr.DataTree:
     """
     Perform vertical subsetting on a DataTree-aware xarray dataset.
 
@@ -81,8 +81,8 @@ def vertical_subset(
                 vert_mask &= vertical_data.values <= vertical_max
 
             # Handle NaN and fill values
-            fill_value = vertical_data.attrs.get('_FillValue', None)
-            missing_value = vertical_data.attrs.get('missing_value', None)
+            fill_value = vertical_data.attrs.get("_FillValue", None)
+            missing_value = vertical_data.attrs.get("missing_value", None)
             mask_nan = ~np.isnan(vertical_data.values)
             mask_fill = np.ones(vertical_data.shape, dtype=bool)
             if fill_value is not None:
@@ -92,7 +92,11 @@ def vertical_subset(
             vert_mask_combined = vert_mask & mask_nan & mask_fill
 
             # Find first and last valid indices along the vertical axis
-            valid_indices = [i for i in range(vertical_data.shape[vert_axis]) if np.any(np.take(vert_mask_combined, i, axis=vert_axis))]
+            valid_indices = [
+                i
+                for i in range(vertical_data.shape[vert_axis])
+                if np.any(np.take(vert_mask_combined, i, axis=vert_axis))
+            ]
             if valid_indices:
                 first_valid = valid_indices[0]
                 last_valid = valid_indices[-1]
@@ -115,7 +119,7 @@ def vertical_subset(
                     Masked dataset.
                 """
                 masked = ds.copy()
-                mask_dims = getattr(vertical_data, 'dims', None)
+                mask_dims = getattr(vertical_data, "dims", None)
                 for var in ds.data_vars:
                     da = ds[var]
                     # Only apply mask if dims match
@@ -124,6 +128,7 @@ def vertical_subset(
                     else:
                         masked[var] = da
                 return masked
+
             new_tree = xr.map_over_datasets(apply_vert_mask, return_dataset)
 
             # Slice new_tree by everything between first_valid and last_valid along the vertical axis
@@ -135,7 +140,7 @@ def vertical_subset(
             return new_tree
 
         if dimensional_subsetting == "dimension":
-            vert_dim = vertical_var.lstrip('/')
+            vert_dim = vertical_var.lstrip("/")
             vert_values = get_vert_values(dataset, vert_dim)
             vert_mask = np.ones(vert_values.shape, dtype=bool)
 
@@ -157,13 +162,14 @@ def vertical_subset(
                             if vert_dim in da.dims:
                                 axis = da.dims.index(vert_dim)
                                 # Broadcast mask to variable shape
-                                shape = [1]*da.ndim
+                                shape = [1] * da.ndim
                                 shape[axis] = -1
                                 expanded_mask = vert_mask.reshape(shape)
                                 masked[var] = da.where(expanded_mask)
                             else:
                                 masked[var] = da
                     return masked
+
                 new_tree = xr.map_over_datasets(mask_layers, return_dataset)
             return new_tree
 
@@ -184,7 +190,8 @@ def get_vert_values(tree: xr.DataTree, vert_dim: str) -> np.ndarray:
     Returns
     -------
     numpy.ndarray
-        Array of vertical values. If a coordinate exists, use its values. If index-only, returns np.arange(N) from the first node where the dimension exists.
+        Array of vertical values. If a coordinate exists, use its values. If index-only,
+        returns np.arange(N) from the first node where the dimension exists.
 
     Raises
     ------
@@ -192,7 +199,7 @@ def get_vert_values(tree: xr.DataTree, vert_dim: str) -> np.ndarray:
         If the dimension does not exist in any node.
     """
     for node in tree.values():
-        ds = getattr(node, 'ds', None)
+        ds = getattr(node, "ds", None)
         if ds is None:
             continue
 
