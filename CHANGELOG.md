@@ -6,6 +6,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated 
+### Removed
+- Removed poetry as a dependency (should have poetry externally already)
+### Fixed
+### Security
+
+
+## [3.3.1]
+### Added
 - Updated readme documentation
 - [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
 ### Changed
