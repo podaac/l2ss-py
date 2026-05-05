@@ -1,30 +1,28 @@
-name: Add to Project
+# Directly move the closed PR to a close status in the PODAAC project
+# to avoid unnecessary clutter and manual triage in the "needs:triage" column.
+name: Update Closed PR Status in PODAAC project
 
 on:
-  issues:
-    types: [opened]
   pull_request:
-    types: [opened]
+    types: [closed]
 
 jobs:
-  add-to-project:
+  update-pr-status:
     runs-on: ubuntu-latest
     steps:
-      - name: Add to project
-        uses: actions/add-to-project@v0.5.0
-        with:
-          project-url: https://github.com/orgs/podaac/projects/75
-          github-token: ${{ secrets.PROJECTS_PAT }}
-
-      - name: Set status to needs:triage
+      - name: Set status to closed
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.PROJECTS_PAT }}
           script: |
-            const projectNumber = 75; // Update this with your actual project number
+            const projectNumber = 75;
             const org = 'podaac';
+            const prNumber = context.payload.pull_request.number;
+            const isMerged = context.payload.pull_request.merged;
 
-            // Get the project ID
+            console.log(`PR #${prNumber} was ${isMerged ? 'merged' : 'closed without merging'}`);
+
+            // Get the project ID and status field information
             const projectQuery = `
               query($org: String!, $number: Int!) {
                 organization(login: $org) {
@@ -54,21 +52,18 @@ jobs:
 
             const project = projectData.organization.projectV2;
             const statusField = project.fields.nodes.find(field => field.name === 'Status');
-            const triageOption = statusField?.options.find(option => option.name === 'needs:triage');
+            const closedOption = statusField?.options.find(option => option.name === 'closed');
 
-            if (!triageOption) {
-              core.warning('Could not find "needs:triage" status option');
+            if (!closedOption) {
+              core.warning('Could not find "closed" status option in project');
               return;
             }
 
-            // Get the item ID that was just added
-            const itemType = context.eventName === 'issues' ? 'Issue' : 'PullRequest';
-            const itemNumber = context.payload.issue?.number || context.payload.pull_request?.number;
-
+            // Get the PR's project item
             const itemQuery = `
               query($org: String!, $repo: String!, $number: Int!) {
                 repository(owner: $org, name: $repo) {
-                  ${itemType === 'Issue' ? 'issue' : 'pullRequest'}(number: $number) {
+                  pullRequest(number: $number) {
                     projectItems(first: 10) {
                       nodes {
                         id
@@ -85,21 +80,18 @@ jobs:
             const itemData = await github.graphql(itemQuery, {
               org: org,
               repo: context.repo.repo,
-              number: itemNumber
+              number: prNumber
             });
 
-            const items = itemType === 'Issue'
-              ? itemData.repository.issue.projectItems.nodes
-              : itemData.repository.pullRequest.projectItems.nodes;
-
+            const items = itemData.repository.pullRequest.projectItems.nodes;
             const projectItem = items.find(item => item.project.id === project.id);
 
             if (!projectItem) {
-              core.warning('Could not find project item');
+              console.log('PR is not in the project, skipping status update');
               return;
             }
 
-            // Update the status field
+            // Update the status field to "closed"
             const updateMutation = `
               mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: String!) {
                 updateProjectV2ItemFieldValue(
@@ -121,7 +113,15 @@ jobs:
               projectId: project.id,
               itemId: projectItem.id,
               fieldId: statusField.id,
-              value: triageOption.id
+              value: closedOption.id
             });
 
-            core.info('Successfully set status to needs:triage');
+            console.log(`✅ Successfully set status to "closed" for PR #${prNumber}`);
+
+            core.summary
+              .addHeading(`PR Status Updated`)
+              .addList([
+                `PR #${prNumber} was ${isMerged ? 'merged' : 'closed'}`,
+                `Project status updated to "closed"`
+              ])
+              .write();

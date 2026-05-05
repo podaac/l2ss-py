@@ -51,7 +51,7 @@ def align_dims_cond_only(dataset: xr.Dataset, cond: xr.Dataset) -> xr.Dataset:
     # Helper to get dim sizes
     def get_sizes(obj):
         if isinstance(obj, xr.Dataset):
-            return dict(obj.dims)
+            return dict(obj.sizes)
         return dict(obj.sizes)
 
     dataset_sizes = get_sizes(dataset)

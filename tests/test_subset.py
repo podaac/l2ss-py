@@ -1646,23 +1646,148 @@ def test_get_unique_groups():
     assert expected_groups_single == unique_groups_single
     assert expected_diff_counts_single == diff_counts_single
 
-def test_subset_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
+@pytest.fixture(scope="session")
+def fake_gpm_file(tmp_path_factory):
+    """
+    Create fake gpm data at run time which mirrors structure and behavior of data pulled from CMR
+
+    Will create data which mirrors how libnetcdf resolves dimension
+    names with when reading data from CMR. Dimension names are given
+    phony between groups even if dimension is shared. E.g. all data
+    variables will share the same dimensions "nTimes,nXtrack", but
+    will be given phony_dim names as seen below
+
+    Group:
+        /HDFEOS/SWATHS/GPM_DPR/Data Fields
+            Dimensions:                (phony_dim_0: 10, phony_dim_1: 5)
+            Dimensions without coordinates: phony_dim_0, phony_dim_1
+            Data variables:
+                precipRateNearSurface  (phony_dim_0, phony_dim_1)
+        Group: /HDFEOS/SWATHS/GPM_DPR/Geolocation Fields
+            Dimensions:    (phony_dim_2: 10, phony_dim_3: 5)
+            Dimensions without coordinates: phony_dim_2, phony_dim_3
+            Data variables:
+                Latitude   (phony_dim_2, phony_dim_3)
+                Longitude  (phony_dim_2, phony_dim_3)
+
+
+    """
+    filepath = tmp_path_factory.mktemp("data") / "fake_gpm.HDF5"
+
+    with h5py.File(filepath, "w") as f:
+
+        # mirror the real gpm HDFEOS group structure
+        data_fields = f.require_group("HDFEOS/SWATHS/GPM_DPR/Data Fields")
+        geo_fields  = f.require_group("HDFEOS/SWATHS/GPM_DPR/Geolocation Fields")
+        scan_time   = f.require_group("HDFEOS/SWATHS/GPM_DPR/ScanTime")
+
+        info        = f.require_group("HDFEOS INFORMATION")
+
+        n_times  = 10
+        n_xtrack = 5
+
+        # write data fields variable with dimensionnames attr as gpm does
+        precip = data_fields.create_dataset(
+            "precipRateNearSurface",
+            data=np.random.rand(n_times, n_xtrack).astype(np.float32),
+        )
+        precip.attrs["DimensionNames"] = "nTimes,nXtrack"
+        precip.attrs["Units"]          = "mm/hr"
+        precip.attrs["MissingValue"]   = -9999.9
+
+        # geolocation fields variables
+        lat = geo_fields.create_dataset(
+            "Latitude",
+            data=np.linspace(-90, 90, n_times * n_xtrack)
+                   .reshape(n_times, n_xtrack)
+                   .astype(np.float32),
+        )
+        lat.attrs["DimensionNames"] = "nTimes,nXtrack"
+        lat.attrs["Units"]          = "degrees_north"
+
+        lon = geo_fields.create_dataset(
+            "Longitude",
+            data=np.linspace(-180, 180, n_times * n_xtrack)
+                   .reshape(n_times, n_xtrack)
+                   .astype(np.float32),
+        )
+        lon.attrs["DimensionNames"] = "nTimes,nXtrack"
+        lon.attrs["Units"]          = "degrees_east"
+
+        # scantime variables
+        year_data   = np.full(n_times, 2021,    dtype=np.float32)
+        month_data  = np.full(n_times, 5,       dtype=np.float32)
+        day_data    = np.full(n_times, 30,      dtype=np.float32)
+        hour_data   = np.full(n_times, 9,       dtype=np.float32)
+        minute_data = np.full(n_times, 57,      dtype=np.float32)
+        second_data = np.full(n_times, 0.0,     dtype=np.float32)
+        milli_data  = np.full(n_times, 0.0,     dtype=np.float32)
+        doy_data    = np.full(n_times, 150,     dtype=np.float32)
+        sod_data    = np.full(n_times, 35820.0, dtype=np.float64)
+
+        for name, data in [
+            ("Year",        year_data),
+            ("Month",       month_data),
+            ("DayOfMonth",  day_data),
+            ("Hour",        hour_data),
+            ("Minute",      minute_data),
+            ("Second",      second_data),
+            ("MilliSecond", milli_data),
+            ("DayOfYear",   doy_data),
+            ("SecondOfDay", sod_data),
+        ]:
+            ds = scan_time.create_dataset(name, data=data)
+            ds.attrs["DimensionNames"] = "nTimes"
+
+        # structmetadata
+        odl = (
+            "GROUP=SwathStructure\n"
+            "GROUP=SWATH_1\n"
+            "SwathName=\"GPM_DPR\"\n"
+            "GROUP=Dimension\n"
+            "OBJECT=Dimension_1\n"
+            "DimensionName=\"nTimes\"\n"
+            f"Size={n_times}\n"
+            "END_OBJECT=Dimension_1\n"
+            "OBJECT=Dimension_2\n"
+            "DimensionName=\"nXtrack\"\n"
+            f"Size={n_xtrack}\n"
+            "END_OBJECT=Dimension_2\n"
+            "END_GROUP=Dimension\n"
+            "END_GROUP=SWATH_1\n"
+            "END_GROUP=SwathStructure\n"
+        )
+        info.create_dataset("StructMetadata.0", data=odl)
+
+    return filepath
+
+
+def test_subset_gpm_compute_new_var_data(fake_gpm_file, data_dir, subset_output_dir, request):
     """Test GPM files that have scantime variable to compute the time for seconds
     since 1980-01-06"""
-    
-    gpm_dir = join(data_dir, 'GPM')
-    gpm_file = 'GPM_test_file_2.HDF5'  # Keep the correct file name
+
+    with xr.open_datatree(fake_gpm_file) as dtree:
+        for node in dtree.subtree:
+            ds = node.ds
+            if isinstance(ds, xr.Dataset):
+                dims = ds.dims.keys()
+
+                # ensure that test data is being read by netcdf backend with phony dim names
+                # like we expect from GPM data from CMR
+                for dim in dims:
+                    assert 'phony' in dim, f"Unexpected non 'phony' dimension found: {dim}"
+
 
     # Correct bbox with (min_lon, min_lat) and (max_lon, max_lat)
     bbox = np.array(((-180, 90), (-90, 90)))
 
-    output_file = f"gpm_test_{gpm_file}"  # Keep the extension
+    output_file = f"gpm_test_subset.HDF5"  # Keep the extension
     subset_output_file = join(subset_output_dir, output_file)
     subset.subset(
-        file_to_subset=join(gpm_dir, gpm_file),  
+        file_to_subset=fake_gpm_file,
         bbox=bbox,
         output_file=subset_output_file
-    )    
+    )
 
     # Open subsetted file using xarray-datatree
     dtree = xr.open_datatree(subset_output_file)
@@ -1680,6 +1805,261 @@ def test_subset_gpm_compute_new_var_data(data_dir, subset_output_dir, request):
     for group in dtree.groups:
         if "ScanTime" in group:
             assert int(dtree[group].ds.variables["timeMidScan"][:][0]) == 1306403820
+
+
+@pytest.fixture(scope="session")
+def fake_gpm_mhs_file(tmp_path_factory):
+    """
+    Creates fake data following structure of GPM_2AGPROFMETOPBMHS_08
+    which has a netcdf4 format as opposed to HDF5EOS like previous
+    iterations of GPM products.
+
+    Specifically based off 2A.METOPB.MHS.GPROFNNv1.20260228-S233156-E011316.069788.V08A.nc
+    """
+    filepath = tmp_path_factory.mktemp("data") / "fake_mhs.nc"
+
+    nscan = 10
+    npixel = 5
+    nlyrs = 5
+
+    # root + global attributes
+    root_dict = {
+        "attrs": {
+            "FileHeader": "DOI=10.5067/GPM/MHS/METOPB/GPROF/2A/08;\nAlgorithmID=2AGPROFMHS;",
+            "InputRecord": "InputFileNames=1C.METOPB.MHS.XCAL2016.nc;",
+            "NavigationRecord": "LongitudeOnEquator=-44.554371;",
+            "FileInfo": "DataFormatVersion=8b;",
+            "GprofInfo": "Satellite=METOPB;Sensor=MHS;",
+        },
+        "dims": {},
+        "coords": {},
+        "data_vars": {},
+    }
+    xr.Dataset.from_dict(root_dict).to_netcdf(filepath, mode="w", engine="netcdf4")
+
+    # GprofDHeadr group containing the layer heights
+    headr_dict = {
+        "attrs": {},
+        "dims": {"nlyrs": nlyrs},
+        "coords": {},
+        "data_vars": {
+            "hgtTopLayer": {
+                "dims": ("nlyrs",),
+                "data": np.arange(nlyrs, dtype=np.float32),
+                "attrs": {"DimensionNames": "nlyrs", "Units": "km"},
+            }
+        },
+    }
+    xr.Dataset.from_dict(headr_dict).to_netcdf(
+        filepath, mode="a", group="GprofDHeadr", engine="netcdf4"
+    )
+
+    # primary swath variables (but only a few)
+    s1_dict = {
+        "attrs": {"SwathHeader": "NumberScansInSet=1;\nNumberPixels=90;"},
+        "dims": {"nscan": nscan, "npixel": npixel, "nlyrs": nlyrs},
+        "coords": {},
+        "data_vars": {
+            "Latitude": {
+                "dims": ("nscan", "npixel"),
+                "data": np.linspace(-90, 90, nscan * npixel)
+                .reshape(nscan, npixel)
+                .astype(np.float32),
+                "attrs": {"DimensionNames": "nscan,npixel", "Units": "degrees"},
+            },
+            "Longitude": {
+                "dims": ("nscan", "npixel"),
+                "data": np.linspace(-180, 180, nscan * npixel)
+                .reshape(nscan, npixel)
+                .astype(np.float32),
+                "attrs": {"DimensionNames": "nscan,npixel", "Units": "degrees"},
+            },
+            "surfacePrecipitation": {
+                "dims": ("nscan", "npixel"),
+                "data": np.linspace(0, 50, nscan * npixel)
+                .reshape(nscan, npixel)
+                .astype(np.float32),
+                "attrs": {"DimensionNames": "nscan,npixel", "Units": "mm/hr"},
+            },
+            "sunGlintAngle": {
+                "dims": ("nscan", "npixel"),
+                "data": np.linspace(0, 180, nscan * npixel)
+                .reshape(nscan, npixel)
+                .astype(np.float32),
+                "attrs": {"DimensionNames": "nscan,npixel", "Units": "degrees"},
+            },
+            "rainWaterContent": {
+                "dims": ("nscan", "npixel", "nlyrs"),
+                "data": np.linspace(0, 10, nscan * npixel * nlyrs)
+                .reshape(nscan, npixel, nlyrs)
+                .astype(np.float32),
+                "attrs": {"DimensionNames": "nscan,npixel,nlyrs", "Units": "g/m3"},
+            },
+        },
+    }
+    xr.Dataset.from_dict(s1_dict).to_netcdf(
+        filepath, mode="a", group="S1", engine="netcdf4"
+    )
+
+    # scantime subgroup is nested under S1 containing temporal variables
+    scantime_dict = {
+        "attrs": {},
+        "dims": {"nscan": nscan},
+        "coords": {},
+        "data_vars": {
+            "Year": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 2026, dtype=np.int16),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "years",
+                    "_FillValue": -9999,
+                    "CodeMissingValue": "-9999",
+                },
+            },
+            "Month": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 2, dtype=np.int8),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "months",
+                    "_FillValue": -99,
+                    "CodeMissingValue": "-99",
+                },
+            },
+            "DayOfMonth": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 28, dtype=np.int8),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "days",
+                    "_FillValue": -99,
+                    "CodeMissingValue": "-99",
+                },
+            },
+            "Hour": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 23, dtype=np.int8),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "hours",
+                    "_FillValue": -99,
+                    "CodeMissingValue": "-99",
+                },
+            },
+            "Minute": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 31, dtype=np.int8),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "minutes",
+                    "_FillValue": -99,
+                    "CodeMissingValue": "-99",
+                },
+            },
+            "Second": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 56, dtype=np.int8),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "s",
+                    "_FillValue": -99,
+                    "CodeMissingValue": "-99",
+                },
+            },
+            "MilliSecond": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 0, dtype=np.int16),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "ms",
+                    "_FillValue": -9999,
+                    "CodeMissingValue": "-9999",
+                },
+            },
+            "DayOfYear": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 59, dtype=np.int16),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "days",
+                    "_FillValue": -9999,
+                    "CodeMissingValue": "-9999",
+                },
+            },
+            "SecondOfDay": {
+                "dims": ("nscan",),
+                "data": np.linspace(84716.0, 84726.0, nscan).astype(np.float64),
+                "attrs": {
+                    "DimensionNames": "nscan",
+                    "Units": "s",
+                    "_FillValue": -9999.9,
+                    "CodeMissingValue": "-9999.9",
+                },
+            },
+        },
+    }
+    xr.Dataset.from_dict(scantime_dict).to_netcdf(
+        filepath, mode="a", group="S1/ScanTime", engine="netcdf4"
+    )
+
+    # SCstatus subgroup nested under S1
+    scstatus_dict = {
+        "attrs": {},
+        "dims": {"nscan": nscan},
+        "coords": {},
+        "data_vars": {
+            "SCaltitude": {
+                "dims": ("nscan",),
+                "data": np.full(nscan, 400.0, dtype=np.float32),
+                "attrs": {"DimensionNames": "nscan", "Units": "km"},
+            }
+        },
+    }
+    xr.Dataset.from_dict(scstatus_dict).to_netcdf(
+        filepath, mode="a", group="S1/SCstatus", engine="netcdf4"
+    )
+
+    return filepath
+
+
+def test_subset_gpm_mhs_compute_new_var_data(fake_gpm_mhs_file, subset_output_dir):
+    """
+    Tests that a GPM v08 file with NetCDF4 format can run through subset and produce correct variables
+    """
+
+    subset_output_file = Path(subset_output_dir) / "mhs_test_subset.nc"
+
+    # perform the subsetting operation on the fake data, make sure to
+    # keep created timeMidScan var created by l2ss to compare
+    subset.subset(
+        file_to_subset=fake_gpm_mhs_file,
+        bbox=np.array(((-90.1, 90.1), (-45.1, 45.1))),
+        variables=[
+            "S1/surfacePrecipitation",
+            "S1/ScanTime/timeMidScan",
+        ],
+        output_file=subset_output_file,
+        cut=True,
+    )
+    dtree = xr.open_datatree(subset_output_file)
+
+    # are /only/ the requested variables + neccisary location data present?
+    assert set(dtree["S1"].variables) == {
+        "surfacePrecipitation",
+        "Latitude",
+        "Longitude",
+    }
+    assert "timeMidScan" in dtree["S1/ScanTime"].variables
+
+    # are the requested variables dims the correct size?
+    assert dtree["S1/Latitude"].shape == (6, 5)
+    assert dtree["S1/Longitude"].shape == (6, 5)
+    assert dtree["S1/surfacePrecipitation"].shape == (6, 5)
+
+    # timeMidScan created, and correct?
+    assert int(dtree["S1/ScanTime"].variables["timeMidScan"][0]) == 1456356716
+
 
 def test_temporal_subset_tempo(data_dir, subset_output_dir, request):
 

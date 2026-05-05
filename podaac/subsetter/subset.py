@@ -18,6 +18,7 @@ subset.py
 Functions related to subsetting a NetCDF file.
 """
 
+import copy
 import os
 from itertools import zip_longest
 from typing import List, Union
@@ -40,8 +41,11 @@ from podaac.subsetter.utils import time_utils
 from podaac.subsetter.utils import file_utils
 from podaac.subsetter.utils import variables_utils
 from podaac.subsetter.vertical_subset import vertical_subset
+from podaac.subsetter.utils import hdf_utils
 
 SERVICE_NAME = 'l2ss-py'
+
+_HDF_EXTENSIONS: list[str] = ['.hdf5', '.he5', '.h5', '.hdf']
 
 
 def subset_with_shapefile_multi(dataset: xr.Dataset,
@@ -192,10 +196,21 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
         time_path = None
         if time_var_name:
             time_path = file_utils.get_path(time_var_name)
-            time_data = dataset[time_var_name]
 
-            if time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
-                temporal_cond = mask_utils.align_time_to_lon_dim(time_data, lon_data, temporal_cond)
+            try:
+                time_data = dataset[time_var_name]
+            except KeyError:
+                time_data = None
+
+            if (
+                time_data is not None
+                and time_data.ndim == 1
+                and lon_data.ndim == 2
+                and temporal_cond is not True
+            ):
+                temporal_cond = mask_utils.align_time_to_lon_dim(
+                    time_data, lon_data, temporal_cond
+                )
 
         operation = (
             oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
@@ -309,7 +324,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     file_extension = os.path.splitext(file_to_subset)[1]
     file_utils.override_decode_cf_datetime()
 
-    hdf_type = False
+    hdf_type = ""
+    scantime_present = False
 
     args = {
         'decode_coords': False,
@@ -318,10 +334,11 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     }
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
-        if '.HDF5' == file_extension:
-            for group in dataset.groups:
-                if "ScanTime" in group:
-                    hdf_type = 'GPM'
+        if file_extension.lower() in _HDF_EXTENSIONS:
+            hdf_type = file_utils.get_hdf_type(dataset)
+            scantime_present = hdf_type == "GPM"
+        else:
+            scantime_present = file_utils.has_scantime(dataset)
 
     if min_time or max_time:
         fill_value_f8 = nc.default_fillvals.get('f8')
@@ -341,14 +358,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
         except Exception:  # pylint: disable=broad-exception-caught
             pass
 
-    if hdf_type == 'GPM':
+    # set decode_times to false if scantime present (e.g. GPM)
+    if scantime_present:
         args['decode_times'] = False
 
     time_encoding = {}
     time_calendar_attributes = {}
 
     if args['decode_times']:
-        # Get time encoding
         with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
 
             lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
@@ -375,8 +392,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 if calendar:
                     time_encoding[group_path][var_name]['calendar'] = calendar
                 if units:
-                    if time != '/solar_time':
-                        time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
+                    time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
                 if dtype and units:
                     time_encoding[group_path][var_name]['dtype'] = dtype
                 if calendar:
@@ -387,7 +403,8 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
-        hdf_type = file_utils.get_hdf_type(dataset)
+        if hdf_type:
+            dataset = hdf_utils.rename_phony_dims(dataset)
 
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset,
@@ -396,7 +413,9 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             time_var_names=time_var_names
         )
 
-        if '.HDF5' == file_extension:
+        # assumption is that GPM HDFEOS or GPM V08+ NetCDF4 will have
+        # scantime.
+        if scantime_present:
             new_time_var_names = []
             for group in dataset.groups:
                 if "ScanTime" in group:
@@ -506,14 +525,41 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                                            stage_file_name_subsetted_true,
                                            stage_file_name_subsetted_false)
 
+        def write_with_illegal_name_recovery(current_encoding):
+            try:
+                subsetted_dataset.to_netcdf(output_file, encoding=current_encoding)
+            except AttributeError as e:
+                if "NetCDF: Name contains illegal characters" in str(e):
+                    metadata_utils.fix_illegal_datatree_attrs(subsetted_dataset)
+                    subsetted_dataset.to_netcdf(output_file, encoding=current_encoding)
+                else:
+                    raise
+
         try:
-            subsetted_dataset.to_netcdf(output_file, encoding=encoding)
-        except AttributeError as e:
-            if "NetCDF: Name contains illegal characters" in str(e):
-                metadata_utils.fix_illegal_datatree_attrs(subsetted_dataset)
-                subsetted_dataset.to_netcdf(output_file, encoding=encoding)
-            else:
+            write_with_illegal_name_recovery(encoding)
+        except ValueError as e:
+            err_msg = str(e)
+            if "unexpected encoding parameters for 'netCDF4' backend" not in err_msg:
                 raise
+
+            fallback_encoding = copy.deepcopy(encoding)
+            removed_time_unit_encodings = False
+
+            for group_path, group_vars in time_encoding.items():
+                for var_name in group_vars:
+                    var_encoding = fallback_encoding.get(group_path, {}).get(var_name)
+                    if not var_encoding:
+                        continue
+                    # Some xarray/netCDF4 versions reject CF-like time attrs in encoding;
+                    # keep them in attributes and retry without encoding-level units/calendar.
+                    removed_time_unit_encodings = (
+                        var_encoding.pop('units', None) is not None
+                        or removed_time_unit_encodings
+                    )
+
+            if not removed_time_unit_encodings:
+                raise
+            write_with_illegal_name_recovery(fallback_encoding)
 
         metadata_utils.ensure_time_units(output_file, time_encoding)
 

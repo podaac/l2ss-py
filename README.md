@@ -1,4 +1,3 @@
-
 # l2ss-py
 
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=podaac_l2ss-py&metric=coverage)](https://sonarcloud.io/dashboard?id=podaac_l2ss-py)  
@@ -13,6 +12,7 @@ Harmony service for subsetting L2 data. l2ss-py supports:
     - GeoJSON subsetting
 - Temporal subsetting
 - Variable subsetting
+- Vertical subsetting
 
 If you would like to contribute to l2ss-py, refer to the [contribution document](CONTRIBUTING.md).
 
@@ -57,11 +57,9 @@ to run this, the l2ss-py package must be installed in your current
 Python interpreter
 
 ```
-$ l2ss-py --help                                                                                                                    
-usage: run_subsetter.py [-h] [--bbox BBOX BBOX BBOX BBOX]
-                        [--variables VARIABLES [VARIABLES ...]]
-                        [--min-time MIN_TIME] [--max-time MAX_TIME] [--cut]
-                        input_file output_file
+$ l2ss-py --help
+usage: l2ss-py [-h] [--bbox BBOX BBOX BBOX BBOX] [--variables VARIABLES [VARIABLES ...]] [--min-time MIN_TIME] [--max-time MAX_TIME] [--cut] [--shapefile SHAPEFILE] [--pixel_subset] [--vertical-var VERTICAL_VAR] [--vertical-min VERTICAL_MIN] [--vertical-max VERTICAL_MAX]
+               input_file output_file
 
 Run l2ss-py
 
@@ -69,28 +67,40 @@ positional arguments:
   input_file            File to subset
   output_file           Output file
 
-optional arguments:
+options:
   -h, --help            show this help message and exit
   --bbox BBOX BBOX BBOX BBOX
-                        Bounding box in the form min_lon min_lat max_lon
-                        max_lat
+                        Bounding box in the form min_lon min_lat max_lon max_lat
   --variables VARIABLES [VARIABLES ...]
-                        Variables, only include if variable subset is desired.
-                        Should be a space separated list of variable names
-                        e.g. sst wind_dir sst_error ...
-  --min-time MIN_TIME   Min time. Should be ISO-8601 format. Only include if
-                        temporal subset is desired.
-  --max-time MAX_TIME   Max time. Should be ISO-8601 format. Only include if
-                        temporal subset is desired.
+                        Variables, only include if variable subset is desired. Should be a space separated list of variable names e.g. sst wind_dir sst_error ...
+  --min-time MIN_TIME   Min time. Should be ISO-8601 format. Only include if temporal subset is desired.
+  --max-time MAX_TIME   Max time. Should be ISO-8601 format. Only include if temporal subset is desired.
   --cut                 If provided, scanline will be cut
   --shapefile SHAPEFILE
                         Path to either shapefile or geojson file used to subset the provided input granule
+  --pixel_subset        To pixel cut based the lon lat on the bounding box
+  --vertical-var VERTICAL_VAR
+                        Name of the vertical variable to subset by (e.g., depth, altitude)
+  --vertical-min VERTICAL_MIN
+                        Minimum value for vertical subsetting (inclusive)
+  --vertical-max VERTICAL_MAX
+                        Maximum value for vertical subsetting (inclusive)
 ```
+
+#### Additional subsetting options
+
+The following options are also recorded in the output file's metadata history for provenance and reproducibility:
+- `--min-time` and `--max-time` (temporal subsetting)
+- `--variables` (variable subsetting)
+- `--vertical-var`, `--vertical-min`, `--vertical-max` (vertical subsetting)
+- `--cut`, `--pixel_subset`, `--shapefile`, and `--bbox` (spatial subsetting)
+
+All subsetting parameters used in a run are included in the output file's `history` and `history_json` attributes.
 
 For example:
 
 ```
-l2ss-py /path/to/input.nc /path/to/output.nc --bbox -50 -10 50 10 --variables wind_speed wind_dir ice_age time --min-time '2015-07-02T09:00:00' --max-time '2015-07-02T10:00:00' --cut
+l2ss-py /path/to/input.nc /path/to/output.nc --bbox -50 -10 50 10 --variables wind_speed wind_dir ice_age time --min-time '2015-07-02T09:00:00' --max-time '2015-07-02T10:00:00' --cut --vertical-var depth --vertical-min 0 --vertical-max 100
 ```
 
 An addition to providing a bounding box, spatial subsetting can be achieved by passing in a shapefile or a geojson file. 

@@ -690,7 +690,9 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
             if result:
                 # Normalize /sample_time to /solar_time for this unique case
                 if result == "/sample_time":
-                    return "/solar_time"
+                    # Check if '/solar_time' exists in the dataset
+                    if "solar_time" in ds.variables:
+                        return "/solar_time"
                 return result
     return None
 
@@ -998,8 +1000,7 @@ def clean_inherited_coords(dt: DataTree) -> DataTree:
 
 def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
     """
-    Update dataset dimensions based on 'DimensionNames' attributes and compute a time variable
-    if not present, using values from the dataset.
+    Compute a time variable if not present, using values from the dataset.
     """
     ds = og_ds.copy()
 
