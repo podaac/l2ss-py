@@ -21,7 +21,6 @@ Functions related to subsetting a NetCDF file.
 import copy
 import os
 from itertools import zip_longest
-from typing import List, Union
 
 import geopandas as gpd
 import netCDF4 as nc
@@ -29,31 +28,32 @@ import numpy as np
 import xarray as xr
 from shapely.geometry import Point
 
-from podaac.subsetter import (
-    datatree_subset,
-    tree_time_converting as tree_time_converting
+from podaac.subsetter import datatree_subset, tree_time_converting
+from podaac.subsetter.utils import (
+    coordinate_utils,
+    file_utils,
+    hdf_utils,
+    mask_utils,
+    metadata_utils,
+    spatial_utils,
+    time_utils,
+    variables_utils,
 )
-from podaac.subsetter.utils import mask_utils
-from podaac.subsetter.utils import coordinate_utils
-from podaac.subsetter.utils import metadata_utils
-from podaac.subsetter.utils import spatial_utils
-from podaac.subsetter.utils import time_utils
-from podaac.subsetter.utils import file_utils
-from podaac.subsetter.utils import variables_utils
 from podaac.subsetter.vertical_subset import vertical_subset
-from podaac.subsetter.utils import hdf_utils
 
-SERVICE_NAME = 'l2ss-py'
+SERVICE_NAME = "l2ss-py"
 
-_HDF_EXTENSIONS: list[str] = ['.hdf5', '.he5', '.h5', '.hdf']
+_HDF_EXTENSIONS: list[str] = [".hdf5", ".he5", ".h5", ".hdf"]
 
 
-def subset_with_shapefile_multi(dataset: xr.Dataset,
-                                lat_var_names: List[str],
-                                lon_var_names: List[str],
-                                shapefile: str,
-                                cut: bool,
-                                pixel_subset: bool) -> xr.Dataset:
+def subset_with_shapefile_multi(
+    dataset: xr.Dataset,
+    lat_var_names: list[str],
+    lon_var_names: list[str],
+    shapefile: str,
+    cut: bool,
+    pixel_subset: bool,
+) -> xr.Dataset:
     """
     Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
 
@@ -95,10 +95,7 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
 
         # Flatten points and convert to GeoDataFrame
         flat_points = np.column_stack((lon2d.ravel(), lat2d.ravel()))
-        point_gdf = gpd.GeoDataFrame(
-            geometry=[Point(xy) for xy in flat_points],
-            crs="EPSG:4326"
-        )
+        point_gdf = gpd.GeoDataFrame(geometry=[Point(xy) for xy in flat_points], crs="EPSG:4326")
 
         # Spatial join to find points inside shapefile
         joined = gpd.sjoin(point_gdf, current_shapefile_df, how="left", predicate="intersects")
@@ -116,18 +113,20 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
     return return_dataset
 
 
-def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
-                     lat_var_names: list,
-                     lon_var_names: list,
-                     time_var_names: list,
-                     bbox: np.ndarray = None,
-                     cut: bool = True,
-                     min_time: str = None,
-                     max_time: str = None,
-                     pixel_subset: bool = False,
-                     vertical_var: str = None,
-                     vertical_min: float = None,
-                     vertical_max: float = None) -> np.ndarray:
+def subset_with_bbox(
+    dataset: xr.Dataset,  # pylint: disable=too-many-branches
+    lat_var_names: list,
+    lon_var_names: list,
+    time_var_names: list,
+    bbox: np.ndarray = None,
+    cut: bool = True,
+    min_time: str = None,
+    max_time: str = None,
+    pixel_subset: bool = False,
+    vertical_var: str = None,
+    vertical_min: float = None,
+    vertical_max: float = None,
+) -> np.ndarray:
     """
     Subset an xarray Dataset using a spatial bounding box.
 
@@ -202,30 +201,23 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
             except KeyError:
                 time_data = None
 
-            if (
-                time_data is not None
-                and time_data.ndim == 1
-                and lon_data.ndim == 2
-                and temporal_cond is not True
-            ):
-                temporal_cond = mask_utils.align_time_to_lon_dim(
-                    time_data, lon_data, temporal_cond
-                )
+            if time_data is not None and time_data.ndim == 1 and lon_data.ndim == 2 and temporal_cond is not True:
+                temporal_cond = mask_utils.align_time_to_lon_dim(time_data, lon_data, temporal_cond)
 
         operation = (
-            oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1])) &
-            (lat_data >= lat_bounds[0]) &
-            (lat_data <= lat_bounds[1]) &
-            temporal_cond
+            oper((lon_data >= lon_bounds[0]), (lon_data <= lon_bounds[1]))
+            & (lat_data >= lat_bounds[0])
+            & (lat_data <= lat_bounds[1])
+            & temporal_cond
         )
 
         # We want the lon lat time path to be the same
         # timeMidScan_datetime is a time made for ges disc collection in a ScanTime group
         if (
             lat_path == lon_path == time_path
-            or (time_var_name is not None and 'timeMidScan_datetime' in time_var_name)
+            or (time_var_name is not None and "timeMidScan_datetime" in time_var_name)
             or (lon_path == lat_path and time_var_name is None)
-           ):
+        ):
             subset_dictionary[lat_path] = operation
         elif lat_path == lon_path and len(time_var_names) == 1:
             subset_dictionary[lat_path] = operation
@@ -233,21 +225,41 @@ def subset_with_bbox(dataset: xr.Dataset,  # pylint: disable=too-many-branches
     return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
 
     if vertical_var is not None:
-        return vertical_subset(dataset, return_dataset, lat_var_names, lon_var_names, vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max, cut=cut)
+        return vertical_subset(
+            dataset,
+            return_dataset,
+            lat_var_names,
+            lon_var_names,
+            vertical_var=vertical_var,
+            vertical_min=vertical_min,
+            vertical_max=vertical_max,
+            cut=cut,
+        )
 
     return return_dataset
 
 
-def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
-           variables: Union[List[str], str, None] = (),
-           # pylint: disable=too-many-branches, disable=too-many-statements
-           cut: bool = True, shapefile: str = None, min_time: str = None, max_time: str = None,
-           origin_source: str = None,
-           lat_var_names: List[str] = (), lon_var_names: List[str] = (), time_var_names: List[str] = (),
-           pixel_subset: bool = False, stage_file_name_subsetted_true: str = None,
-           stage_file_name_subsetted_false: str = None,
-           vertical_var: str = None, vertical_min: float = None, vertical_max: float = None
-           ) -> Union[np.ndarray, None]:
+def subset(
+    file_to_subset: str,
+    bbox: np.ndarray,
+    output_file: str,
+    variables: list[str] | str | None = (),
+    # pylint: disable=too-many-branches, disable=too-many-statements
+    cut: bool = True,
+    shapefile: str = None,
+    min_time: str = None,
+    max_time: str = None,
+    origin_source: str = None,
+    lat_var_names: list[str] = (),
+    lon_var_names: list[str] = (),
+    time_var_names: list[str] = (),
+    pixel_subset: bool = False,
+    stage_file_name_subsetted_true: str = None,
+    stage_file_name_subsetted_false: str = None,
+    vertical_var: str = None,
+    vertical_min: float = None,
+    vertical_max: float = None,
+) -> np.ndarray | None:
     """
     Subset a given NetCDF file given a bounding box
 
@@ -327,11 +339,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
     hdf_type = ""
     scantime_present = False
 
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': False,
-        'decode_times': False
-    }
+    args = {"decode_coords": False, "mask_and_scale": False, "decode_times": False}
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
         if file_extension.lower() in _HDF_EXTENSIONS:
@@ -341,38 +349,36 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             scantime_present = file_utils.has_scantime(dataset)
 
     if min_time or max_time:
-        fill_value_f8 = nc.default_fillvals.get('f8')
-        float_dtypes = ['float64', 'float32']
-        args['decode_times'] = True
+        fill_value_f8 = nc.default_fillvals.get("f8")
+        float_dtypes = ["float64", "float32"]
+        args["decode_times"] = True
         # try to open file to see if we can access the time variable
         try:
-            with nc.Dataset(file_to_subset, 'r') as nc_dataset:
-                for time_variable in (v for v in nc_dataset.variables.keys() if 'time' in v):
+            with nc.Dataset(file_to_subset, "r") as nc_dataset:
+                for time_variable in (v for v in nc_dataset.variables.keys() if "time" in v):
                     time_var = nc_dataset[time_variable]
-                    if (getattr(time_var, '_FillValue', None) == fill_value_f8 and time_var.dtype in float_dtypes) or \
-                       (getattr(time_var, 'long_name', None) == "reference time of sst file"):
-                        args['mask_and_scale'] = True
-                        if getattr(time_var, 'long_name', None) == "reference time of sst file":
-                            args['mask_and_scale'] = file_utils.test_access_sst_dtime_values(nc_dataset)
+                    if (getattr(time_var, "_FillValue", None) == fill_value_f8 and time_var.dtype in float_dtypes) or (
+                        getattr(time_var, "long_name", None) == "reference time of sst file"
+                    ):
+                        args["mask_and_scale"] = True
+                        if getattr(time_var, "long_name", None) == "reference time of sst file":
+                            args["mask_and_scale"] = file_utils.test_access_sst_dtime_values(nc_dataset)
                         break
         except Exception:  # pylint: disable=broad-exception-caught
             pass
 
     # set decode_times to false if scantime present (e.g. GPM)
     if scantime_present:
-        args['decode_times'] = False
+        args["decode_times"] = False
 
     time_encoding = {}
     time_calendar_attributes = {}
 
-    if args['decode_times']:
+    if args["decode_times"]:
         with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
 
             lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
-                dataset=dataset,
-                lat_var_names=lat_var_names,
-                lon_var_names=lon_var_names,
-                time_var_names=time_var_names
+                dataset=dataset, lat_var_names=lat_var_names, lon_var_names=lon_var_names, time_var_names=time_var_names
             )
 
             for time in time_var_names:
@@ -381,25 +387,25 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 var_name = os.path.basename(time)
                 group_path = os.path.dirname(time)
 
-                units = time_var.attrs.get('units')
+                units = time_var.attrs.get("units")
                 dtype = time_var.dtype
-                calendar = time_var.attrs.get('calendar')
+                calendar = time_var.attrs.get("calendar")
 
                 if group_path not in time_encoding:
                     time_encoding[group_path] = {}
 
                 time_encoding[group_path][var_name] = {}
                 if calendar:
-                    time_encoding[group_path][var_name]['calendar'] = calendar
+                    time_encoding[group_path][var_name]["calendar"] = calendar
                 if units:
-                    time_encoding[group_path][var_name]['units'] = time_utils.check_time_units(units)
+                    time_encoding[group_path][var_name]["units"] = time_utils.check_time_units(units)
                 if dtype and units:
-                    time_encoding[group_path][var_name]['dtype'] = dtype
+                    time_encoding[group_path][var_name]["dtype"] = dtype
                 if calendar:
                     time_calendar_attributes[time] = calendar
 
-    if len(time_var_names) == 1 and (min_time or max_time) and time_var_names[0] == '/solar_time':
-        args['decode_times'] = False
+    if len(time_var_names) == 1 and (min_time or max_time) and time_var_names[0] == "/solar_time":
+        args["decode_times"] = False
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
 
@@ -407,10 +413,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
             dataset = hdf_utils.rename_phony_dims(dataset)
 
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
-            dataset=dataset,
-            lat_var_names=lat_var_names,
-            lon_var_names=lon_var_names,
-            time_var_names=time_var_names
+            dataset=dataset, lat_var_names=lat_var_names, lon_var_names=lon_var_names, time_var_names=time_var_names
         )
 
         # assumption is that GPM HDFEOS or GPM V08+ NetCDF4 will have
@@ -421,14 +424,14 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 if "ScanTime" in group:
                     group_dataset = dataset[group].ds
                     dataset[group].ds = datatree_subset.update_dataset_with_time(group_dataset, group_path=group)
-                    if 'timeMidScan_datetime' in dataset[group].ds:
-                        new_time_var_names.append(group + '/timeMidScan_datetime')
+                    if "timeMidScan_datetime" in dataset[group].ds:
+                        new_time_var_names.append(group + "/timeMidScan_datetime")
 
             if new_time_var_names:
                 time_var_names = new_time_var_names
 
         if not time_var_names and (min_time or max_time):
-            raise ValueError('Could not determine time variable')
+            raise ValueError("Could not determine time variable")
 
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
@@ -447,8 +450,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
             all_data_variables = datatree_subset.get_vars_with_paths(dataset)
             drop_variables = [
-                var for var in all_data_variables
-                if var not in keep_variables and var.upper() not in keep_variables
+                var for var in all_data_variables if var not in keep_variables and var.upper() not in keep_variables
             ]
 
             dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
@@ -459,12 +461,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         if shapefile:
             subsetted_dataset = subset_with_shapefile_multi(
-                dataset,
-                lat_var_names,
-                lon_var_names,
-                shapefile,
-                cut,
-                pixel_subset
+                dataset, lat_var_names, lon_var_names, shapefile, cut, pixel_subset
             )
         elif bbox is not None:
             subsetted_dataset = subset_with_bbox(
@@ -479,51 +476,65 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                 pixel_subset=pixel_subset,
                 vertical_var=vertical_var,
                 vertical_min=vertical_min,
-                vertical_max=vertical_max
+                vertical_max=vertical_max,
             )
         else:
-            raise ValueError('Either bbox or shapefile must be provided')
+            raise ValueError("Either bbox or shapefile must be provided")
 
         metadata_utils.set_version_history(
-            subsetted_dataset, cut, bbox, shapefile,
-            min_time=min_time, max_time=max_time,
-            vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max,
-            variables=variables, pixel_subset=pixel_subset
+            subsetted_dataset,
+            cut,
+            bbox,
+            shapefile,
+            min_time=min_time,
+            max_time=max_time,
+            vertical_var=vertical_var,
+            vertical_min=vertical_min,
+            vertical_max=vertical_max,
+            variables=variables,
+            pixel_subset=pixel_subset,
         )
         metadata_utils.set_json_history(
-            subsetted_dataset, cut, file_to_subset, bbox, shapefile, origin_source,
-            min_time=min_time, max_time=max_time,
-            vertical_var=vertical_var, vertical_min=vertical_min, vertical_max=vertical_max,
-            variables=variables, pixel_subset=pixel_subset
+            subsetted_dataset,
+            cut,
+            file_to_subset,
+            bbox,
+            shapefile,
+            origin_source,
+            min_time=min_time,
+            max_time=max_time,
+            vertical_var=vertical_var,
+            vertical_min=vertical_min,
+            vertical_max=vertical_max,
+            variables=variables,
+            pixel_subset=pixel_subset,
         )
 
         if time_calendar_attributes:
             for time_var, calendar in time_calendar_attributes.items():
-                if 'calendar' in subsetted_dataset[time_var].attrs:
-                    subsetted_dataset[time_var].attrs['calendar'] = calendar
+                if "calendar" in subsetted_dataset[time_var].attrs:
+                    subsetted_dataset[time_var].attrs["calendar"] = calendar
                     # if we set the calendar attribute remove calendar encoding
                     var_name = os.path.basename(time_var)
                     group_path = os.path.dirname(time_var)
                     # Safely remove calendar from encoding if it exists
                     if group_path in time_encoding and var_name in time_encoding[group_path]:
-                        time_encoding[group_path][var_name].pop('calendar', None)
+                        time_encoding[group_path][var_name].pop("calendar", None)
 
         subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
         encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
-        spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(
-            subsetted_dataset,
-            lat_var_names,
-            lon_var_names
-        )
+        spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(subsetted_dataset, lat_var_names, lon_var_names)
 
-        metadata_utils.update_netcdf_attrs(output_file,
-                                           subsetted_dataset,
-                                           lon_var_names,
-                                           lat_var_names,
-                                           spatial_bounds_array,
-                                           stage_file_name_subsetted_true,
-                                           stage_file_name_subsetted_false)
+        metadata_utils.update_netcdf_attrs(
+            output_file,
+            subsetted_dataset,
+            lon_var_names,
+            lat_var_names,
+            spatial_bounds_array,
+            stage_file_name_subsetted_true,
+            stage_file_name_subsetted_false,
+        )
 
         def write_with_illegal_name_recovery(current_encoding):
             try:
@@ -553,8 +564,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     # Some xarray/netCDF4 versions reject CF-like time attrs in encoding;
                     # keep them in attributes and retry without encoding-level units/calendar.
                     removed_time_unit_encodings = (
-                        var_encoding.pop('units', None) is not None
-                        or removed_time_unit_encodings
+                        var_encoding.pop("units", None) is not None or removed_time_unit_encodings
                     )
 
             if not removed_time_unit_encodings:
@@ -565,6 +575,7 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
 
         # ensure all the dimensions are on the root node when we pixel subset
         if pixel_subset:
+
             def add_all_group_dims_to_root_inplace(nc_path):
                 def collect_dims(group, dims):
                     for dimname, dim in group.dimensions.items():
@@ -573,12 +584,13 @@ def subset(file_to_subset: str, bbox: np.ndarray, output_file: str,
                     for subgrp in group.groups.values():
                         collect_dims(subgrp, dims)
 
-                with nc.Dataset(nc_path, 'r+') as ds:
+                with nc.Dataset(nc_path, "r+") as ds:
                     all_dims = {}
                     collect_dims(ds, all_dims)
                     for dimname, size in all_dims.items():
                         if dimname not in ds.dimensions:
                             ds.createDimension(dimname, size)
+
             add_all_group_dims_to_root_inplace(output_file)
 
         return spatial_bounds_array

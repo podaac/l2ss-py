@@ -1,8 +1,6 @@
-import pytest
 import numpy as np
-import netCDF4 as nc
 import xarray as xr
-import uuid
+
 from podaac.subsetter import dimension_cleanup
 
 

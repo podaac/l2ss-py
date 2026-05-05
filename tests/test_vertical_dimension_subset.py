@@ -1,7 +1,9 @@
 import numpy as np
-import xarray as xr
 import pytest
+import xarray as xr
+
 from podaac.subsetter import subset
+
 
 def create_vertical_test_datatree(tmp_path):
     lat = np.linspace(-90, 90, 4)

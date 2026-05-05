@@ -1,7 +1,9 @@
-import pytest
-import numpy as np
-import xarray as xr
 import datetime
+
+import numpy as np
+import pytest
+import xarray as xr
+
 from podaac.subsetter import tree_time_converting
 
 

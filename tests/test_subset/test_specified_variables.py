@@ -1,27 +1,16 @@
-import operator
-import shutil
-import tempfile
 import os
-from os import listdir
-from os.path import dirname, isfile, join, realpath
+import shutil
+from os.path import join
 from pathlib import Path
-from unittest import TestCase
-import h5py
 
-import netCDF4 as nc
 import numpy as np
 import pytest
 import xarray as xr
+from conftest import data_files
 
 from podaac.subsetter import subset
 from podaac.subsetter.utils.coordinate_utils import get_coordinate_variable_names
 from podaac.subsetter.utils.variables_utils import get_all_variable_names_from_dtree
-
-from conftest import data_files 
-
-import xarray as xr
-
-
 
 
 def get_non_variable_names_from_dtree(dtree: xr.DataTree):
@@ -72,7 +61,7 @@ def test_specified_variables(test_file, data_dir, subset_output_dir, request):
     shutil.copyfile(os.path.join(data_dir, test_file), nc_copy_for_expected_results)
 
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, test_file)
+    output_file = f"{request.node.name}_{test_file}"
     
     in_ds_tree = xr.open_datatree(nc_copy_for_expected_results, decode_times=False, decode_coords=False)
 

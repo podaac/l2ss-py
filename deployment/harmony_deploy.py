@@ -1,8 +1,9 @@
-import os
-import requests
+import argparse
 import json
 import logging
-import argparse
+import os
+
+import requests
 from requests.auth import HTTPBasicAuth
 
 # Environment variables

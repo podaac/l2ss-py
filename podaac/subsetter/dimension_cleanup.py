@@ -11,6 +11,7 @@ dimension_cleanup.py
 ======================
 Functions which improve upon existing netCDF4 library existing functions
 """
+
 import xarray as xr
 
 
@@ -66,9 +67,9 @@ def remove_duplicate_dims_xarray(dataset: xr.Dataset) -> xr.Dataset:
 
                         # Create new dimension if it doesn't exist
                         if new_dim_name not in ds.dims:
-                            ds = ds.assign_coords({
-                                new_dim_name: ds[dim].copy() if dim in ds.coords else range(ds.dims[dim])
-                            })
+                            ds = ds.assign_coords(
+                                {new_dim_name: ds[dim].copy() if dim in ds.coords else range(ds.dims[dim])}
+                            )
                 dims_renamed.add(dim)
 
         # Create new variable with renamed dimensions
@@ -77,15 +78,11 @@ def remove_duplicate_dims_xarray(dataset: xr.Dataset) -> xr.Dataset:
         encoding = original_encodings[var_name].copy()
 
         # Remove problematic encoding keys
-        for key in ['dimensions', 'source', 'original_shape']:
+        for key in ["dimensions", "source", "original_shape"]:
             encoding.pop(key, None)
 
         # Create new variable
-        ds[var_name] = xr.Variable(
-            dims=new_dims,
-            data=data,
-            attrs=attrs
-        )
+        ds[var_name] = xr.Variable(dims=new_dims, data=data, attrs=attrs)
 
         # Restore encoding
         ds[var_name].encoding.update(encoding)

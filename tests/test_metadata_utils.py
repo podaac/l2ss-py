@@ -1,11 +1,11 @@
-import pytest
 import xarray as xr
 from xarray import DataTree
+
 from podaac.subsetter.utils.metadata_utils import (
-    legalize_attr_name,
     check_illegal_datatree_attrs,
     fix_illegal_datatree_attrs,
 )
+
 
 def make_datatree_with_attrs(global_attrs, var_attrs):
     ds = xr.Dataset()

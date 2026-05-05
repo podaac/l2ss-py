@@ -1,12 +1,8 @@
-import pytest
 import xarray as xr
 from xarray import DataTree
-import numpy as np
-from podaac.subsetter.datatree_subset import (
-    is_empty,
-    subtree_is_empty,
-    find_fully_empty_paths
-)
+
+from podaac.subsetter.datatree_subset import find_fully_empty_paths, is_empty, subtree_is_empty
+
 
 def make_simple_tree():
     ds = xr.Dataset({"a": ("x", [1, 2]), "b": ("x", [3, 4])})
