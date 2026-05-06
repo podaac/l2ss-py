@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
-### Deprecated 
+### Deprecated
 ### Removed
 - Removed poetry as a dependency (should have poetry externally already)
 ### Fixed
+- [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
 ### Security
 
 
@@ -38,7 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/364] (https://github.com/podaac/l2ss-py/issues/364) Implement vertical subsetting via dimensions.
 ### Changed
 - [issue/246] (https://github.com/podaac/l2ss-py/issues/246) Subsetting parameters part of history attributes and json history.
-### Deprecated 
+### Deprecated
 - [issue/358] (https://github.com/podaac/l2ss-py/issues/358) Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
 ### Removed
 ### Fixed
