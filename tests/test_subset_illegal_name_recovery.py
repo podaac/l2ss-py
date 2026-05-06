@@ -1,7 +1,7 @@
-import numpy as np
-import pytest
 from unittest.mock import Mock
 
+import numpy as np
+import pytest
 from podaac.subsetter import subset
 
 
@@ -41,8 +41,10 @@ def _patch_subset_dependencies(monkeypatch, subsetted_dataset, spatial_bounds):
     monkeypatch.setattr(subset.xr, "open_datatree", lambda *_args, **_kwargs: _DummyOpenDataTree(dummy_tree))
     monkeypatch.setattr(subset.file_utils, "override_decode_cf_datetime", lambda: None)
     monkeypatch.setattr(subset.file_utils, "has_scantime", lambda *_args, **_kwargs: False)
-    monkeypatch.setattr(subset.coordinate_utils, "get_coordinate_variable_names", lambda **_kwargs: (["/lat"], ["/lon"], []))
-    monkeypatch.setattr(subset.file_utils, "calculate_chunks", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        subset.coordinate_utils, "get_coordinate_variable_names", lambda **_kwargs: (["/lat"], ["/lon"], [])
+    )
+    monkeypatch.setattr(subset.file_utils, "chunk_datatree", lambda dt: dt)
     monkeypatch.setattr(subset.variables_utils, "get_all_variable_names_from_dtree", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(
         subset.variables_utils, "normalize_candidate_paths_against_dtree", lambda paths, *_args, **_kwargs: paths
@@ -52,9 +54,7 @@ def _patch_subset_dependencies(monkeypatch, subsetted_dataset, spatial_bounds):
     monkeypatch.setattr(subset.metadata_utils, "set_json_history", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(subset.datatree_subset, "clean_inherited_coords", lambda ds: ds)
     monkeypatch.setattr(subset.datatree_subset, "prepare_basic_encoding", lambda *_args, **_kwargs: {})
-    monkeypatch.setattr(
-        subset.datatree_subset, "tree_get_spatial_bounds", lambda *_args, **_kwargs: spatial_bounds
-    )
+    monkeypatch.setattr(subset.datatree_subset, "tree_get_spatial_bounds", lambda *_args, **_kwargs: spatial_bounds)
     monkeypatch.setattr(subset.metadata_utils, "update_netcdf_attrs", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(subset.metadata_utils, "ensure_time_units", lambda *_args, **_kwargs: None)
 
