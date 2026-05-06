@@ -123,7 +123,6 @@ def convert_to_datetime(
         group, var_name = get_group_by_path(data_tree, var_path)
 
         if np.issubdtype(group[var_name].dtype, np.dtype(float)) or np.issubdtype(group[var_name].dtype, np.float32):
-
             # adjust the time values from the start date
             if start_date:
                 # create array of the start time in datetime format
@@ -131,9 +130,7 @@ def convert_to_datetime(
                 # add seconds since the start time to the start time to get the time at the data point
                 new_values = date_time_array.astype("datetime64[ns]") + group[var_name].astype("timedelta64[s]").values
                 try:
-                    group[var_name].values = (
-                        date_time_array.astype("datetime64[ns]") + group[var_name].astype("timedelta64[s]").values
-                    )
+                    group[var_name].values = new_values
                 except ValueError:
                     pass
                 update_coord_everywhere(data_tree, var_name, new_values)
