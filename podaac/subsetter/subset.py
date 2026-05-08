@@ -412,6 +412,9 @@ def subset(
         if hdf_type:
             dataset = hdf_utils.rename_phony_dims(dataset)
 
+        # apply chunking after dimension name recovery (if needed)
+        dataset = file_utils.chunk_datatree(dataset)
+
         lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
             dataset=dataset, lat_var_names=lat_var_names, lon_var_names=lon_var_names, time_var_names=time_var_names
         )
@@ -436,10 +439,7 @@ def subset(
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
-        chunks = file_utils.calculate_chunks(dataset)
         all_vars = variables_utils.get_all_variable_names_from_dtree(dataset)
-        if chunks:
-            dataset = dataset.chunk(chunks)
         if variables:
             # Drop variables that aren't explicitly requested, except lat_var_name and
             # lon_var_name which are needed for subsetting

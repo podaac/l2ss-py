@@ -39,6 +39,17 @@ def remove_duplicate_dims_xarray(dataset: xr.Dataset) -> xr.Dataset:
     Handle datasets with duplicate dimensions in xarray while preserving
     encodings and handling multiple duplicate dimensions.
     """
+
+    has_duplicates = False
+    for var in dataset.variables.values():
+        dim_list = list(var.dims)
+        if len(dim_list) != len(set(dim_list)):
+            has_duplicates = True
+            break
+
+    if not has_duplicates:
+        return dataset
+
     # Work with a copy
     ds = dataset.copy(deep=True)
 

@@ -6,6 +6,8 @@ file_utils.py
 Utility functions for file and dataset handling.
 """
 
+from collections.abc import Hashable, Mapping
+
 import cftime
 import dateutil
 import xarray as xr
@@ -14,16 +16,50 @@ from dateutil import parser
 from xarray import DataTree
 
 
-def calculate_chunks(dataset: xr.Dataset) -> dict:
+def chunk_datatree(datatree: xr.DataTree) -> xr.DataTree:
     """
-    For the given dataset, calculate if the size on any dimension is
+    Walk every node in the datatree and chunk each node's dataset
+    independently based on logic present in `calculate_chunks`.
+
+    For HDFEOS files the root and all intermediate group nodes carry
+    no dimensions or data variables. Chunking must be applied at the
+    leaf nodes where the actual data and dimensions live, e.g.
+    /HDFEOS/GRIDS/OMI Column Amount O3/Data Fields.
+
+    Parameters
+    ----------
+    datatree : xr.DataTree
+        The datatree to chunk in place.
+
+    Returns
+    -------
+    xr.DataTree
+        The same datatree with all data-carrying nodes chunked.
+    """
+    for node in datatree.subtree:
+        # skip intermediate group nodes that carry no data variables
+        # or dimensions. these are structural nodes only.
+        if not node.ds or not node.ds.data_vars or not node.ds.dims:
+            continue
+
+        chunks = calculate_chunks(node)
+        if chunks:
+            # overide node chunks directly
+            node.ds = node.ds.chunk(chunks)
+
+    return datatree
+
+
+def calculate_chunks(node: xr.DataTree | xr.Dataset) -> Mapping[Hashable, int]:
+    """
+    For the given datatree node, calculate if the size on any dimension is
     worth chunking. Any dimension larger than 4000 will be chunked. This
     is done to ensure that the variable can fit in memory.
     """
-    if len(dataset.dims) <= 3:
-        chunk = {dim: 4000 for dim in dataset.dims if dataset.sizes[dim] > 4000 and len(dataset.dims) > 1}
+    if len(node.dims) <= 3:
+        chunk = {dim: 4000 for dim in node.dims if node.sizes[dim] > 4000 and len(node.dims) > 1}
     else:
-        chunk = {dim: 500 for dim in dataset.dims if dataset.sizes[dim] > 500}
+        chunk = {dim: 500 for dim in node.dims if node.sizes[dim] > 500}
     return chunk
 
 
