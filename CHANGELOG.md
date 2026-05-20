@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
 ### Security
+- Updated dependency libraries
 
 
 ## [3.3.1]
