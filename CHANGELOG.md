@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 ### Deprecated
 ### Removed
+### Fixed
+### Security
+
+
+## [3.3.2]
+### Added
+### Changed
+### Deprecated
+### Removed
 - Removed poetry as a dependency (should have poetry externally already)
 ### Fixed
 - [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
