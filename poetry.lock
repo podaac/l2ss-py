@@ -1109,15 +1109,15 @@ numpy = ">=1.21.2"
 
 [[package]]
 name = "harmony-service-lib"
-version = "2.11.0"
+version = "3.0.0"
 description = "A library for Python-based Harmony services to parse incoming message, fetch data, stage data, and call back to Harmony."
 optional = true
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main"]
 markers = "extra == \"harmony\""
 files = [
-    {file = "harmony_service_lib-2.11.0-py3-none-any.whl", hash = "sha256:0bcfc457915692bfd15c590e76152426fb25dc906cbaf363f09634eb496684e2"},
-    {file = "harmony_service_lib-2.11.0.tar.gz", hash = "sha256:3306a34e6fa7a09dabe7a1e30dc4eaf42ec478305a527836b653ce4c658bb84a"},
+    {file = "harmony_service_lib-3.0.0-py3-none-any.whl", hash = "sha256:d4e089aed2d5834042099fb02899d0c7dbfa0f51ba41400afc3e719c6340e411"},
+    {file = "harmony_service_lib-3.0.0.tar.gz", hash = "sha256:21f89319f6fd38751d18396d1ba46376a2a5959dc57d524ffe436199530fa1f6"},
 ]
 
 [package.dependencies]
@@ -1126,11 +1126,10 @@ deprecation = ">=2.1.0,<2.2.0"
 pynacl = ">=1.4,<2.0"
 pystac = ">=1.0.0"
 python-json-logger = ">=2.0.1,<2.1.0"
-requests = ">=2.31,<3.0"
-urllib3 = ">=2.6.1,<2.7.0"
+requests = "*"
 
 [package.extras]
-dev = ["Faker (>=8.1.3,<8.2.0)", "autopep8 (>=1.5,<2.0)", "debugpy (>=1.2,<2.0)", "flake8 (>=6.1.0)", "freezegun (>=1.5.1,<1.6.0)", "ipython (>=8.10.0,<8.11.0)", "jedi (>=0.17.2,<0.18.0)", "packaging (>=24.1,<25.0)", "parameterized (>=0.7,<1.0)", "pycodestyle (>=2.9.1)", "pytest (>=7.2.0,<7.3.0)", "pytest-cov (>=2.11,<3.0)", "pytest-mock (>=3.5,<4.0)", "python-language-server (>=0.35,<1.0)", "responses (>=0.22.0,<0.23.0)", "safety (==3.2.3)", "safety-schemas (==0.0.5)", "setuptools (==78.1.1)"]
+dev = ["Faker", "autopep8", "debugpy", "flake8", "freezegun", "ipython", "jedi", "packaging", "parameterized", "pycodestyle", "pytest", "pytest-cov", "pytest-mock", "responses", "setuptools"]
 
 [[package]]
 name = "identify"
@@ -3485,14 +3484,14 @@ files = [
 
 [[package]]
 name = "urllib3"
-version = "2.6.3"
+version = "2.7.0"
 description = "HTTP library with thread-safe connection pooling, file post, and more."
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.10"
 groups = ["main", "dev"]
 files = [
-    {file = "urllib3-2.6.3-py3-none-any.whl", hash = "sha256:bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"},
-    {file = "urllib3-2.6.3.tar.gz", hash = "sha256:1b62b6884944a57dbe321509ab94fd4d3b307075e0c2eae991ac71ee15ad38ed"},
+    {file = "urllib3-2.7.0-py3-none-any.whl", hash = "sha256:9fb4c81ebbb1ce9531cce37674bbc6f1360472bc18ca9a553ede278ef7276897"},
+    {file = "urllib3-2.7.0.tar.gz", hash = "sha256:231e0ec3b63ceb14667c67be60f2f2c40a518cb38b03af60abc813da26505f4c"},
 ]
 
 [package.extras]
@@ -3629,4 +3628,4 @@ harmony = ["harmony-service-lib", "pystac"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "ebcb891473af8f6d7ebf691847c92583fc5da0d22a0e2ac96a4568ed7d28785d"
+content-hash = "ca2920ba44d2f9f777f6298dd6c001fb3d8ff1275d9985fd6c88cba60e38f4ab"
