@@ -1219,7 +1219,7 @@ def test_temporal_he5file_subset(
 
         values = ds[var_name].values.ravel().astype(np.datetime64)
         assert (values >= time_min).all() and (values <= time_max).all(), (
-            f"time values outside [{time_max}, {time_min}] found in "
+            f"time values outside [{time_min}, {time_max}] found in "
             f"{time_var_path} after temporal subset. "
             f"min={values.min()}, max={values.max()}"
         )

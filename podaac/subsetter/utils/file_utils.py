@@ -39,7 +39,7 @@ def chunk_datatree(datatree: xr.DataTree) -> xr.DataTree:
     for node in datatree.subtree:
         # skip intermediate group nodes that carry no data variables
         # or dimensions. these are structural nodes only.
-        if not node.ds or not node.ds.data_vars or not node.ds.dims:
+        if not node.ds or not node.ds.dims:
             continue
 
         chunks = calculate_chunks(node)
