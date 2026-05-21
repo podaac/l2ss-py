@@ -1,6 +1,7 @@
 import xarray as xr
-from podaac.subsetter.utils.hdf_utils import rename_phony_dims
 from xarray import DataTree
+
+from podaac.subsetter.utils.hdf_utils import rename_phony_dims
 
 
 def make_tree(groups: dict[str, xr.Dataset]) -> DataTree:

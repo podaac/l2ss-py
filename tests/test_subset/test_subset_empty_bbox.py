@@ -1,21 +1,14 @@
-import operator
-import shutil
-import tempfile
-import warnings
 import os
-from os import listdir
-from os.path import dirname, isfile, join, realpath
+import shutil
+from os.path import join
 from pathlib import Path
-from unittest import TestCase
 
-import netCDF4 as nc
 import numpy as np
 import pytest
-import xarray as xr
+from conftest import data_files
+from harmony_service_lib.exceptions import NoDataException
 
 from podaac.subsetter import subset
-from harmony_service_lib.exceptions import NoDataException
-from conftest import data_files 
 
 
 @pytest.mark.parametrize("test_file", data_files())
@@ -27,7 +20,7 @@ def test_subset_empty_bbox(test_file, data_dir, subset_output_dir, request):
                     nc_copy_for_expected_results)
 
     bbox = np.array(((120, 125), (-90, -85)))
-    output_file = "{}_{}".format(request.node.name, test_file)
+    output_file = f"{request.node.name}_{test_file}"
 
     with pytest.raises(NoDataException, match="No data in subsetted granule."):
 

@@ -7,10 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
-### Deprecated 
+### Deprecated
 ### Removed
 ### Fixed
 ### Security
+
+
+## [3.3.2]
+### Added
+- [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
+### Changed
+- [issue/402] (https://github.com/podaac/l2ss-py/issues/402) Update tests which focus on HDF/EOS subsetting, add in pytest based granule fixtures
+### Deprecated
+### Removed
+- Removed poetry as a dependency (should have poetry externally already)
+### Fixed
+- [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
+### Security
+- Updated dependency libraries
 
 
 ## [3.3.1]
@@ -35,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/364] (https://github.com/podaac/l2ss-py/issues/364) Implement vertical subsetting via dimensions.
 ### Changed
 - [issue/246] (https://github.com/podaac/l2ss-py/issues/246) Subsetting parameters part of history attributes and json history.
-### Deprecated 
+### Deprecated
 - [issue/358] (https://github.com/podaac/l2ss-py/issues/358) Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
 ### Removed
 ### Fixed

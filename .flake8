@@ -1,3 +1,4 @@
 [flake8]
 #ignore = ...
 max-line-length=200
+extend-ignore = E203, W503
