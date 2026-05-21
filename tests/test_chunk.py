@@ -50,3 +50,28 @@ def test_chunk_datatree_skips_root_with_no_dims(large_dataset: xr.Dataset) -> No
     result = chunk_datatree(tree)
     assert result["/leaf"].ds["var"].chunks is not None
     assert result["/"].ds.sizes == {}
+
+
+def test_chunk_datatree_ignores_inherited_unused_dimensions() -> None:
+    # reproduces a oco-3 lite sif 10.r / offset failure:
+    # root carries a large sounding_dim so calculate_chunks returns
+    #   {'sounding_dim': 4000} for any node that inherits it
+    # /Offset has only small, unrelated dims (signalbin_dim, footprint_dim)
+
+    offset_ds = xr.Dataset(
+        {"histogram": (["signalbin_dim", "footprint_dim"], np.zeros((227, 8)))},
+        coords={"sounding_dim": np.arange(5000)},
+    )
+
+    tree = xr.DataTree.from_dict({"/Offset": offset_ds})
+
+    # precondition to confirm the inheritance is actually present
+    assert "sounding_dim" in tree["/Offset"].ds.dims
+    assert "sounding_dim" not in tree["/Offset"].ds["histogram"].dims
+
+    # must not raise ValueError
+    result = chunk_datatree(tree)
+
+    # /Offset dims are below the chunking threshold so no chunks are applied,
+    # but critically no error should be occuring
+    assert result["/Offset"].ds["histogram"].chunks is None

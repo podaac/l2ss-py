@@ -42,10 +42,22 @@ def chunk_datatree(datatree: xr.DataTree) -> xr.DataTree:
         if not node.ds or not node.ds.dims:
             continue
 
+        # some cases where a node will have dimensions that no data
+        # variables use. in that case a value error will be raised if
+        # we pass a mapping to the dataset with dimension that does not
+        # exist. collect only the dims that are used by at least 1
+        # variable, and chunks along their axis.
+        active_dims: set[str] = {dim for var in node.ds.data_vars.values() for dim in var.dims}
+
         chunks = calculate_chunks(node)
-        if chunks:
-            # overide node chunks directly
-            node.ds = node.ds.chunk(chunks)
+        if not chunks:
+            continue
+
+        # drop any chunk keys that belong to inherited but unused dimensions
+        active_chunks: dict[str, int] = {dim: size for dim, size in chunks.items() if dim in active_dims}
+
+        if active_chunks:
+            node.ds = node.ds.chunk(active_chunks)
 
     return datatree
 
