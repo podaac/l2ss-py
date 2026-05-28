@@ -1013,7 +1013,7 @@ _NS_PER_UNIT_LOOKUP: dict[str, float] = {
 
 
 def _coerce_to_int_array(
-    data_array: xr.DataTree,
+    data: xr.DataSet | xr.DataArray,
     unit_type: Literal["day", "hour", "minute"],
 ) -> np.ndarray:
     """
@@ -1032,7 +1032,7 @@ def _coerce_to_int_array(
         1-D (or N-D) int32 NumPy array.
     """
     # .values triggers a single dask compute for the whole array.
-    arr: np.ndarray = data_array.values
+    arr: np.ndarray = data.values
     if np.issubdtype(arr.dtype, np.timedelta64):
         return (arr.astype("int64") / _NS_PER_UNIT_LOOKUP[unit_type]).astype(np.int32)
     return arr.astype(np.int32)
