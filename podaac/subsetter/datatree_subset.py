@@ -1013,7 +1013,7 @@ _NS_PER_UNIT_LOOKUP: dict[str, float] = {
 
 
 def _coerce_to_int_array(
-    data: xr.DataSet | xr.DataArray,
+    data: xr.Dataset | xr.DataArray,
     unit_type: Literal["day", "hour", "minute"],
 ) -> np.ndarray:
     """
