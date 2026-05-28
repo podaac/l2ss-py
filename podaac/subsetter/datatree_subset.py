@@ -1,14 +1,14 @@
 """script to help with subsetting xarray datatree objects"""
 
 # pylint: disable=inconsistent-return-statements
-import datetime
 import logging
 import re
+from typing import Literal
 
 import cf_xarray as cfxr
 import numpy as np
+import pandas as pd
 import xarray as xr
-from netCDF4 import date2num  # pylint: disable=no-name-in-module
 from xarray import DataTree
 
 from podaac.subsetter import dimension_cleanup as dc
@@ -1004,45 +1004,122 @@ def clean_inherited_coords(dt: DataTree) -> DataTree:
     return dt
 
 
-def update_dataset_with_time(og_ds, time_name="timeMidScan", group_path=None):
+# lookup table for nanoseconds per unit, used to convert timedelta64 fields to integers.
+_NS_PER_UNIT_LOOKUP: dict[str, float] = {
+    "day": 24.0 * 60.0 * 60.0 * 1e9,
+    "hour": 60.0 * 60.0 * 1e9,
+    "minute": 60.0 * 1e9,
+}
+
+
+def _coerce_to_int_array(
+    data: xr.DataSet | xr.DataArray,
+    unit_type: Literal["day", "hour", "minute"],
+) -> np.ndarray:
+    """
+    Return the underlying array as int32, converting timedelta64 if necessary.
+
+    Parameters
+    ----------
+    data_array : xr.DataArray
+        Source DataArray, possibly (probably) backed by dask.
+    unit_type : Literal["day", "hour", "minute"]
+        Used only when the underlying dtype is ``timedelta64``.
+
+    Returns
+    -------
+    np.ndarray
+        1-D (or N-D) int32 NumPy array.
+    """
+    # .values triggers a single dask compute for the whole array.
+    arr: np.ndarray = data.values
+    if np.issubdtype(arr.dtype, np.timedelta64):
+        return (arr.astype("int64") / _NS_PER_UNIT_LOOKUP[unit_type]).astype(np.int32)
+    return arr.astype(np.int32)
+
+
+def update_dataset_with_time(
+    og_ds: xr.Dataset,
+    time_name: str = "timeMidScan",
+    group_path: str | None = None,
+) -> xr.Dataset:
     """
     Compute a time variable if not present, using values from the dataset.
+
+    performs a single vectorized pass via pandas.to_datetime, which
+    ensures Dask-backed arrays are materialised exactly once.
+
+    Parameters
+    ----------
+    og_ds : xr.Dataset
+        Input dataset, potentially containing Dask-backed arrays.
+    time_name : str, optional
+        Name to assign to the output numeric time variable.
+        Defaults to "timeMidScan".
+    group_path : str or None, optional
+        Group path string; time construction is only applied when this
+        contains "ScanTime".
+
+    Returns
+    -------
+    xr.Dataset
+        Shallow copy of the input dataset with ``time_name`` and
+        ``time_name + "_datetime"`` variables added when applicable.
+
+    Raises
+    ------
+    ValueError
+        If any MilliSecond value is outside ``[0, 1000)``.
     """
-    ds = og_ds.copy()
+    ds: xr.Dataset = og_ds.copy(deep=False)
 
-    def convert_to_int(value, unit_type):
-        if isinstance(value, np.timedelta64):
-            ns_per_unit = {"day": 24 * 60 * 60 * 1e9, "hour": 60 * 60 * 1e9, "minute": 60 * 1e9}
-            return int(value.astype("int64") / ns_per_unit[unit_type])
-        return int(value)
+    if any(time_name in var for var in ds.variables):
+        return ds
 
-    if not any(time_name in var for var in ds.variables):
-        if "ScanTime" in (group_path or ""):
-            time_unit_out = "seconds since 1980-01-06 00:00:00"
-            new_time_list = []
-            new_time_list_dt = []
+    if "ScanTime" not in (group_path or ""):
+        return ds
 
-            for i, _ in enumerate(ds["Year"].values):
-                ms = int(ds["MilliSecond"].values[i])
-                if not 0 <= ms < 1000:
-                    raise ValueError(f"Milliseconds out of range: {ms} at index {i}")
-                microsecond = ms * 1000
-                dt = datetime.datetime(
-                    int(ds["Year"].values[i]),
-                    int(ds["Month"].values[i]),
-                    convert_to_int(ds["DayOfMonth"].values[i], "day"),
-                    hour=convert_to_int(ds["Hour"].values[i], "hour"),
-                    minute=convert_to_int(ds["Minute"].values[i], "minute"),
-                    second=int(ds["Second"].values[i]),
-                    microsecond=microsecond,
-                )
-                new_time_list.append(date2num(dt, time_unit_out))
-                new_time_list_dt.append(dt)  # keep actual datetime
+    # validate milliseconds first
+    ms_arr = ds["MilliSecond"].values.astype(np.int32)
+    invalid_mask = (ms_arr < 0) | (ms_arr >= 1000)
+    if invalid_mask.any():
+        first_bad: int = int(np.argmax(invalid_mask))
+        raise ValueError(f"Milliseconds out of range: {ms_arr[first_bad]} at index {first_bad}")
 
-            ds[time_name] = (ds["Year"].dims, np.array(new_time_list))
-            ds[time_name].attrs["unit"] = time_unit_out
+    # materialise each variable array once, coercing where needed
+    years = ds["Year"].values.astype(np.int32)
+    months = ds["Month"].values.astype(np.int32)
+    days = _coerce_to_int_array(ds["DayOfMonth"], "day")
+    hours = _coerce_to_int_array(ds["Hour"], "hour")
+    minutes = _coerce_to_int_array(ds["Minute"], "minute")
+    seconds = ds["Second"].values.astype(np.int32)
 
-            ds[time_name + "_datetime"] = (ds["Year"].dims, np.array(new_time_list_dt))
+    # build out the new datetime array
+    # note(ocs): could also do pure numpy approach, but pandas is
+    # easier and already dep.
+    dt_ns: np.ndarray = pd.to_datetime(
+        pd.DataFrame(
+            {
+                "year": years,
+                "month": months,
+                "day": days,
+                "hour": hours,
+                "minute": minutes,
+                "second": seconds,
+                "microsecond": ms_arr * 1000,
+            }
+        )
+    ).to_numpy(dtype="datetime64[ns]")
+
+    # convert to seconds since GPS epoch
+    time_unit_out: str = "seconds since 1980-01-06 00:00:00"
+    epoch_ns = np.datetime64("1980-01-06T00:00:00", "ns")
+    time_seconds: np.ndarray = ((dt_ns - epoch_ns).astype(np.int64) / 1e9).astype(np.float64)
+
+    dims = ds["Year"].dims
+    ds[time_name] = (dims, time_seconds)
+    ds[time_name].attrs["unit"] = time_unit_out
+    ds[time_name + "_datetime"] = (dims, dt_ns)
 
     return ds
 
