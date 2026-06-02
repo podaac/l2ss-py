@@ -184,7 +184,6 @@ def subset_with_bbox(
         iterator = zip(lat_var_names, lon_var_names, time_var_names)
 
     for lat_var_name, lon_var_name, time_var_name in iterator:
-
         lat_path = file_utils.get_path(lat_var_name)
         lon_path = file_utils.get_path(lon_var_name)
 
@@ -376,13 +375,11 @@ def subset(
 
     if args["decode_times"]:
         with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
-
             lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
                 dataset=dataset, lat_var_names=lat_var_names, lon_var_names=lon_var_names, time_var_names=time_var_names
             )
 
             for time in time_var_names:
-
                 time_var = dataset[time]
                 var_name = os.path.basename(time)
                 group_path = os.path.dirname(time)
@@ -408,7 +405,6 @@ def subset(
         args["decode_times"] = False
 
     with xr.open_datatree(file_to_subset, **args) as dataset:
-
         if hdf_type:
             dataset = hdf_utils.rename_phony_dims(dataset)
 
@@ -441,19 +437,21 @@ def subset(
 
         all_vars = variables_utils.get_all_variable_names_from_dtree(dataset)
         if variables:
-            # Drop variables that aren't explicitly requested, except lat_var_name and
-            # lon_var_name which are needed for subsetting
-            normalized_variables = [f"/{s.replace('__', '/').lstrip('/')}".upper() for s in variables]
+            # add in root "/" to variable path if not present so that
+            # matching with `all_data_variables` is works correctly
+            normalized_variables = [item if item.startswith("/") else "/" + item for item in variables]
 
             keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
-            keep_variables = variables_utils.normalize_candidate_paths_against_dtree(keep_variables, all_vars)
 
             all_data_variables = datatree_subset.get_vars_with_paths(dataset)
-            drop_variables = [
-                var for var in all_data_variables if var not in keep_variables and var.upper() not in keep_variables
-            ]
 
-            dataset = datatree_subset.drop_vars_by_path(dataset, drop_variables)
+            keep_coords = coordinate_utils.collect_coordinate_variables(dataset, keep_variables)
+
+            keep_set = set(keep_variables) | keep_coords
+
+            drop_variables = [var for var in all_data_variables if var not in keep_set]
+
+            datatree_subset.drop_vars_by_path(dataset, drop_variables)
 
         lon_var_names = variables_utils.normalize_candidate_paths_against_dtree(lon_var_names, all_vars)
         lat_var_names = variables_utils.normalize_candidate_paths_against_dtree(lat_var_names, all_vars)

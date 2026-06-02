@@ -295,7 +295,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                     and (indexers.keys() - dataset[variable_name].dims)
                     and set(indexers.keys()).intersection(dataset[variable_name].dims)
                 ):
-
                     missing_dim = sorted(indexers.keys() - dataset[variable_name].dims)[0]
                     var_indexers = {
                         dim_name: dim_value
@@ -827,8 +826,8 @@ def get_vars_with_paths(tree: DataTree) -> list[str]:
     paths = []
 
     def collect_vars(node: DataTree, current_path: str = "") -> None:
-        # Add data variables from current node
-        for var_name in node.ds.data_vars:
+        # add data variables + coordinates from current node
+        for var_name in node.variables:
             paths.append(f"{current_path}/{var_name}")
 
         # Recursively process child nodes
@@ -840,9 +839,9 @@ def get_vars_with_paths(tree: DataTree) -> list[str]:
     return sorted(paths)  # Sort for consistent ordering
 
 
-def drop_vars_by_path(tree: DataTree, var_paths: str | list[str]) -> DataTree:
+def drop_vars_by_path(tree: DataTree, var_paths: str | list[str]):
     """
-    Drop variables from a DataTree using paths in the format '/group/var' or '/var' for root level
+    Drop variables *in place* from a DataTree using paths in the format '/group/var' or '/var' for root level
 
     Parameters
     ----------
@@ -855,34 +854,18 @@ def drop_vars_by_path(tree: DataTree, var_paths: str | list[str]) -> DataTree:
             - '/group1/var1'  # variable in group1
             - '/group1/subgroup/var1'  # variable in nested group
 
-    Returns
-    -------
-    DataTree
-        Modified DataTree with variables dropped
     """
-    if isinstance(var_paths, str):
-        var_paths = [var_paths]
+    drop = set(var_paths)
 
-    for path in var_paths:
-        # Split the path into group path and variable name
-        parts = path.strip("/").split("/")
-
-        if len(parts) == 1:
-            # Root level variable
-            var_name = parts[0]
-            # Modify the dataset in-place using xarray's drop_vars
-            tree.ds = tree.ds.drop_vars([var_name], errors="ignore")
-        else:
-            # Group variable
-            group_path = "/".join(parts[:-1])
-            var_name = parts[-1]
-            try:
-                node = tree[group_path]
-                node.ds = node.ds.drop_vars([var_name], errors="ignore")
-            except KeyError:
-                pass
-
-    return tree
+    for node in tree.subtree:
+        # get current prefix to construct full path to var
+        prefix = "/" if node.path == "/" else node.path + "/"
+        to_drop = [
+            name for name in node.variables if (prefix + name) in drop  # dataset.variables  # data_vars + coords
+        ]
+        if to_drop:
+            # modify the dataset in place
+            node.dataset = node.dataset.drop_vars(to_drop, errors="ignore")
 
 
 def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
