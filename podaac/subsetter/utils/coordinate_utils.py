@@ -297,10 +297,14 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
         A set containing the paths to the coordinate variables
     """
     keep_coords: set[str] = set()
-    for i in variables:
-        node_path = i.rsplit("/", 1)[0]  # get the prefix path
+    for var in variables:
+        try:
+            var_node = tree[var]
+        except KeyError:
+            continue
 
-        for leaf in tree[i].coords:
+        node_path = var.rsplit("/", 1)[0]  # get the prefix path
+        for leaf in var_node.coords:
             # want to find where the dimension variable
             # actually lives, continuing if none present
             owning_node = find_coordinate_origin_node(tree, node_path, leaf)
