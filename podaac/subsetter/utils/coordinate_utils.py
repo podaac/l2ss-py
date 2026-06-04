@@ -263,7 +263,7 @@ def find_coordinate_origin_node(
 
     Examples
     --------
-    >>> origin = find_coordinate_origin(dt, "/group/subgroup", "time")
+    >>> origin = find_coordinate_origin_node(dt, "/group/subgroup", "time")
     >>> # Returns "/" if time is defined at the root
     """
     node: xr.DataTree | None = tree[node_path]
