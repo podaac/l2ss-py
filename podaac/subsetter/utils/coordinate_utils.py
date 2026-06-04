@@ -270,7 +270,7 @@ def find_coordinate_origin_node(
 
     # iterate from current node to root via closest parents (inclusive
     # of current node)
-    for n in node.parents:
+    for n in (node, *node.parents):
         # have to use to_dataset so that we can specificy *not* to
         # include the inherited coords
         if coord_name in n.to_dataset(inherit=False).coords:
