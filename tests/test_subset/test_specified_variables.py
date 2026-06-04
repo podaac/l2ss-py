@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from podaac.subsetter import subset
-from podaac.subsetter.datatree_subset import get_vars_with_paths
+from podaac.subsetter.utils.variables_utils import get_vars_with_paths
 
 
 class VariableTestCase(NamedTuple):
@@ -32,7 +32,7 @@ _test_table: list[VariableTestCase] = [
             "/sc_vel_y",
             "/sp_vel_z",
         },
-        want_coord={"/sp_lat", "/sp_lon", "/ddm_timestamp_utc"},
+        want_coord={"/sp_lat", "/sp_lon", "/ddm_timestamp_utc", "/ddm", "/sample"},
     ),
     VariableTestCase(
         input="SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc",
@@ -67,7 +67,7 @@ _test_table: list[VariableTestCase] = [
             "/sea_state_bias_ku",
             "/range_used_20hz_ku",
         },
-        want_coord={"/lat", "/lon", "/time"},
+        want_coord={"/lat", "/lon", "/time", "/meas_ind"},
     ),
     VariableTestCase(
         input="AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc",
