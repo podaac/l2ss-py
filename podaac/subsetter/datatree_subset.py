@@ -799,7 +799,7 @@ def tree_get_spatial_bounds(
     return np.array([[min(min_lons), max(max_lons)], [min(min_lats), max(max_lats)]])
 
 
-def get_vars_with_paths(tree: DataTree) -> list[str]:
+def get_vars_with_paths(tree: DataTree) -> set[str]:
     """
     Get all variables and coordinates with their full paths from a DataTree
 
@@ -810,9 +810,9 @@ def get_vars_with_paths(tree: DataTree) -> list[str]:
 
     Returns
     -------
-    List[str]
-        List of variable paths in format '/group/var' or '/var' for root level,
-        including coordinate variables at root level
+    set[str]
+        Unordered set of variable and coordinate paths in format
+        '/group/var' or '/var' for root level.
 
     Examples
     --------
@@ -848,14 +848,13 @@ def drop_vars_by_path(tree: DataTree, var_paths: str | list[str] | set[str]) -> 
             - '/group1/subgroup/var1'  # variable in nested group
 
     """
-    drop = set(var_paths)
+    # guard for single string being passed
+    drop: set[str] = {var_paths} if isinstance(var_paths, str) else set(var_paths)
 
     for node in tree.subtree:
-        # get current prefix to construct full path to var
-        prefix = "/" if node.path == "/" else node.path + "/"
-        to_drop = [name for name in node.variables if (prefix + name) in drop]
+        prefix = node.path.rstrip("/") + "/"
+        to_drop = [name for name in node.variables if f"{prefix}{name}" in drop]
         if to_drop:
-            # modify the dataset in place
             node.dataset = node.dataset.drop_vars(to_drop, errors="ignore")
 
 
