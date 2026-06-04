@@ -5,20 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from podaac.subsetter import subset
-
-
-def get_all_paths(tree: xr.DataTree) -> set[str]:
-    """
-    Return qualified paths for all data and non data variables in a DataTree
-    """
-    paths: set[str] = set()
-    for node in tree.subtree:
-        for name in set(node.data_vars) | set(node.to_dataset(inherit=False).coords):
-            if node.path == "/":
-                paths.add(f"/{name}")
-            else:
-                paths.add(f"{node.path}/{name}")
-    return paths
+from podaac.subsetter.datatree_subset import get_vars_with_paths
 
 
 class VariableTestCase(NamedTuple):
@@ -171,7 +158,7 @@ def test_specified_variables(case, data_dir: str, tmp_path: Path):
 
     with xr.open_datatree(output_path, decode_times=False, decode_coords=False) as out_tree:
         # all vars is the super set containing data + coord vars
-        all_vars = get_all_paths(out_tree)
+        all_vars = get_vars_with_paths(out_tree)
 
         # wanted variable should be a subset of all vars
         assert case.want_var <= all_vars

@@ -821,33 +821,26 @@ def get_vars_with_paths(tree: DataTree) -> list[str]:
     >>> tree['group1'] = DataTree(data=ds.copy())
     >>> paths = get_vars_with_paths(tree)
     >>> print(paths)
-    ['/time', '/var1', '/var2', '/group1/var1', '/group1/var2']
+    {'/time', '/var1', '/var2', '/group1/var1', '/group1/var2'}
     """
-    paths = []
-
-    def collect_vars(node: DataTree, current_path: str = "") -> None:
-        # add data variables + coordinates from current node
-        for var_name in node.variables:
-            paths.append(f"{current_path}/{var_name}")
-
-        # Recursively process child nodes
-        for child_name in node.children:
-            new_path = f"{current_path}/{child_name}" if current_path else f"/{child_name}"
-            collect_vars(node[child_name], new_path)
-
-    collect_vars(tree)
-    return sorted(paths)  # Sort for consistent ordering
+    paths: set[str] = set()
+    for node in tree.subtree:
+        prefix = node.path.rstrip("/") + "/"
+        for name in set(node.data_vars) | set(node.to_dataset(inherit=False).coords):
+            paths.add(f"{prefix}{name}")
+    return paths
 
 
-def drop_vars_by_path(tree: DataTree, var_paths: str | list[str]):
+def drop_vars_by_path(tree: DataTree, var_paths: str | list[str] | set[str]) -> None:
     """
-    Drop variables *in place* from a DataTree using paths in the format '/group/var' or '/var' for root level
+    Drop variables *in place* from a DataTree using paths in the
+    format '/group/var' or '/var' for root level.
 
     Parameters
     ----------
     tree : DataTree
         The input DataTree
-    var_paths : str or List[str]
+    var_paths : str or list[str] or set[str]
         Paths to variables to drop in format '/group/var' or '/var' for root level
         Examples:
             - '/var1'  # root level variable
