@@ -449,7 +449,7 @@ def subset(
 
             keep_set = set(keep_variables) | keep_coords
 
-            drop_variables = [var for var in all_data_variables if var not in keep_set]
+            drop_variables = all_data_variables - keep_set
 
             datatree_subset.drop_vars_by_path(dataset, drop_variables)
 
