@@ -860,9 +860,7 @@ def drop_vars_by_path(tree: DataTree, var_paths: str | list[str]):
     for node in tree.subtree:
         # get current prefix to construct full path to var
         prefix = "/" if node.path == "/" else node.path + "/"
-        to_drop = [
-            name for name in node.variables if (prefix + name) in drop  # dataset.variables  # data_vars + coords
-        ]
+        to_drop = [name for name in node.variables if (prefix + name) in drop]
         if to_drop:
             # modify the dataset in place
             node.dataset = node.dataset.drop_vars(to_drop, errors="ignore")
