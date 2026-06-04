@@ -435,23 +435,21 @@ def subset(
         if hdf_type and (min_time or max_time):
             dataset, _ = tree_time_converting.convert_to_datetime(dataset, time_var_names, hdf_type)
 
-        all_vars = variables_utils.get_all_variable_names_from_dtree(dataset)
+        all_vars = variables_utils.get_vars_with_paths(dataset)
         if variables:
             # add in root "/" to variable path if not present so that
             # matching with `all_data_variables` is works correctly
-            normalized_variables = [item if item.startswith("/") else "/" + item for item in variables]
+            normalized_variables = variables_utils.normalize_candidate_paths_against_dtree(variables, all_vars)
 
             keep_variables = normalized_variables + lon_var_names + lat_var_names + time_var_names
-
-            all_data_variables = datatree_subset.get_vars_with_paths(dataset)
 
             keep_coords = coordinate_utils.collect_coordinate_variables(dataset, keep_variables)
 
             keep_set = set(keep_variables) | keep_coords
 
-            drop_variables = all_data_variables - keep_set
+            drop_variables = all_vars - keep_set
 
-            datatree_subset.drop_vars_by_path(dataset, drop_variables)
+            variables_utils.drop_vars_by_path(dataset, drop_variables)
 
         lon_var_names = variables_utils.normalize_candidate_paths_against_dtree(lon_var_names, all_vars)
         lat_var_names = variables_utils.normalize_candidate_paths_against_dtree(lat_var_names, all_vars)

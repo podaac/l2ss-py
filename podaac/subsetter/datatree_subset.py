@@ -799,65 +799,6 @@ def tree_get_spatial_bounds(
     return np.array([[min(min_lons), max(max_lons)], [min(min_lats), max(max_lats)]])
 
 
-def get_vars_with_paths(tree: DataTree) -> set[str]:
-    """
-    Get all variables and coordinates with their full paths from a DataTree
-
-    Parameters
-    ----------
-    tree : DataTree
-        The input DataTree
-
-    Returns
-    -------
-    set[str]
-        Unordered set of variable and coordinate paths in format
-        '/group/var' or '/var' for root level.
-
-    Examples
-    --------
-    >>> ds = xr.Dataset({'var1': [1], 'var2': [2], 'time': ('time', [0])})
-    >>> tree = DataTree(data=ds)
-    >>> tree['group1'] = DataTree(data=ds.copy())
-    >>> paths = get_vars_with_paths(tree)
-    >>> print(paths)
-    {'/time', '/var1', '/var2', '/group1/var1', '/group1/var2'}
-    """
-    paths: set[str] = set()
-    for node in tree.subtree:
-        prefix = node.path.rstrip("/") + "/"
-        for name in set(node.data_vars) | set(node.to_dataset(inherit=False).coords):
-            paths.add(f"{prefix}{name}")
-    return paths
-
-
-def drop_vars_by_path(tree: DataTree, var_paths: str | list[str] | set[str]) -> None:
-    """
-    Drop variables *in place* from a DataTree using paths in the
-    format '/group/var' or '/var' for root level.
-
-    Parameters
-    ----------
-    tree : DataTree
-        The input DataTree
-    var_paths : str or list[str] or set[str]
-        Paths to variables to drop in format '/group/var' or '/var' for root level
-        Examples:
-            - '/var1'  # root level variable
-            - '/group1/var1'  # variable in group1
-            - '/group1/subgroup/var1'  # variable in nested group
-
-    """
-    # guard for single string being passed
-    drop: set[str] = {var_paths} if isinstance(var_paths, str) else set(var_paths)
-
-    for node in tree.subtree:
-        prefix = node.path.rstrip("/") + "/"
-        to_drop = [name for name in node.variables if f"{prefix}{name}" in drop]
-        if to_drop:
-            node.dataset = node.dataset.drop_vars(to_drop, errors="ignore")
-
-
 def prepare_basic_encoding(datasets: DataTree, time_encoding) -> dict:
     """
     Prepare basic encoding dictionary for DataTree organized by groups.
