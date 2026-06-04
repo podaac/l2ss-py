@@ -5,9 +5,11 @@ test_run_subsetter.py
 
 Test the run_subsetter cli
 """
-from podaac.subsetter import run_subsetter
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
 import numpy as np
+
+from podaac.subsetter import run_subsetter
 
 
 def test_run_subsetter():

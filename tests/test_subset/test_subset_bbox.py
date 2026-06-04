@@ -1,20 +1,15 @@
 import operator
-import shutil
-import tempfile
 import warnings
-from os import listdir
-from os.path import dirname, isfile, join, realpath
-from unittest import TestCase
+from os.path import join
 
-import netCDF4 as nc
 import numpy as np
 import pytest
 import xarray as xr
+from conftest import data_files
 
-from podaac.subsetter import subset
-from conftest import data_files 
+from podaac.subsetter import datatree_subset, subset
 from podaac.subsetter.utils.coordinate_utils import convert_bbox
-from podaac.subsetter import datatree_subset
+
 
 @pytest.mark.parametrize("test_file", data_files())
 def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
@@ -26,7 +21,7 @@ def test_subset_bbox(test_file, data_dir, subset_output_dir, request):
 
     # pylint: disable=too-many-locals
     bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, test_file)
+    output_file = f"{request.node.name}_{test_file}"
     subset_output_file = join(subset_output_dir, output_file)
     subset.subset(
         file_to_subset=join(data_dir, test_file),

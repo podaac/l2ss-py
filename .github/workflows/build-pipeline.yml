@@ -79,6 +79,7 @@ jobs:
         run: |
           poetry run pylint podaac
           poetry run flake8 podaac
+          poetry run ruff check podaac/
       - name: Test and coverage
         run: |
           poetry run pytest -v \
@@ -90,7 +91,7 @@ jobs:
             tests/
       - name: SonarCloud Scan
         id: sonarcloud
-        uses: sonarsource/sonarqube-scan-action@v6
+        uses: sonarsource/sonarqube-scan-action@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -112,7 +113,7 @@ jobs:
       - name: SonarCloud Scan Retry
         id: sonarcloud-retry
         if: steps.sonarcloud.outcome == 'failure'
-        uses: sonarsource/sonarqube-scan-action@v6
+        uses: sonarsource/sonarqube-scan-action@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -160,7 +161,7 @@ jobs:
 
       - name: Configure AWS credentials for UAT
         if: env.venue == 'uat'
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
@@ -168,7 +169,7 @@ jobs:
 
       - name: Configure AWS credentials for OPS
         if: env.venue == 'ops'
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_OPS }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_OPS }}
@@ -245,7 +246,7 @@ jobs:
       - name: Build Python Artifact
         run: |
           poetry build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: python-artifact
           path: dist/*
@@ -270,7 +271,7 @@ jobs:
         if: |
           steps.pypi-test-publish.conclusion == 'success' ||
           steps.pypi-publish.conclusion == 'success'
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
@@ -280,7 +281,7 @@ jobs:
           steps.pypi-test-publish.conclusion == 'success' ||
           steps.pypi-publish.conclusion == 'success'
         id: meta
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
@@ -297,7 +298,7 @@ jobs:
         if: |
           steps.pypi-test-publish.conclusion == 'success' ||
           steps.pypi-publish.conclusion == 'success'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: docker/Dockerfile

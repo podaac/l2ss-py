@@ -24,43 +24,32 @@ subsetting functionality itself, and should provide coverage on the
 following files:
     - podaac.subsetter.subset.py
 """
+import gc as garbage_collection
 import json
 import operator
 import os
 import shutil
 import tempfile
-import urllib.parse
 from os import listdir
-from os.path import dirname, join, realpath, isfile, basename
+from os.path import basename, dirname, isfile, join, realpath
 from pathlib import Path
-from unittest import TestCase
 
 import geopandas as gpd
+import h5py
 import importlib_metadata
 import netCDF4 as nc
-import h5py
 import numpy as np
-import warnings
 import pandas as pd
 import pytest
 import xarray as xr
+from harmony_service_lib.exceptions import NoDataException
 from jsonschema import validate
 from shapely.geometry import Point
-from unittest.mock import patch
 
-from podaac.subsetter import subset
-from podaac.subsetter import datatree_subset
-from podaac.subsetter.subset import SERVICE_NAME
+from podaac.subsetter import datatree_subset, subset
 from podaac.subsetter.datatree_subset import get_indexers_from_nd
-from harmony_service_lib.exceptions import NoDataException
-
-from podaac.subsetter.utils import mask_utils
-from podaac.subsetter.utils import coordinate_utils
-from podaac.subsetter.utils import metadata_utils
-from podaac.subsetter.utils import time_utils
-from podaac.subsetter.utils import file_utils
-
-import gc as garbage_collection
+from podaac.subsetter.subset import SERVICE_NAME
+from podaac.subsetter.utils import coordinate_utils, file_utils, time_utils
 
 GROUP_DELIM = '__'
 
@@ -165,6 +154,25 @@ def data_files():
 TEST_DATA_FILES = data_files()
 
 
+def assert_phony_dims(dtree: xr.DataTree, *, present: bool) -> None:
+    """Simple helper func to check for phony dimes. If present = True,
+    then we validate that they are present. If False, then we validate
+    that they are not present.
+    """
+    for node in dtree.subtree:
+        ds = node.ds
+        if isinstance(ds, xr.Dataset) and ds.dims:
+            for dim in ds.dims:
+                if present:
+                    assert "phony" in dim, (
+                        f"Expected phony dim before subset, got: {dim}"
+                    )
+                else:
+                    assert "phony" not in dim, (
+                        f"Unexpected 'phony' dimension found: {dim}"
+                    )
+
+
 def test_bbox_conversion(data_dir):
     """
     Test that the bounding box conversion returns expected
@@ -250,15 +258,15 @@ def test_history_metadata_create(data_dir, subset_output_dir, request):
     test_file = next(filter(
         lambda f: '20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc' in f
         , TEST_DATA_FILES))
-    output_file = "{}_{}".format(request.node.name, test_file)
+    output_file = f"{request.node.name}_{test_file}"
 
     # Remove the 'history' metadata from the granule
     in_nc = xr.open_dataset(join(data_dir, test_file))
     del in_nc.attrs['history']
-    in_nc.to_netcdf(join(subset_output_dir, 'int_{}'.format(output_file)), 'w')
+    in_nc.to_netcdf(join(subset_output_dir, f'int_{output_file}'), 'w')
 
     subset.subset(
-        file_to_subset=join(subset_output_dir, "int_{}".format(output_file)),
+        file_to_subset=join(subset_output_dir, f"int_{output_file}"),
         bbox=np.array(((-180, 180), (-90.0, 90))),
         output_file=join(subset_output_dir, output_file)
     )
@@ -327,7 +335,7 @@ def test_data_1D(data_dir, subset_output_dir, request):
     Test that subsetting a 1-D granule does not result in failure.
     """
     merged_jason_filename = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
-    output_file = "{}_{}".format(request.node.name, merged_jason_filename)
+    output_file = f"{request.node.name}_{merged_jason_filename}"
 
     subset.subset(
         file_to_subset=join(data_dir, merged_jason_filename),
@@ -604,7 +612,7 @@ def test_temporal_subset_ascat(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2015-07-02T09:00:00'
     max_time = '2015-07-02T10:00:00'
 
@@ -651,7 +659,7 @@ def test_temporal_subset_modis_a(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'MODIS_A-JPL-L2P-v2014.0.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2019-08-05T06:57:00'
     max_time = '2019-08-05T06:58:00'
     # Actual min is 2019-08-05T06:55:01.000000000
@@ -708,7 +716,7 @@ def test_temporal_subset_s6(data_dir, subset_output_dir, request):
         os.path.join(data_dir, 'sentinel_6', file),
         os.path.join(subset_output_dir, file)
     )
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2020-12-07T01:20:00'
     max_time = '2020-12-07T01:25:00'
     # Actual min is 2020-12-07T01:15:01.000000000
@@ -743,7 +751,7 @@ def test_subset_jason(data_dir, subset_output_dir, request):
     """TODO: Give description to this test function."""
     bbox = np.array(((-180, 0), (-90, 90)))
     file = 'JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = "2002-01-15T06:07:06Z"
     max_time = "2002-01-15T06:30:16Z"
 
@@ -771,7 +779,7 @@ def test_cf_decode_times_sndr(data_dir, subset_output_dir, request):
     sndr_spatial = [(-180,-150), (-15,180), (-180,30)]
     for sndr_file, box in zip(sndr_files, sndr_spatial):
         bbox = np.array(((box[0], box[1]), (-90, 90)))
-        output_file = "{}_{}".format(request.node.name, sndr_file)
+        output_file = f"{request.node.name}_{sndr_file}"
         shutil.copyfile(
             os.path.join(SNDR_dir, sndr_file),
             os.path.join(subset_output_dir, sndr_file)
@@ -806,7 +814,7 @@ def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     sndr_file = 'SNDR.J1.CRIMSS.20210224T0100.m06.g011.L2_CLIMCAPS_RET.std.v02_28.G.210331064430.nc'
 
     bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, sndr_file)
+    output_file = f"{request.node.name}_{sndr_file}"
     shutil.copyfile(
         os.path.join(SNDR_dir, sndr_file),
         os.path.join(subset_output_dir, sndr_file)
@@ -836,7 +844,7 @@ def test_duplicate_dims_tropomi(data_dir, subset_output_dir, request):
     trop_file = 'S5P_OFFL_L2__AER_LH_20210704T005246_20210704T023416_19290_02_020200_20210708T023111.nc'
 
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, trop_file)
+    output_file = f"{request.node.name}_{trop_file}"
     shutil.copyfile(
         os.path.join(TROP_dir, trop_file),
         os.path.join(subset_output_dir, trop_file)
@@ -865,7 +873,7 @@ def test_duplicate_dims_tempo_ozone(data_dir, subset_output_dir, request):
     tempo_ozone_file = 'TEMPO_O3PROF-PROXY_L2_V01_20130831T222959Z_S014G06.nc'
 
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, tempo_ozone_file)
+    output_file = f"{request.node.name}_{tempo_ozone_file}"
     shutil.copyfile(
         os.path.join(TEMPO_dir, tempo_ozone_file),
         os.path.join(subset_output_dir, tempo_ozone_file)
@@ -892,7 +900,7 @@ def test_no_null_time_values_in_time_and_space_subset_for_tempo(data_dir, subset
     tempo_no2_file = 'TEMPO_NO2_L2_V01_20231206T131913Z_S002G04.nc'
 
     bbox = np.array(((-87, -83), (28.5, 33.7)))
-    output_file = "{}_{}".format(request.node.name, tempo_no2_file)
+    output_file = f"{request.node.name}_{tempo_no2_file}"
     shutil.copyfile(
         os.path.join(TEMPO_dir, tempo_no2_file),
         os.path.join(subset_output_dir, tempo_no2_file)
@@ -910,38 +918,6 @@ def test_no_null_time_values_in_time_and_space_subset_for_tempo(data_dir, subset
     out_nc = nc.Dataset(join(subset_output_dir, output_file))
 
     assert np.isnan(out_nc.groups['geolocation']['time'][:]).any() == False
-
-
-def test_omi_novars_subset(data_dir, subset_output_dir, request):
-    """
-    Check that the OMI variables are conserved when no variable are specified
-    the data field and lat/lon are in different groups
-    """
-    omi_dir = join(data_dir, 'OMI')
-    omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
-
-    bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file)
-    )
-    _ = subset.subset(
-        file_to_subset=join(subset_output_dir, omi_file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file),
-    )
-    # check if the box_test is
-
-    in_nc = nc.Dataset(join(omi_dir, omi_file))
-    out_nc = nc.Dataset(join(subset_output_dir, output_file))
-
-    for var_name, _ in in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
-        'Geolocation Fields'].variables.items():
-        assert in_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
-                   'Geolocation Fields'].variables[var_name].shape == \
-               out_nc.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount SO2'].groups[
-                   'Geolocation Fields'].variables[var_name].shape
 
 
 @pytest.mark.skip(reason='We no longer flatten groups but do we want to have same function copying the dims')
@@ -1052,7 +1028,7 @@ def test_temporal_merged_topex(data_dir, subset_output_dir, request):
         os.path.join(data_dir, file),
         os.path.join(subset_output_dir, file)
     )
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '1992-01-01T00:00:00'
     max_time = '1992-11-01T00:00:00'
     # Actual min is 2020-12-07T01:15:01.000000000
@@ -1121,7 +1097,7 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2015-07-02T09:00:00'
     max_time = '2015-07-02T10:00:00'
     variables = [
@@ -1169,162 +1145,179 @@ def test_temporal_variable_subset(data_dir, subset_output_dir, request):
     # subset should be present.
     assert set(np.append(['lat', 'lon', 'time'], variables)) == set(out_ds.data_vars.keys())
 
-@pytest.mark.skip(reason="Test flattens data which we do not have to do anymore")
-def test_temporal_he5file_subset(data_dir, subset_output_dir):
-    """
-    Test that the time type changes to datetime for subsetting
-    """
-
-    OMI_file_names = [('OMI','OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'),
-                      ('OMI','OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'),
-                      ('MLS','MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5')]
-    OMI_copy_file = 'OMI_copy_testing_2.he5'
-    for i in OMI_file_names:
-        shutil.copyfile(os.path.join(data_dir, i[0], i[1]),
-                        os.path.join(subset_output_dir, OMI_copy_file))
-        min_time = '2020-01-16T12:30:00Z'
-        max_time = '2020-01-16T12:40:00Z'
-
-        nc_dataset, has_groups, hdf_type = file_utils.h5file_transform(os.path.join(subset_output_dir, OMI_copy_file))
-        assert has_groups == True
-        assert i[0] == hdf_type
-        args = {
-            'decode_coords': False,
-            'mask_and_scale': False,
-            'decode_times': False
-        }
-
-        if min_time or max_time:
-            args['decode_times'] = True
-
-        with xr.open_dataset(
-                xr.backends.NetCDF4DataStore(nc_dataset),
-                **args
-        ) as dataset:
-            _, _, time_var_names = coordinate_utils.get_coordinate_variable_names(
-                dataset=dataset,
-                lat_var_names=None,
-                lon_var_names=None,
-                time_var_names=None
-            )
-            if 'BRO' in i:
-                assert any('utc' in x.lower() for x in time_var_names)
-            
-            dataset, _ = tc.convert_to_datetime(dataset, time_var_names, hdf_type)
-            assert dataset[time_var_names[0]].dtype == 'datetime64[ns]'
-
-
-def test_omi_pixcor(data_dir, subset_output_dir, request):
-    """
-    OMI PIX COR collection has the same shape across groups but covers a different domain
-    group to group. Dimension names had to be changed in order for copying data back into
-    netCDF files. L2S developers not this collection was particularly tricky
-    """
-    omi_dir = join(data_dir, 'OMI')
-    omi_file = 'OMI-Aura_L2-OMPIXCOR_2020m0116t1207-o82471_v003-2020m0116t174929.he5'
-    omi_file_input = 'input' + omi_file
-    bbox = np.array(((-180, 180), (-30, 30)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
-
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file)
+    assert set(np.append(["lat", "lon", "time"], variables)) == set(
+        out_ds.data_vars.keys()
     )
 
-    _ = subset.subset(
-        file_to_subset=os.path.join(subset_output_dir, omi_file),
-        bbox=bbox,
-        output_file=os.path.join(subset_output_dir, output_file)
+
+@pytest.mark.parametrize("fixture_name, time_var_path", [
+    (
+        "fake_omi_pixcor_file",
+        "/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Geolocation Fields/TimeUTC",
+    ),
+    (
+        "fake_omi_bro_file",
+        "/HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields/TimeUTC",
+    ),
+    (
+        "fake_mls_aura_l2gp_oh_file",
+        "/HDFEOS/SWATHS/OH/Geolocation Fields/Time",
+    ),
+])
+def test_temporal_he5file_subset(
+    fixture_name: str,
+    time_var_path: str,
+    fake_omi_pixcor_file: Path,
+    fake_omi_bro_file: Path,
+    fake_mls_aura_l2gp_oh_file: Path,
+    tmp_path: Path,
+):
+    """
+    Test that temporal subsetting correctly filters scan lines to only those
+    that fall within the requested time range.
+    """
+    min_time = "2020-01-16T12:31:00Z"
+    max_time = "2020-01-16T12:39:00Z"
+
+    time_min = np.datetime64("2020-01-16T12:31:00", "ns")
+    time_max = np.datetime64("2020-01-16T12:39:00", "ns")
+
+    fixture_map: dict[str, Path] = {
+        "fake_omi_pixcor_file": fake_omi_pixcor_file,
+        "fake_omi_bro_file": fake_omi_bro_file,
+        "fake_mls_aura_l2gp_oh_file": fake_mls_aura_l2gp_oh_file,
+    }
+    fixture_path = fixture_map[fixture_name]
+    output_path = tmp_path / f"{fixture_path.stem}_temporal_subset.he5"
+
+    subset.subset(
+        file_to_subset=str(fixture_path),
+        bbox=np.array(((-180, 180), (-90, 90))),
+        output_file=str(output_path),
+        min_time=min_time,
+        max_time=max_time,
     )
 
-    out_nc = nc.Dataset(join(subset_output_dir, output_file))
+    assert output_path.exists(), f"subset output file was not created at {output_path}"
+    assert output_path.stat().st_size > 0, (
+        f"subset output file is empty at {output_path}"
+    )
 
-    assert out_nc
+    group_path, var_name = time_var_path.rsplit("/", 1)
 
+    with xr.open_datatree(str(output_path), engine="netcdf4") as dtree:
+        assert_phony_dims(dtree, present=False)
 
-def test_MLS_levels(data_dir, subset_output_dir, request):
+        assert group_path in dtree.groups, (
+            f"expected group {group_path!r} not found in subsetted output"
+        )
+
+        ds = dtree[group_path].ds
+        assert var_name in ds, (
+            f"expected variable {var_name!r} not found in {group_path} after subset"
+        )
+
+        values = ds[var_name].values.ravel().astype(np.datetime64)
+        assert (values >= time_min).all() and (values <= time_max).all(), (
+            f"time values outside [{time_min}, {time_max}] found in "
+            f"{time_var_path} after temporal subset. "
+            f"min={values.min()}, max={values.max()}"
+        )
+
+def test_MLS_levels(fake_mls_aura_l2gp_oh_file: Path, tmp_path: Path):
     """
     Test that the unique groups are determined before bounding box
     subsetting
     """
-    mls_dir = join(data_dir, 'MLS')
-    mls_file = 'MLS-Aura_L2GP-CO_v05-01-c01_2021d043.he5'
-    mls_file_input = 'input' + mls_file
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, mls_file)
 
-    shutil.copyfile(
-        os.path.join(mls_dir, mls_file),
-        os.path.join(subset_output_dir, mls_file)
-    )
+    subset_output_file = tmp_path / "mls_test_subset.nc"
 
     subset.subset(
-        file_to_subset=os.path.join(subset_output_dir, mls_file),
+        file_to_subset=fake_mls_aura_l2gp_oh_file,
         bbox=bbox,
-        output_file=os.path.join(subset_output_dir, output_file)
+        output_file=subset_output_file,
     )
 
-    in_ds = h5py.File(os.path.join(mls_dir, mls_file), "r")
-    out_ds = h5py.File(os.path.join(subset_output_dir, output_file), "r")
+    assert os.path.exists(subset_output_file), (
+        f"subset output file was not created at {subset_output_file}"
+    )
+    assert os.path.getsize(subset_output_file) > 0, (
+        f"subset output file is empty at {subset_output_file}"
+    )
 
-    # check that the variable shapes are conserved in MLS
-    for i in list(in_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields']):
-        var_in_shape = in_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields'][i].shape
-        var_out_shape = out_ds['HDFEOS']['SWATHS']['CO']['Geolocation Fields'][i].shape
-        assert var_in_shape == var_out_shape
+    with xr.open_datatree(fake_mls_aura_l2gp_oh_file, engine="netcdf4") as in_dt, \
+         xr.open_datatree(str(subset_output_file), engine="netcdf4") as out_dt:
 
-    for i in list(in_ds['HDFEOS']['SWATHS']['CO']['Data Fields']):
-        var_in_shape = in_ds['HDFEOS']['SWATHS']['CO']['Data Fields'][i].shape
-        var_out_shape = out_ds['HDFEOS']['SWATHS']['CO']['Data Fields'][i].shape
-        assert var_in_shape == var_out_shape
+        in_geo  = in_dt["/HDFEOS/SWATHS/OH/Geolocation Fields"].ds
+        out_geo = out_dt["/HDFEOS/SWATHS/OH/Geolocation Fields"].ds
+
+        for var_name in in_geo.data_vars:
+            assert var_name in out_geo.data_vars, (
+                f"geolocation variable {var_name!r} missing from subsetted output"
+            )
+            assert in_geo[var_name].shape == out_geo[var_name].shape, (
+                f"shape mismatch for geolocation variable {var_name!r}: "
+                f"{in_geo[var_name].shape} != {out_geo[var_name].shape}"
+            )
+
+        in_data  = in_dt["/HDFEOS/SWATHS/OH/Data Fields"].ds
+        out_data = out_dt["/HDFEOS/SWATHS/OH/Data Fields"].ds
+
+        for var_name in in_data.data_vars:
+            assert var_name in out_data.data_vars, (
+                f"data variable {var_name!r} missing from subsetted output"
+            )
+            assert in_data[var_name].shape == out_data[var_name].shape, (
+                f"shape mismatch for data variable {var_name!r}: "
+                f"{in_data[var_name].shape} != {out_data[var_name].shape}"
+            )
 
 
-def test_he5_timeattrs_output(data_dir, subset_output_dir, request):
+def test_he5_timeattrs_output(fake_omi_bro_file: Path, tmp_path: Path):
     """Test that the time attributes in the output match the attributes of the input for OMI test files"""
 
-    omi_dir = join(data_dir, 'OMI')
-    omi_file = 'OMI-Aura_L2-OMBRO_2020m0116t1207-o82471_v003-2020m0116t182003.he5'
-    omi_file_input = 'input' + omi_file
-    bbox = np.array(((-180, 90), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, omi_file)
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file)
-    )
-    shutil.copyfile(
-        os.path.join(omi_dir, omi_file),
-        os.path.join(subset_output_dir, omi_file_input)
-    )
+    output_file = tmp_path / "omi_bro_timeattrs.he5"
 
-    min_time = '2020-01-16T12:30:00Z'
-    max_time = '2020-01-16T12:40:00Z'
+    min_time = "2020-01-16T12:30:00Z"
+    max_time = "2020-01-16T12:40:00Z"
     bbox = np.array(((-180, 180), (-90, 90)))
-    nc_dataset_input = nc.Dataset(os.path.join(subset_output_dir, omi_file_input))
-    incut_set = nc_dataset_input.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups[
-        'Geolocation Fields']
+    nc_dataset_input = nc.Dataset(fake_omi_bro_file)
+    incut_set = (
+        nc_dataset_input.groups["HDFEOS"]
+        .groups["SWATHS"]
+        .groups["OMI Total Column Amount BrO"]
+        .groups["Geolocation Fields"]
+    )
     xr_dataset_input = xr.open_dataset(xr.backends.NetCDF4DataStore(incut_set))
-    inattrs = xr_dataset_input['Time'].attrs
+    inattrs = xr_dataset_input["Time"].attrs
 
     subset.subset(
-        file_to_subset=os.path.join(subset_output_dir, omi_file),
+        file_to_subset=fake_omi_bro_file,
         bbox=bbox,
-        output_file=os.path.join(subset_output_dir, output_file),
+        output_file=output_file,
         min_time=min_time,
-        max_time=max_time
+        max_time=max_time,
     )
 
-    output_ncdataset = nc.Dataset(os.path.join(subset_output_dir, output_file))
-    outcut_set = output_ncdataset.groups['HDFEOS'].groups['SWATHS'].groups['OMI Total Column Amount BrO'].groups[
-        'Geolocation Fields']
+    output_ncdataset = nc.Dataset(output_file)
+    outcut_set = (
+        output_ncdataset.groups["HDFEOS"]
+        .groups["SWATHS"]
+        .groups["OMI Total Column Amount BrO"]
+        .groups["Geolocation Fields"]
+    )
     xrout_dataset = xr.open_dataset(xr.backends.NetCDF4DataStore(outcut_set))
-    outattrs = xrout_dataset['Time'].attrs
+    outattrs = xrout_dataset["Time"].attrs
 
     for key in inattrs.keys():
         if isinstance(inattrs[key], np.ndarray):
             if np.array_equal(inattrs[key], outattrs[key]):
                 pass
             else:
-                raise AssertionError('Attributes for {} do not equal each other'.format(key))
+                raise AssertionError(
+                    "Attributes for {} do not equal each other".format(key)
+                )
         else:
             assert inattrs[key] == outattrs[key]
 
@@ -1333,7 +1326,7 @@ def test_temporal_subset_lines(data_dir, subset_output_dir, request):
     """TODO: Give description to this test function."""
     bbox = np.array(((-180, 180), (-90, 90)))
     file = 'SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2012-11-11T23:59:10'
     max_time = '2012-11-12T00:20:10'
 
@@ -1361,7 +1354,7 @@ def test_grouped_empty_subset(data_dir, subset_output_dir, request):
     """
     bbox = np.array(((-10, 10), (-10, 10)))
     file = 'S6A_P4_2__LR_STD__ST_002_140_20201207T011501_20201207T013023_F00.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
 
     shutil.copyfile(os.path.join(data_dir, 'sentinel_6', file),
                     os.path.join(subset_output_dir, file))
@@ -1376,32 +1369,24 @@ def test_grouped_empty_subset(data_dir, subset_output_dir, request):
        #assert spatial_bounds is None
 
 
-def test_get_time_OMI(data_dir, subset_output_dir):
+def test_get_time_OMI(fake_omi_bro_file, data_dir, subset_output_dir):
     """
-    Test that code get time variables for OMI .he5 files"
+    Test that the code can get time variables for OMI .he5 files"
     """
-    omi_file = 'OMI-Aura_L2-OMSO2_2020m0116t1207-o82471_v003-2020m0223t142939.he5'
 
-    shutil.copyfile(os.path.join(data_dir, 'OMI', omi_file),
-                    os.path.join(subset_output_dir, omi_file))
+    args = {"decode_coords": False, "mask_and_scale": False, "decode_times": False}
 
-    file = os.path.join(subset_output_dir, omi_file)
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': False,
-        'decode_times': False
-    }
-
-    with xr.open_datatree(
-            file,
-            **args
-    ) as dataset:
-        lon_var_names, lat_var_names =  datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
+    with xr.open_datatree(fake_omi_bro_file, **args) as dataset:
+        lon_var_names, lat_var_names = (
+            datatree_subset.compute_coordinate_variable_names_from_tree(dataset)
+        )
         time_var_names = []
         for lat_var_name in lat_var_names:
-            time_var_names.append(datatree_subset.compute_time_variable_name_tree(
+            time_var_names.append(
+                datatree_subset.compute_time_variable_name_tree(
                     dataset, dataset[lat_var_name], time_var_names
-                ))
+                )
+            )
         assert "Time" in time_var_names[0]
         assert "Latitude" in lat_var_names[0]
 
@@ -1415,7 +1400,7 @@ def test_empty_temporal_subset(data_dir, subset_output_dir, request):
     #  37.707:38.484
     bbox = np.array(((37.707, 38.484), (-13.265, -12.812)))
     file = '20190927000500-JPL-L2P_GHRSST-SSTskin-MODIS_A-D-v02.0-fv01.0.nc'
-    output_file = "{}_{}".format(request.node.name, file)
+    output_file = f"{request.node.name}_{file}"
     min_time = '2019-09-01'
     max_time = '2019-09-30'
 
@@ -1519,8 +1504,8 @@ def test_var_subsetting_tropomi(data_dir, subset_output_dir, request):
     variable_slash = ['/PRODUCT/methane_mixing_ratio']
     variable_noslash = ['PRODUCT/methane_mixing_ratio']
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file_slash = "{}_{}".format(request.node.name, trop_file)
-    output_file_noslash = "{}_noslash_{}".format(request.node.name, trop_file)
+    output_file_slash = f"{request.node.name}_{trop_file}"
+    output_file_noslash = f"{request.node.name}_noslash_{trop_file}"
     shutil.copyfile(
         os.path.join(trop_dir, trop_file),
         os.path.join(subset_output_dir, trop_file)
@@ -1553,7 +1538,7 @@ def test_tropomi_utc_time(data_dir, subset_output_dir, request):
     trop_file = 'S5P_OFFL_L2__CH4____20190319T110835_20190319T125006_07407_01_010202_20190325T125810_subset.nc4'
     variable = ['/PRODUCT/time_utc', '/PRODUCT/corner']
     bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, trop_file)
+    output_file = f"{request.node.name}_{trop_file}"
     shutil.copyfile(
         os.path.join(trop_dir, trop_file),
         os.path.join(subset_output_dir, trop_file)
@@ -1608,183 +1593,19 @@ def test_bad_time_unit(subset_output_dir):
     ds_test = xr.open_dataset(nc_out_location)
     ds_test.close()
 
-@pytest.mark.skip(reason="we no longer faltten groups so not sure if we need to test this flatten feature")
-def test_get_unique_groups():
-    """Test lat_var_names return the expected unique groups"""
-
-    input_lats_s6 = ['__data_01__latitude', '__data_20__c__latitude', '__data_20__ku__latitude']
-
-    unique_groups_s6, diff_counts_s6 = subset.get_base_group_names(input_lats_s6)
-
-    expected_groups_s6 = ['__data_01', '__data_20__c', '__data_20__ku']
-    expected_diff_counts_s6 = [0, 1, 1]
-
-    assert expected_groups_s6 == unique_groups_s6
-    assert expected_diff_counts_s6 == diff_counts_s6
-
-    input_lats_mls = ['__HDF__swaths__o3__geo__latitude',
-                        '__HDF__swaths__o3 columns__geo__latitude',
-                        '__HDF__swaths__o3-apiori__geo__latitude']
-
-    unique_groups_mls, diff_counts_mls = subset.get_base_group_names(input_lats_mls)
-
-    expected_groups_mls = ['__HDF__swaths__o3',
-                            '__HDF__swaths__o3 columns',
-                            '__HDF__swaths__o3-apiori']
-    expected_diff_counts_mls = [2, 2, 2]
-
-    assert expected_groups_mls == unique_groups_mls
-    assert expected_diff_counts_mls == diff_counts_mls
-
-    input_lats_single = ['__latitude', '__geolocation__latitude']
-
-    unique_groups_single, diff_counts_single = subset.get_base_group_names(input_lats_single)
-
-    expected_groups_single = ['__', '__geolocation']
-    expected_diff_counts_single = [-1, 0]
-    
-    assert expected_groups_single == unique_groups_single
-    assert expected_diff_counts_single == diff_counts_single
-
-@pytest.fixture(scope="session")
-def fake_gpm_file(tmp_path_factory):
-    """
-    Create fake gpm data at run time which mirrors structure and behavior of data pulled from CMR
-
-    Will create data which mirrors how libnetcdf resolves dimension
-    names with when reading data from CMR. Dimension names are given
-    phony between groups even if dimension is shared. E.g. all data
-    variables will share the same dimensions "nTimes,nXtrack", but
-    will be given phony_dim names as seen below
-
-    Group:
-        /HDFEOS/SWATHS/GPM_DPR/Data Fields
-            Dimensions:                (phony_dim_0: 10, phony_dim_1: 5)
-            Dimensions without coordinates: phony_dim_0, phony_dim_1
-            Data variables:
-                precipRateNearSurface  (phony_dim_0, phony_dim_1)
-        Group: /HDFEOS/SWATHS/GPM_DPR/Geolocation Fields
-            Dimensions:    (phony_dim_2: 10, phony_dim_3: 5)
-            Dimensions without coordinates: phony_dim_2, phony_dim_3
-            Data variables:
-                Latitude   (phony_dim_2, phony_dim_3)
-                Longitude  (phony_dim_2, phony_dim_3)
 
 
-    """
-    filepath = tmp_path_factory.mktemp("data") / "fake_gpm.HDF5"
+def test_subset_gpm_compute_new_var_data(fake_gpm_2adprenv_07_file: Path, tmp_path: Path):
 
-    with h5py.File(filepath, "w") as f:
-
-        # mirror the real gpm HDFEOS group structure
-        data_fields = f.require_group("HDFEOS/SWATHS/GPM_DPR/Data Fields")
-        geo_fields  = f.require_group("HDFEOS/SWATHS/GPM_DPR/Geolocation Fields")
-        scan_time   = f.require_group("HDFEOS/SWATHS/GPM_DPR/ScanTime")
-
-        info        = f.require_group("HDFEOS INFORMATION")
-
-        n_times  = 10
-        n_xtrack = 5
-
-        # write data fields variable with dimensionnames attr as gpm does
-        precip = data_fields.create_dataset(
-            "precipRateNearSurface",
-            data=np.random.rand(n_times, n_xtrack).astype(np.float32),
-        )
-        precip.attrs["DimensionNames"] = "nTimes,nXtrack"
-        precip.attrs["Units"]          = "mm/hr"
-        precip.attrs["MissingValue"]   = -9999.9
-
-        # geolocation fields variables
-        lat = geo_fields.create_dataset(
-            "Latitude",
-            data=np.linspace(-90, 90, n_times * n_xtrack)
-                   .reshape(n_times, n_xtrack)
-                   .astype(np.float32),
-        )
-        lat.attrs["DimensionNames"] = "nTimes,nXtrack"
-        lat.attrs["Units"]          = "degrees_north"
-
-        lon = geo_fields.create_dataset(
-            "Longitude",
-            data=np.linspace(-180, 180, n_times * n_xtrack)
-                   .reshape(n_times, n_xtrack)
-                   .astype(np.float32),
-        )
-        lon.attrs["DimensionNames"] = "nTimes,nXtrack"
-        lon.attrs["Units"]          = "degrees_east"
-
-        # scantime variables
-        year_data   = np.full(n_times, 2021,    dtype=np.float32)
-        month_data  = np.full(n_times, 5,       dtype=np.float32)
-        day_data    = np.full(n_times, 30,      dtype=np.float32)
-        hour_data   = np.full(n_times, 9,       dtype=np.float32)
-        minute_data = np.full(n_times, 57,      dtype=np.float32)
-        second_data = np.full(n_times, 0.0,     dtype=np.float32)
-        milli_data  = np.full(n_times, 0.0,     dtype=np.float32)
-        doy_data    = np.full(n_times, 150,     dtype=np.float32)
-        sod_data    = np.full(n_times, 35820.0, dtype=np.float64)
-
-        for name, data in [
-            ("Year",        year_data),
-            ("Month",       month_data),
-            ("DayOfMonth",  day_data),
-            ("Hour",        hour_data),
-            ("Minute",      minute_data),
-            ("Second",      second_data),
-            ("MilliSecond", milli_data),
-            ("DayOfYear",   doy_data),
-            ("SecondOfDay", sod_data),
-        ]:
-            ds = scan_time.create_dataset(name, data=data)
-            ds.attrs["DimensionNames"] = "nTimes"
-
-        # structmetadata
-        odl = (
-            "GROUP=SwathStructure\n"
-            "GROUP=SWATH_1\n"
-            "SwathName=\"GPM_DPR\"\n"
-            "GROUP=Dimension\n"
-            "OBJECT=Dimension_1\n"
-            "DimensionName=\"nTimes\"\n"
-            f"Size={n_times}\n"
-            "END_OBJECT=Dimension_1\n"
-            "OBJECT=Dimension_2\n"
-            "DimensionName=\"nXtrack\"\n"
-            f"Size={n_xtrack}\n"
-            "END_OBJECT=Dimension_2\n"
-            "END_GROUP=Dimension\n"
-            "END_GROUP=SWATH_1\n"
-            "END_GROUP=SwathStructure\n"
-        )
-        info.create_dataset("StructMetadata.0", data=odl)
-
-    return filepath
-
-
-def test_subset_gpm_compute_new_var_data(fake_gpm_file, data_dir, subset_output_dir, request):
-    """Test GPM files that have scantime variable to compute the time for seconds
-    since 1980-01-06"""
-
-    with xr.open_datatree(fake_gpm_file) as dtree:
-        for node in dtree.subtree:
-            ds = node.ds
-            if isinstance(ds, xr.Dataset):
-                dims = ds.dims.keys()
-
-                # ensure that test data is being read by netcdf backend with phony dim names
-                # like we expect from GPM data from CMR
-                for dim in dims:
-                    assert 'phony' in dim, f"Unexpected non 'phony' dimension found: {dim}"
-
+    with xr.open_datatree(fake_gpm_2adprenv_07_file, engine="netcdf4") as dtree:
+        assert_phony_dims(dtree, present = True)
 
     # Correct bbox with (min_lon, min_lat) and (max_lon, max_lat)
     bbox = np.array(((-180, 90), (-90, 90)))
 
-    output_file = f"gpm_test_subset.HDF5"  # Keep the extension
-    subset_output_file = join(subset_output_dir, output_file)
+    subset_output_file = tmp_path / "gpm_test_subset.HDF5"
     subset.subset(
-        file_to_subset=fake_gpm_file,
+        file_to_subset=fake_gpm_2adprenv_07_file,
         bbox=bbox,
         output_file=subset_output_file
     )
@@ -1793,247 +1614,26 @@ def test_subset_gpm_compute_new_var_data(fake_gpm_file, data_dir, subset_output_
     dtree = xr.open_datatree(subset_output_file)
 
     # Check the dimensions
-    for node in dtree.subtree:
-        ds = node.ds  # Get the dataset at this node
-        if isinstance(ds, xr.Dataset):
-            dims = ds.dims.keys()
-
-            # Ensure no 'phony' dimensions
-            for dim in dims:
-                assert 'phony' not in dim, f"Unexpected 'phony' dimension found: {dim}"
+    assert_phony_dims(dtree, present=False)
 
     for group in dtree.groups:
         if "ScanTime" in group:
             assert int(dtree[group].ds.variables["timeMidScan"][:][0]) == 1306403820
 
 
-@pytest.fixture(scope="session")
-def fake_gpm_mhs_file(tmp_path_factory):
-    """
-    Creates fake data following structure of GPM_2AGPROFMETOPBMHS_08
-    which has a netcdf4 format as opposed to HDF5EOS like previous
-    iterations of GPM products.
-
-    Specifically based off 2A.METOPB.MHS.GPROFNNv1.20260228-S233156-E011316.069788.V08A.nc
-    """
-    filepath = tmp_path_factory.mktemp("data") / "fake_mhs.nc"
-
-    nscan = 10
-    npixel = 5
-    nlyrs = 5
-
-    # root + global attributes
-    root_dict = {
-        "attrs": {
-            "FileHeader": "DOI=10.5067/GPM/MHS/METOPB/GPROF/2A/08;\nAlgorithmID=2AGPROFMHS;",
-            "InputRecord": "InputFileNames=1C.METOPB.MHS.XCAL2016.nc;",
-            "NavigationRecord": "LongitudeOnEquator=-44.554371;",
-            "FileInfo": "DataFormatVersion=8b;",
-            "GprofInfo": "Satellite=METOPB;Sensor=MHS;",
-        },
-        "dims": {},
-        "coords": {},
-        "data_vars": {},
-    }
-    xr.Dataset.from_dict(root_dict).to_netcdf(filepath, mode="w", engine="netcdf4")
-
-    # GprofDHeadr group containing the layer heights
-    headr_dict = {
-        "attrs": {},
-        "dims": {"nlyrs": nlyrs},
-        "coords": {},
-        "data_vars": {
-            "hgtTopLayer": {
-                "dims": ("nlyrs",),
-                "data": np.arange(nlyrs, dtype=np.float32),
-                "attrs": {"DimensionNames": "nlyrs", "Units": "km"},
-            }
-        },
-    }
-    xr.Dataset.from_dict(headr_dict).to_netcdf(
-        filepath, mode="a", group="GprofDHeadr", engine="netcdf4"
-    )
-
-    # primary swath variables (but only a few)
-    s1_dict = {
-        "attrs": {"SwathHeader": "NumberScansInSet=1;\nNumberPixels=90;"},
-        "dims": {"nscan": nscan, "npixel": npixel, "nlyrs": nlyrs},
-        "coords": {},
-        "data_vars": {
-            "Latitude": {
-                "dims": ("nscan", "npixel"),
-                "data": np.linspace(-90, 90, nscan * npixel)
-                .reshape(nscan, npixel)
-                .astype(np.float32),
-                "attrs": {"DimensionNames": "nscan,npixel", "Units": "degrees"},
-            },
-            "Longitude": {
-                "dims": ("nscan", "npixel"),
-                "data": np.linspace(-180, 180, nscan * npixel)
-                .reshape(nscan, npixel)
-                .astype(np.float32),
-                "attrs": {"DimensionNames": "nscan,npixel", "Units": "degrees"},
-            },
-            "surfacePrecipitation": {
-                "dims": ("nscan", "npixel"),
-                "data": np.linspace(0, 50, nscan * npixel)
-                .reshape(nscan, npixel)
-                .astype(np.float32),
-                "attrs": {"DimensionNames": "nscan,npixel", "Units": "mm/hr"},
-            },
-            "sunGlintAngle": {
-                "dims": ("nscan", "npixel"),
-                "data": np.linspace(0, 180, nscan * npixel)
-                .reshape(nscan, npixel)
-                .astype(np.float32),
-                "attrs": {"DimensionNames": "nscan,npixel", "Units": "degrees"},
-            },
-            "rainWaterContent": {
-                "dims": ("nscan", "npixel", "nlyrs"),
-                "data": np.linspace(0, 10, nscan * npixel * nlyrs)
-                .reshape(nscan, npixel, nlyrs)
-                .astype(np.float32),
-                "attrs": {"DimensionNames": "nscan,npixel,nlyrs", "Units": "g/m3"},
-            },
-        },
-    }
-    xr.Dataset.from_dict(s1_dict).to_netcdf(
-        filepath, mode="a", group="S1", engine="netcdf4"
-    )
-
-    # scantime subgroup is nested under S1 containing temporal variables
-    scantime_dict = {
-        "attrs": {},
-        "dims": {"nscan": nscan},
-        "coords": {},
-        "data_vars": {
-            "Year": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 2026, dtype=np.int16),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "years",
-                    "_FillValue": -9999,
-                    "CodeMissingValue": "-9999",
-                },
-            },
-            "Month": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 2, dtype=np.int8),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "months",
-                    "_FillValue": -99,
-                    "CodeMissingValue": "-99",
-                },
-            },
-            "DayOfMonth": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 28, dtype=np.int8),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "days",
-                    "_FillValue": -99,
-                    "CodeMissingValue": "-99",
-                },
-            },
-            "Hour": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 23, dtype=np.int8),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "hours",
-                    "_FillValue": -99,
-                    "CodeMissingValue": "-99",
-                },
-            },
-            "Minute": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 31, dtype=np.int8),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "minutes",
-                    "_FillValue": -99,
-                    "CodeMissingValue": "-99",
-                },
-            },
-            "Second": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 56, dtype=np.int8),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "s",
-                    "_FillValue": -99,
-                    "CodeMissingValue": "-99",
-                },
-            },
-            "MilliSecond": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 0, dtype=np.int16),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "ms",
-                    "_FillValue": -9999,
-                    "CodeMissingValue": "-9999",
-                },
-            },
-            "DayOfYear": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 59, dtype=np.int16),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "days",
-                    "_FillValue": -9999,
-                    "CodeMissingValue": "-9999",
-                },
-            },
-            "SecondOfDay": {
-                "dims": ("nscan",),
-                "data": np.linspace(84716.0, 84726.0, nscan).astype(np.float64),
-                "attrs": {
-                    "DimensionNames": "nscan",
-                    "Units": "s",
-                    "_FillValue": -9999.9,
-                    "CodeMissingValue": "-9999.9",
-                },
-            },
-        },
-    }
-    xr.Dataset.from_dict(scantime_dict).to_netcdf(
-        filepath, mode="a", group="S1/ScanTime", engine="netcdf4"
-    )
-
-    # SCstatus subgroup nested under S1
-    scstatus_dict = {
-        "attrs": {},
-        "dims": {"nscan": nscan},
-        "coords": {},
-        "data_vars": {
-            "SCaltitude": {
-                "dims": ("nscan",),
-                "data": np.full(nscan, 400.0, dtype=np.float32),
-                "attrs": {"DimensionNames": "nscan", "Units": "km"},
-            }
-        },
-    }
-    xr.Dataset.from_dict(scstatus_dict).to_netcdf(
-        filepath, mode="a", group="S1/SCstatus", engine="netcdf4"
-    )
-
-    return filepath
-
-
-def test_subset_gpm_mhs_compute_new_var_data(fake_gpm_mhs_file, subset_output_dir):
+def test_subset_gpm_mhs_compute_new_var_data(
+    fake_gpm_2agprofmetopbmhs_08_file: Path, tmp_path: Path
+):
     """
     Tests that a GPM v08 file with NetCDF4 format can run through subset and produce correct variables
     """
 
-    subset_output_file = Path(subset_output_dir) / "mhs_test_subset.nc"
+    subset_output_file = tmp_path / "mhs_test_subset.nc"
 
     # perform the subsetting operation on the fake data, make sure to
     # keep created timeMidScan var created by l2ss to compare
     subset.subset(
-        file_to_subset=fake_gpm_mhs_file,
+        file_to_subset=fake_gpm_2agprofmetopbmhs_08_file,
         bbox=np.array(((-90.1, 90.1), (-45.1, 45.1))),
         variables=[
             "S1/surfacePrecipitation",
@@ -2053,53 +1653,187 @@ def test_subset_gpm_mhs_compute_new_var_data(fake_gpm_mhs_file, subset_output_di
     assert "timeMidScan" in dtree["S1/ScanTime"].variables
 
     # are the requested variables dims the correct size?
-    assert dtree["S1/Latitude"].shape == (6, 5)
-    assert dtree["S1/Longitude"].shape == (6, 5)
-    assert dtree["S1/surfacePrecipitation"].shape == (6, 5)
+    assert dtree["S1/Latitude"].shape == (6, 6)
+    assert dtree["S1/Longitude"].shape == (6, 6)
+    assert dtree["S1/surfacePrecipitation"].shape == (6, 6)
 
     # timeMidScan created, and correct?
     assert int(dtree["S1/ScanTime"].variables["timeMidScan"][0]) == 1456356716
 
 
+def test_omi_novars_subset(fake_omi_bro_file: Path, tmp_path: Path):
+
+    expected_data_vars = frozenset(
+        {
+            "AMFCloudFraction",
+            "AMFCloudPressure",
+            "AdjustedSceneAlbedo",
+            "AirMassFactor",
+            "AirMassFactorDiagnosticFlag",
+            "AirMassFactorGeometric",
+            "AverageColumnAmount",
+            "AverageColumnUncertainty",
+            "AverageFittingRMS",
+            "ColumnAmount",
+            "ColumnAmountDestriped",
+            "ColumnUncertainty",
+            "FitConvergenceFlag",
+            "FittingRMS",
+            "MainDataQualityFlag",
+            "MaximumColumnAmount",
+            "PixelArea",
+            "PixelCornerLatitudes",
+            "PixelCornerLongitudes",
+            "RadianceReferenceColumnAmount",
+            "RadianceReferenceColumnUncertainty",
+            "RadianceReferenceColumnXTRFit",
+            "RadianceReferenceConvergenceFlag",
+            "RadianceReferenceFittingRMS",
+            "RadianceReferenceLatitudeRange",
+            "RadianceWavCalConvergenceFlag",
+            "RadianceWavCalLatitudeRange",
+            "SlantColumnAmount",
+            "SlantColumnAmountDestriped",
+            "SlantColumnUncertainty",
+            "SlantFitConvergenceFlag",
+            "SlantFittingRMS",
+            "SolarWavCalConvergenceFlag",
+        }
+    )
+
+    expected_geo_vars = frozenset(
+        {
+            "Latitude",
+            "Longitude",
+            "SolarAzimuthAngle",
+            "SolarZenithAngle",
+            "SpacecraftAltitude",
+            "TerrainHeight",
+            "Time",
+            "TimeUTC",
+            "ViewingAzimuthAngle",
+            "ViewingZenithAngle",
+            "XTrackQualityFlags",
+            "XTrackQualityFlagsExpanded",
+        }
+    )
+
+    with xr.open_datatree(fake_omi_bro_file, engine="netcdf4") as dtree:
+        assert_phony_dims(dtree, present=True)
+
+    bbox = np.array(((-90.1, 90.1), (-45.1, 45.1)))
+
+    subset_output_file = tmp_path / "omibro_test_subset.hdf5"
+    subset.subset(
+        file_to_subset=fake_omi_bro_file,
+        bbox=bbox,
+        output_file=subset_output_file,
+    )
+
+    dtree = xr.open_datatree(subset_output_file)
+
+    assert_phony_dims(dtree, present=False)
+
+    data_ds = dtree["HDFEOS/SWATHS/OMI Total Column Amount BrO/Data Fields"].ds
+    geo_ds = dtree["HDFEOS/SWATHS/OMI Total Column Amount BrO/Geolocation Fields"].ds
+
+    missing_data_vars = expected_data_vars - set(data_ds.data_vars)
+    missing_geo_vars = expected_geo_vars - set(geo_ds.data_vars)
+
+    assert not missing_data_vars, (
+        f"missing data field variables after subset: {sorted(missing_data_vars)}"
+    )
+    assert not missing_geo_vars, (
+        f"missing geolocation field variables after subset: {sorted(missing_geo_vars)}"
+    )
+
+    assert data_ds["AMFCloudFraction"].dims == ("nTimes", "nXtrack")
+    assert geo_ds["Latitude"].dims == ("nTimes", "nXtrack")
+    assert geo_ds["Longitude"].dims == ("nTimes", "nXtrack")
+    assert geo_ds["Time"].dims == ("nTimes",)
+
+
+
+def test_subset_omipixcor_multi_swath(fake_omi_pixcor_file: Path, tmp_path: Path):
+
+    with xr.open_datatree(fake_omi_pixcor_file, engine="netcdf4") as dtree:
+        assert_phony_dims(dtree, present=True)
+
+    bbox = np.array(((-3, 5), (-45.1, 45.1)))
+
+    subset_output_file = tmp_path / "omipixcor_test_subset.he5"
+    subset.subset(
+        file_to_subset=fake_omi_pixcor_file,
+        bbox=bbox,
+        output_file=subset_output_file,
+    )
+
+    dtree = xr.open_datatree(subset_output_file)
+
+    assert_phony_dims(dtree, present=False)
+
+    # UV-1 and UV-2 share dim names but must retain their distinct sizes
+    uv1_var = dtree["/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-1/Data Fields"].ds[
+        "FoV75CornerLatitude"
+    ]
+    uv2_var = dtree["/HDFEOS/SWATHS/OMI Ground Pixel Corners UV-2/Data Fields"].ds[
+        "FoV75CornerLatitude"
+    ]
+    uv1_shape = uv1_var.shape
+    uv2_shape = uv2_var.shape
+
+    assert uv1_shape[-1] != uv2_shape[-1], (
+        "UV-1 and UV-2 nXtrack sizes should differ but both resolved to the same size"
+    )
+
+    # they retained differences, but are the requested variables dims the correct size?
+    assert uv1_shape == (2, 2, 3)
+    assert uv2_shape == (2, 2, 5)
+
+
 def test_temporal_subset_tempo(data_dir, subset_output_dir, request):
 
     tempo_file = "TEMPO_HCHO_L2_V01_20240110T170237Z_S005G08.nc"
-    output_file = f"tempo_test_{tempo_file}" 
+    output_file = f"tempo_test_{tempo_file}"
     subset_output_file = join(subset_output_dir, output_file)
     bbox = np.array(((-180, 180), (-90, 90)))
 
-    min_time = '2024-01-10T17:02:55.500000Z'
-    max_time = '2024-01-10T17:03:31.900000Z'
+    min_time = "2024-01-10T17:02:55.500000Z"
+    max_time = "2024-01-10T17:03:31.900000Z"
 
     subset.subset(
         file_to_subset=join(data_dir, tempo_file),
-        bbox = bbox,
-        min_time = min_time,
-        max_time = max_time,
-        output_file=subset_output_file
-    )    
+        bbox=bbox,
+        min_time=min_time,
+        max_time=max_time,
+        output_file=subset_output_file,
+    )
 
     dtree = xr.open_datatree(subset_output_file, decode_times=False)
 
-    assert dtree['/geolocation/time'].attrs['calendar'] == "gregorian"
-    assert dtree['/geolocation/time'].attrs['units'] == "seconds since 1980-01-06T00:00:00Z"
-    assert dtree['/geolocation/time'].dtype == np.float64
+    assert dtree["/geolocation/time"].attrs["calendar"] == "gregorian"
+    assert (
+        dtree["/geolocation/time"].attrs["units"]
+        == "seconds since 1980-01-06T00:00:00Z"
+    )
+    assert dtree["/geolocation/time"].dtype == np.float64
 
-    assert dtree['/geolocation/time'].values[0] == 1388941375.536457
-    assert dtree['/geolocation/time'].values[1] ==   1388941378.569526
-    assert dtree['/geolocation/time'].values[2] ==  1388941381.602584
-    assert dtree['/geolocation/time'].values[3] ==  1388941384.635648
-    assert dtree['/geolocation/time'].values[4] ==  1388941387.6687133
-    assert dtree['/geolocation/time'].values[5] ==  1388941390.701774
-    assert dtree['/geolocation/time'].values[6] ==  1388941393.734837
-    assert dtree['/geolocation/time'].values[7] ==  1388941396.7679
-    assert dtree['/geolocation/time'].values[8] ==  1388941399.800967
-    assert dtree['/geolocation/time'].values[9] ==  1388941402.834026
-    assert dtree['/geolocation/time'].values[10] ==  1388941405.867095
-    assert dtree['/geolocation/time'].values[11] == 1388941408.900158
+    assert dtree["/geolocation/time"].values[0] == 1388941375.536457
+    assert dtree["/geolocation/time"].values[1] == 1388941378.569526
+    assert dtree["/geolocation/time"].values[2] == 1388941381.602584
+    assert dtree["/geolocation/time"].values[3] == 1388941384.635648
+    assert dtree["/geolocation/time"].values[4] == 1388941387.6687133
+    assert dtree["/geolocation/time"].values[5] == 1388941390.701774
+    assert dtree["/geolocation/time"].values[6] == 1388941393.734837
+    assert dtree["/geolocation/time"].values[7] == 1388941396.7679
+    assert dtree["/geolocation/time"].values[8] == 1388941399.800967
+    assert dtree["/geolocation/time"].values[9] == 1388941402.834026
+    assert dtree["/geolocation/time"].values[10] == 1388941405.867095
+    assert dtree["/geolocation/time"].values[11] == 1388941408.900158
+
 
 # --- Constants for Expected Values ---
-EXPECTED_1 = 'bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True'
+EXPECTED_1 = "bbox=[[-180.0, 180.0], [-90.0, 90.0]] cut=True"
 EXPECTED_2 = "{'bbox': [[-180.0, 180.0], [-90.0, 90.0]], 'cut': True, 'pixel_subset': False, 'variables': []}"
 EXPECTED_PARAMETERS = {
     "bbox": [[-180.0, 180.0], [-90.0, 90.0]],

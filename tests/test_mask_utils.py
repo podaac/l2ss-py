@@ -1,8 +1,8 @@
 # test_mask_utils.py
-import pytest
-import xarray as xr
 import numpy as np
-from podaac.subsetter.utils.mask_utils import align_time_to_lon_dim, align_dims_cond_only
+import xarray as xr
+
+from podaac.subsetter.utils.mask_utils import align_dims_cond_only, align_time_to_lon_dim
 
 
 class TestAlignTimeToLonDim:

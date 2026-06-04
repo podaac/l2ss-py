@@ -91,7 +91,8 @@ def _mapping_from_dimension_names(dt: DataTree) -> dict[str, str]:
                     # should be called then keep the first assignment and warn.
                     warnings.warn(
                         f"Conflicting DimensionNames for {phony!r}: "
-                        f"{existing!r} vs {real!r}.  Keeping {existing!r}."
+                        f"{existing!r} vs {real!r}.  Keeping {existing!r}.",
+                        stacklevel=2,
                     )
                 else:
                     mapping[phony] = real
@@ -161,17 +162,13 @@ def _parse_odl_field_dimlists(odl_text: str) -> dict[str, dict[str, list[str]]]:
 
         # GeoField and DataField blocks both use the same OBJECT structure
         for field_block in re.split(r"END_OBJECT\s*=\s*(?:Geo|Data)Field_\d+", block):
-            field_name_match = re.search(
-                r'(?:GeoFieldName|DataFieldName)\s*=\s*"([^"]+)"', field_block
-            )
+            field_name_match = re.search(r'(?:GeoFieldName|DataFieldName)\s*=\s*"([^"]+)"', field_block)
             dimlist_match = re.search(r"DimList\s*=\s*\(([^)]+)\)", field_block)
             if not field_name_match or not dimlist_match:
                 continue
 
             field_name = field_name_match.group(1).strip()
-            dim_names = [
-                d.strip().strip('"') for d in dimlist_match.group(1).split(",")
-            ]
+            dim_names = [d.strip().strip('"') for d in dimlist_match.group(1).split(",")]
             field_dimlists[field_name] = dim_names
 
         if field_dimlists:
@@ -254,7 +251,8 @@ def _apply_from_field_dimlists(
                         warnings.warn(
                             f"Conflicting ODL DimList for {current_dim!r} in "
                             f"{node.path!r}: {existing!r} vs {real_name!r}. "
-                            f"Keeping {existing!r}."
+                            f"Keeping {existing!r}.",
+                            stacklevel=2,
                         )
                     else:
                         local_mapping[current_dim] = real_name

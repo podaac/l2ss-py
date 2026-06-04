@@ -15,6 +15,7 @@ Thank you for contributing to L2SS-Py!
     - [Reviewing](CONTRIBUTING.md#reviewing)
 - [Style Guides](CONTRIBUTING.md#style-guides)
     - [Python Style Guide](CONTRIBUTING.md#python-style-guide)
+    - [Pre-commit](CONTRIBUTING.md#pre-commit)
     - [Documentation Style Guide](CONTRIBUTING.md#documentation-1)
 
 ## How to Get Help
@@ -184,14 +185,43 @@ features or old documentation updated for any changed features
 
 ### Python Style Guide
 
-L2SS-Py follows PEP8 as much as possible. Reference the [pylint](.pylintrc) and 
-[flake8](.flake8) configuration files for specific expectations. The CI/CD pipeline 
-will fail unless there are 0 flake8 warnings and anything other than a 
-10/10 pylint score.
+L2SS-Py follows PEP 8 as much as possible. The project currently uses
+[Black](https://black.readthedocs.io/),
+[Ruff](https://docs.astral.sh/ruff/),
+[Flake8](https://flake8.pycqa.org/), and
+[Pylint](https://pylint.pycqa.org/).
 
-Please keep any Harmony or CMR-specific code out of the actual subset 
-code. The subsetter should be able to run locally without any reliance 
+Before opening a pull request, run the project formatting and lint checks
+locally so the code matches the repository conventions. The pre-commit hooks
+described below are the preferred way to do this.
+
+Please keep any Harmony or CMR-specific code out of the actual subset
+code. The subsetter should be able to run locally without any reliance
 on outside services.
+
+### Pre-commit
+
+This repository uses [pre-commit](https://pre-commit.com/) to run the local
+code quality checks defined in [`.pre-commit-config.yaml`](.pre-commit-config.yaml).
+The configured hooks currently run Ruff and Black on Python files under
+`podaac/`. Flake8 and Pylint are also part of the repository configuration via
+their respective config files.
+
+Recommended setup:
+
+```bash
+pre-commit install
+pre-commit run --all-files
+```
+
+If you only want to run the individual tools, you can also use:
+
+```bash
+ruff check --fix podaac/
+black podaac/
+flake8 podaac/
+pylint podaac/
+```
 
 ### Documentation
 
