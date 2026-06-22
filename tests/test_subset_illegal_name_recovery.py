@@ -45,7 +45,7 @@ def _patch_subset_dependencies(monkeypatch, subsetted_dataset, spatial_bounds):
         subset.coordinate_utils, "get_coordinate_variable_names", lambda **_kwargs: (["/lat"], ["/lon"], [])
     )
     monkeypatch.setattr(subset.file_utils, "chunk_datatree", lambda dt: dt)
-    monkeypatch.setattr(subset.variables_utils, "get_all_variable_names_from_dtree", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(subset.variables_utils, "get_vars_with_paths", lambda *_args, **_kwargs: [])
     monkeypatch.setattr(
         subset.variables_utils, "normalize_candidate_paths_against_dtree", lambda paths, *_args, **_kwargs: paths
     )
