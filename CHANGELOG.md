@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- [issue/429] (https://github.com/podaac/l2ss-py/issues/429) Change extension output to .nc
 ### Deprecated
 ### Removed
 - Removed poetry as a dependency (should have poetry externally already)
