@@ -1,6 +1,6 @@
 """script to help with subsetting xarray datatree objects"""
 
-# pylint: disable=inconsistent-return-statements
+# pylint: disable=inconsistent-return-statements, too-many-return-statements
 import logging
 import re
 from typing import Literal
@@ -330,7 +330,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             # Cast all variables to their original type
             for variable_name, variable in new_dataset.data_vars.items():
                 original_type = indexed_ds[variable_name].dtype
-                new_type = variable.dtype
                 indexed_var = indexed_ds[variable_name]
 
                 if (
@@ -360,24 +359,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                     new_dataset[variable_name].attrs = indexed_var.attrs
                     variable.attrs = indexed_var.attrs
                 # Check if variable has no _FillValue. If so, use original data
-                if "_FillValue" not in variable.attrs or len(indexed_var.shape) == 0:
-                    pass
-                    #if original_type != new_type:
-                    #    new_dataset[variable_name] = xr.apply_ufunc(
-                    #        cast_type, variable, str(original_type), dask="allowed", keep_attrs=True
-                    #    )
-
-                    # Replace nans with values from original dataset. If the
-                    # variable has more than one dimension, copy the entire
-                    # variable over, otherwise use a NaN mask to copy over the
-                    # relevant values.
-                    #new_dataset[variable_name] = indexed_var
-                    #new_dataset[variable_name].attrs = indexed_var.attrs
-                    #variable.attrs = indexed_var.attrs
-                    #new_dataset[variable_name].encoding["_FillValue"] = None
-                    #variable.encoding["_FillValue"] = None
-
-                else:
+                if "_FillValue" in variable.attrs and len(indexed_var.shape) > 0:
                     fill_value = new_dataset[variable_name].attrs.get("_FillValue")
 
                     if np.issubdtype(original_type, np.dtype(np.datetime64)):
@@ -385,13 +367,16 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                     elif np.issubdtype(original_type, np.dtype(np.timedelta64)):
                         fill_value = np.timedelta64("nat")
 
+                    new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
+
                     if original_type != new_dataset[variable_name].dtype:
-                        new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
                         new_dataset[variable_name] = xr.apply_ufunc(
-                            cast_type, new_dataset[variable_name], str(original_type), dask="allowed", keep_attrs=True
+                            cast_type,
+                            new_dataset[variable_name],
+                            str(original_type),
+                            dask="allowed",
+                            keep_attrs=True,
                         )
-                    else:
-                        new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
             processed_ds = new_dataset
             dc.sync_dims_inplace(dataset, processed_ds)
         else:
