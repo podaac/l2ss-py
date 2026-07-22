@@ -198,6 +198,7 @@ def find_fully_empty_paths(dt: xr.DataTree):
     return results
 
 
+
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
     Return a DataTree which meets the given condition, processing all nodes in the tree.
@@ -221,7 +222,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     """
 
     def process_node(
-        node: DataTree, path: str, empty_paths
+        node: DataTree, path: str, empty_paths, parent_processed_ds=None
     ) -> tuple[xr.Dataset, dict[str, DataTree]]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
@@ -232,6 +233,10 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             The node to process
         path : str
             The current path of the node
+        parent_processed_ds : xr.Dataset, optional
+            The parent's processed (subsetted) dataset, used to align children
+            that share dimensions with their parent but have no subset condition
+            of their own.
 
         Returns
         -------
@@ -351,6 +356,18 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
         else:
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
+            if parent_processed_ds is not None:
+                sel_kwargs = {}
+                for dim in list(processed_ds.dims):
+                    if dim in parent_processed_ds.dims and dim in processed_ds.coords and dim in parent_processed_ds.coords:
+                        parent_values = parent_processed_ds[dim].values
+                        child_values = processed_ds[dim].values
+                        if len(parent_values) != len(child_values) or not np.array_equal(parent_values, child_values):
+                            common = np.intersect1d(parent_values, child_values)
+                            if len(common) > 0:
+                                sel_kwargs[dim] = common
+                if sel_kwargs:
+                    processed_ds = processed_ds.sel(**sel_kwargs)
 
         processed_children = {}
         for child_name, child_node in node.children.items():
@@ -359,10 +376,12 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             # If the child is in empty_paths, apply indexers if present to align dimensions recursively
             if current_path in empty_paths:
                 if indexers is not None:
-                    child_node = apply_indexers_to_tree(child_node, indexers)
+                    child_node = apply_indexers_to_tree(child_node, indexers, processed_ds)
                 processed_children[child_name] = child_node
             else:
-                child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
+                child_ds, child_children, child_indexers = process_node(
+                    child_node, current_path, empty_paths, processed_ds
+                )
 
                 # --- Align parent and child datasets before attaching child ---
                 if indexers is None and child_indexers:
@@ -691,7 +710,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
                 if result == "/sample_time":
                     # Check if '/solar_time' exists in the dataset
                     if "/solar_time" in [f"/{v}" for v in ds.variables]:
-                        print("returning solar time")
                         return "/solar_time"
                 return result
     return None
@@ -1038,15 +1056,34 @@ def update_dataset_with_time(
     return ds
 
 
-def apply_indexers_to_tree(node: DataTree, indexers: dict) -> DataTree:
+def apply_indexers_to_tree(node: DataTree, indexers: dict, parent_ds=None) -> DataTree:
     """
     Recursively apply indexers to a DataTree node and all its descendants.
     Returns a new DataTree with the same structure but with all datasets subsetted.
+
+    If parent_ds is provided, shared coordinate dimensions are aligned by value
+    (using .sel) rather than by position, to handle cases where the child has a
+    different range of coordinate values than the parent.
     """
     ds = node.ds
     if ds is not None:
-        ds = ds.isel(**indexers, missing_dims="ignore")
+        if parent_ds is not None:
+            # Align shared coordinate dimensions by value
+            sel_kwargs = {}
+            for dim in list(ds.dims):
+                if dim in parent_ds.dims and dim in ds.coords and dim in parent_ds.coords:
+                    parent_values = parent_ds[dim].values
+                    child_values = ds[dim].values
+                    common = np.intersect1d(parent_values, child_values)
+                    if len(common) < len(child_values):
+                        sel_kwargs[dim] = common
+            if sel_kwargs:
+                ds = ds.sel(**sel_kwargs)
+            else:
+                ds = ds.isel(**indexers, missing_dims="ignore")
+        else:
+            ds = ds.isel(**indexers, missing_dims="ignore")
     new_node = DataTree(name=node.name, dataset=ds)
     for child_name, child_node in node.children.items():
-        new_node[child_name] = apply_indexers_to_tree(child_node, indexers)
+        new_node[child_name] = apply_indexers_to_tree(child_node, indexers, parent_ds)
     return new_node
