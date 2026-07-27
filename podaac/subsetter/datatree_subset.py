@@ -1,6 +1,6 @@
 """script to help with subsetting xarray datatree objects"""
 
-# pylint: disable=inconsistent-return-statements
+# pylint: disable=inconsistent-return-statements, too-many-nested-blocks
 import logging
 import re
 from typing import Literal
@@ -196,7 +196,6 @@ def find_fully_empty_paths(dt: xr.DataTree):
         for child in dt.children.values():
             results.extend(find_fully_empty_paths(child))
     return results
-
 
 
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
