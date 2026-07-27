@@ -1,109 +1,173 @@
-import operator
-import shutil
-import tempfile
-import os
-from os import listdir
-from os.path import dirname, isfile, join, realpath
 from pathlib import Path
-from unittest import TestCase
-import h5py
+from typing import NamedTuple
 
-import netCDF4 as nc
 import numpy as np
 import pytest
 import xarray as xr
-
 from podaac.subsetter import subset
-from podaac.subsetter.utils.coordinate_utils import get_coordinate_variable_names
-from podaac.subsetter.utils.variables_utils import get_all_variable_names_from_dtree
-
-from conftest import data_files 
-
-import xarray as xr
+from podaac.subsetter.utils.variables_utils import get_vars_with_paths
 
 
+class VariableTestCase(NamedTuple):
+    input: str
+    want_var: set[str]
+    want_coord: set[str]
 
 
-def get_non_variable_names_from_dtree(dtree: xr.DataTree):
-    """
-    Recursively extract all non-variable names (with full paths) from an xarray DataTree.
-    This includes coordinates, dimensions, and other variables that are not data_vars.
-    
-    Parameters
-    ----------
-    dtree : xr.DataTree
-        The root of the DataTree.
-    Returns
-    -------
-    List[str]
-        A list of non-variable full paths (e.g. '/group1/coord').
-    """
-    non_var_names = []
-    
-    def recurse(node: xr.DataTree):
-        group_path = node.path
-        
-        # Get all variables that are NOT data_vars
-        if node.ds is not None:  # Check if node has a dataset
-            for var_name in node.ds.variables:
-                if var_name not in node.ds.data_vars:
-                    if group_path in ("", "/"):
-                        full_path = f"/{var_name}"
-                    else:
-                        full_path = f"{group_path}/{var_name}"
-                    non_var_names.append(full_path)
-        
-        for child in node.children.values():
-            recurse(child)
-    
-    recurse(dtree)
-    return non_var_names
+_test_table: list[VariableTestCase] = [
+    VariableTestCase(
+        input="MODIS_T-JPL-L2P-v2014.0.nc",
+        want_var={"/sst_dtime"},
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="MODIS_A-JPL-L2P-v2014.0.nc",
+        want_var={"/sea_surface_temperature"},
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="cyg04.ddmi.s20210228-000000-e20210228-235959.l1.power-brcs-cdr.a10.d10.nc",
+        want_var={
+            "/sc_pos_z",
+            "/sc_vel_y",
+            "/sp_vel_z",
+        },
+        want_coord={"/sp_lat", "/sp_lon", "/ddm_timestamp_utc", "/ddm", "/sample"},
+    ),
+    VariableTestCase(
+        input="SWOT_L2_LR_SSH_Expert_368_012_20121111T235910_20121112T005015_DG10_01.nc",
+        want_var={
+            "/mean_sea_surface_dtu",
+            "/latitude_avg_ssh",
+            "/geoid",
+            "/x_factor",
+            "/mean_sea_surface_cnescls_uncert",
+            "/simulated_error_orbital",
+            "/internal_tide_hret",
+        },
+        want_coord={"/latitude", "/longitude", "/time"},
+    ),
+    VariableTestCase(
+        input="20200101000001-JPL-L2P_GHRSST-SSTskin-MODIS_T-N-v02.0-fv01.0.nc",
+        want_var={
+            "/quality_level",
+            "/sst_dtime",
+            "/sea_surface_temperature_4um",
+            "/quality_level_4um",
+            "/l2p_flags",
+            "/sses_standard_deviation_4um",
+        },
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="JA1_GPN_2PeP001_002_20020115_060706_20020115_070316.nc",
+        want_var={
+            "/alt_state_flag_oper",
+            "/qual_inst_corr_1hz_swh_c",
+            "/sea_state_bias_ku",
+            "/range_used_20hz_ku",
+        },
+        want_coord={"/lat", "/lon", "/time", "/meas_ind"},
+    ),
+    VariableTestCase(
+        input="AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc",
+        want_var={
+            "/quality_level",
+            "/sses_standard_deviation",
+            "/diurnal_amplitude",
+            "/wind_speed",
+            "/rain_rate",
+            "/l2p_flags",
+            "/dt_analysis",
+        },
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="Merged_TOPEX_Jason_OSTM_Jason-3_Cycle_002.V4_2.nc",
+        want_var={"/Surface_Type", "/reference_orbit", "/Distance_to_coast", "/index"},
+        want_coord={"/latitude", "/longitude", "/time"},
+    ),
+    VariableTestCase(
+        input="ascat_20150702_084200_metopa_45145_eps_o_250_2300_ovw.l2.nc",
+        want_var={"/wvc_index", "/wind_speed", "/ice_age", "/ice_prob", "/wind_dir"},
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="ascat_20150702_102400_metopa_45146_eps_o_250_2300_ovw.l2.nc",
+        want_var={"/wvc_index", "/wind_speed", "/ice_age", "/ice_prob", "/wind_dir"},
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="20180101005944-REMSS-L2P_GHRSST-SSTsubskin-AMSR2-L2B_rt_r29918-v02.0-fv01.0.nc",
+        want_var={
+            "/quality_level",
+            "/sses_standard_deviation",
+            "/diurnal_amplitude",
+            "/wind_speed",
+            "/rain_rate",
+            "/l2p_flags",
+            "/dt_analysis",
+        },
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="TEMPO_HCHO_L2_V01_20240110T170237Z_S005G08.nc",
+        want_var={
+            "/support_data/amf_cloud_fraction",
+            "/geolocation/longitude_bounds",
+            "/support_data/amf_cloud_pressure",
+            "/geolocation/viewing_azimuth_angle",
+        },
+        want_coord={"/mirror_step", "/xtrack", "/geolocation/latitude", "/geolocation/longitude", "/geolocation/time"},
+    ),
+    VariableTestCase(
+        input="VIIRS_NPP-NAVO-L2P-v3.0.nc",
+        want_var={
+            "/quality_level",
+            "/brightness_temperature_12um",
+            "/sea_surface_temperature",
+            "/sses_bias",
+            "/adi_dtime_from_sst",
+        },
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+    VariableTestCase(
+        input="20190927000500-JPL-L2P_GHRSST-SSTskin-MODIS_A-D-v02.0-fv01.0.nc",
+        want_var={"/quality_level", "/wind_speed", "/sea_surface_temperature", "/sses_bias"},
+        want_coord={"/lat", "/lon", "/time"},
+    ),
+]
 
 
-
-@pytest.mark.parametrize("test_file", data_files())
-def test_specified_variables(test_file, data_dir, subset_output_dir, request):
+@pytest.mark.parametrize("case", _test_table, ids=lambda c: c.input)
+def test_specified_variables(case, data_dir: str, tmp_path: Path):
     """
     Test that the variables which are specified when calling the subset
-    operation are present in the resulting subsetted data file,
-    and that the variables which are specified are not present.
+    operation are present in the resulting subsetted data file plus
+    their required dimension scale/coordinate variables
     """
-    nc_copy_for_expected_results = os.path.join(subset_output_dir, Path(test_file).stem + "_dup.nc")
-    shutil.copyfile(os.path.join(data_dir, test_file), nc_copy_for_expected_results)
 
-    bbox = np.array(((-180, 180), (-90, 90)))
-    output_file = "{}_{}".format(request.node.name, test_file)
-    
-    in_ds_tree = xr.open_datatree(nc_copy_for_expected_results, decode_times=False, decode_coords=False)
-
-    # Coordinate variables are always included in the result
-    lat_var_names, lon_var_names, time_var_names = get_coordinate_variable_names(in_ds_tree)
-
-    coordinate_variables = lat_var_names + lon_var_names + time_var_names
-    all_variables = get_all_variable_names_from_dtree(in_ds_tree)
-    non_coordinate_vars = [
-        var for var in all_variables if var not in coordinate_variables
-    ]
-
-    included_variables = non_coordinate_vars[::2] + coordinate_variables
-
-    non_vars = get_non_variable_names_from_dtree(in_ds_tree)
+    output_path = tmp_path / case.input
 
     subset.subset(
-        file_to_subset=join(data_dir, test_file),
-        bbox=bbox,
-        output_file=join(subset_output_dir, output_file),
-        variables=included_variables
+        file_to_subset=Path(data_dir) / case.input,
+        bbox=np.array(((-180, 180), (-90, 90))),
+        output_file=output_path,
+        variables=list(case.want_var),  # only specify wanted data variables
     )
 
-    out_ds_tree = xr.open_datatree(join(subset_output_dir, output_file), decode_times=False, decode_coords=False)
-    out_lat_var_names, out_lon_var_names, out_time_var_names = get_coordinate_variable_names(out_ds_tree)
-    out_coordinate_variables = out_lat_var_names + out_lon_var_names + out_time_var_names
+    with xr.open_datatree(output_path, decode_times=False, decode_coords=False) as out_tree:
+        # all vars is the super set containing data + coord vars
+        all_vars = get_vars_with_paths(out_tree)
 
-    subsetted_vars = get_all_variable_names_from_dtree(out_ds_tree)
-    subsetted_non_vars = get_non_variable_names_from_dtree(out_ds_tree) 
+        # wanted variable should be a subset of all vars
+        assert case.want_var <= all_vars
 
-    assert set(subsetted_vars + subsetted_non_vars) == set(included_variables + non_vars)
+        # wanted coordinate vars should be a subset of all vars as well
+        assert case.want_coord <= all_vars
 
-    in_ds_tree.close()
-    out_ds_tree.close()
+        # and the symmetric difference of the variable super set and
+        # the union of data and coordinate vars should be an empty set
+        # indicating that nothing is present that is not expected to
+        # be present. E.g. extra dimension scale vars
+        assert (case.want_var | case.want_coord) ^ all_vars == set()

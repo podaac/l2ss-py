@@ -1,8 +1,8 @@
-import pytest
+
 import numpy as np
+import pytest
 import xarray as xr
-import pandas as pd
-from unittest.mock import patch, MagicMock
+
 from podaac.subsetter.utils.time_utils import build_temporal_cond
 
 

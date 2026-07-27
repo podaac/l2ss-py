@@ -5,39 +5,67 @@ variables_utils.py
 
 Utility functions to get variables and normalize variables for a granule files.
 """
-from typing import List
+
 import xarray as xr
 
 
-def get_all_variable_names_from_dtree(dtree: xr.DataTree) -> List[str]:
+def get_vars_with_paths(tree: xr.DataTree) -> set[str]:
     """
-    Recursively extract all variable names (with full paths) from an xarray DataTree.
+    Get all variables and coordinates with their full paths from a DataTree
 
     Parameters
     ----------
-    dtree : xr.DataTree
-        The root of the DataTree.
+    tree : DataTree
+        The input DataTree
 
     Returns
     -------
-    List[str]
-        A list of variable full paths (e.g. '/group1/var').
+    set[str]
+        Unordered set of variable and coordinate paths in format
+        '/group/var' or '/var' for root level.
+
+    Examples
+    --------
+    >>> ds = xr.Dataset({'var1': [1], 'var2': [2], 'time': ('time', [0])})
+    >>> tree = DataTree(data=ds)
+    >>> tree['group1'] = DataTree(data=ds.copy())
+    >>> paths = get_vars_with_paths(tree)
+    >>> print(paths)
+    {'/time', '/var1', '/var2', '/group1/var1', '/group1/var2'}
     """
-    var_names = []
+    paths: set[str] = set()
+    for node in tree.subtree:
+        prefix = node.path.rstrip("/") + "/"
+        for name in set(node.data_vars) | set(node.to_dataset(inherit=False).coords):
+            paths.add(f"{prefix}{name}")
+    return paths
 
-    def recurse(node: xr.DataTree):
-        group_path = node.path
-        for var_name in node.data_vars:
-            if group_path in ("", "/"):
-                full_path = f"/{var_name}"
-            else:
-                full_path = f"{group_path}/{var_name}"
-            var_names.append(full_path)
-        for child in node.children.values():
-            recurse(child)
 
-    recurse(dtree)
-    return var_names
+def drop_vars_by_path(tree: xr.DataTree, var_paths: str | list[str] | set[str]) -> None:
+    """
+    Drop variables *in place* from a DataTree using paths in the
+    format '/group/var' or '/var' for root level.
+
+    Parameters
+    ----------
+    tree : DataTree
+        The input DataTree
+    var_paths : str or list[str] or set[str]
+        Paths to variables to drop in format '/group/var' or '/var' for root level
+        Examples:
+            - '/var1'  # root level variable
+            - '/group1/var1'  # variable in group1
+            - '/group1/subgroup/var1'  # variable in nested group
+
+    """
+    # guard for single string being passed
+    drop: set[str] = {var_paths} if isinstance(var_paths, str) else set(var_paths)
+
+    for node in tree.subtree:
+        prefix = node.path.rstrip("/") + "/"
+        to_drop = [name for name in node.variables if f"{prefix}{name}" in drop]
+        if to_drop:
+            node.dataset = node.dataset.drop_vars(to_drop, errors="ignore")
 
 
 def _normalize_for_matching(path: str) -> str:
@@ -50,9 +78,7 @@ def _normalize_for_matching(path: str) -> str:
     return path.lstrip("/").replace(" ", "").replace("_", "").lower()
 
 
-def normalize_candidate_paths_against_dtree(
-    candidates: List[str], all_vars: List[str]
-) -> List[str]:
+def normalize_candidate_paths_against_dtree(candidates: list[str], all_vars: list[str]) -> list[str]:
     """
     Normalize and match candidate variable paths to actual variable paths from a DataTree.
 
@@ -78,9 +104,7 @@ def normalize_candidate_paths_against_dtree(
         - Unmatched candidates are returned unchanged.
     """
     # Build normalized lookup: no slashes, underscores/spaces ignored
-    norm_to_real = {
-        _normalize_for_matching(real_path): real_path for real_path in all_vars
-    }
+    norm_to_real = {_normalize_for_matching(real_path): real_path for real_path in all_vars}
 
     resolved = []
     for cand in candidates:

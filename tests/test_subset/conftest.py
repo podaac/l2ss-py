@@ -1,13 +1,14 @@
 # In tests/conftest.py
-import pytest
-import tempfile
+import gc as garbage_collection
 import shutil
+import tempfile
 from os import listdir
 from os.path import dirname, isfile, join, realpath
-import gc as garbage_collection
 
 import netCDF4 as nc
+import pytest
 import xarray as xr
+
 
 @pytest.fixture(scope='class')
 def data_dir():

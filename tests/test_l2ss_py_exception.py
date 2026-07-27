@@ -1,6 +1,5 @@
-import pytest
 import traceback
-import sys
+
 from podaac.subsetter.subset_harmony import L2SSException
 
 

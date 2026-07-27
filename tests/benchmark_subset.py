@@ -18,9 +18,9 @@ benchmark_subset.py
 Benchmark the L2 Subset functionality
 """
 
+import os
 import shutil
 import tempfile
-import os
 from os.path import dirname, join
 
 import numpy as np

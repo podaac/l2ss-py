@@ -6,12 +6,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 ### Added
+### Changed
+### Deprecated
+### Removed
+- Removed poetry as a dependency (should have poetry externally already)
+### Fixed
+- [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
+- Optimize performance of ScanTime variable computation
+- [issue/435] (https://github.com/podaac/l2ss-py/issues/435) Extra unneeded dimension scales included in output
+### Security
+- Updated dependency libraries
+
+
+## [3.3.1]
+### Added
 - Updated readme documentation
+- [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
 ### Changed
 - Changed way Cygnss collection finds time variable
-### Deprecated 
+- Update time encoding with units
+- [issue/402] (https://github.com/podaac/l2ss-py/issues/402) Update tests which focus on HDF/EOS subsetting, add in pytest based granule fixtures:w
+### Deprecated
 ### Removed
 ### Fixed
+- [issue/394] (https://github.com/podaac/l2ss-py/issues/394) Fixes HDF handling with datatree
+- [issue/394] (https://github.com/podaac/l2ss-py/issues/394) Update ODL parser to handle multi swath/grid collections
+- [issue/396] (https://github.com/podaac/l2ss-py/issues/396) Handle new GPM v08 collections with netcdf format, but still containing wonky ScanTime swath group
+- [issue/400] (https://github.com/podaac/l2ss-py/issues/400) Fixed temporal subsetting for MOPITT collections
+- [issue/394] (https://github.com/podaac/l2ss-py/issues/394) Update ODL parser to apply direct mapping from DataField and GeoField objects
 ### Security
 
 
@@ -20,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/364] (https://github.com/podaac/l2ss-py/issues/364) Implement vertical subsetting via dimensions.
 ### Changed
 - [issue/246] (https://github.com/podaac/l2ss-py/issues/246) Subsetting parameters part of history attributes and json history.
-### Deprecated 
+### Deprecated
 - [issue/358] (https://github.com/podaac/l2ss-py/issues/358) Update _convert_time_from_description to use nanosecond precision & time encoding to only specify dtype if units is also present
 ### Removed
 ### Fixed

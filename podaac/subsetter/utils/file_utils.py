@@ -6,28 +6,60 @@ file_utils.py
 Utility functions for file and dataset handling.
 """
 
-from typing import Optional
-import dateutil
-from dateutil import parser
+from collections.abc import Hashable, Mapping
+
 import cftime
+import dateutil
 import xarray as xr
 import xarray.coding.times
+from dateutil import parser
 from xarray import DataTree
 
 
-def calculate_chunks(dataset: xr.Dataset) -> dict:
+def chunk_datatree(datatree: xr.DataTree) -> xr.DataTree:
     """
-    For the given dataset, calculate if the size on any dimension is
+    Walk every node in the datatree and chunk each node's dataset
+    independently based on logic present in `calculate_chunks`.
+
+    For HDFEOS files the root and all intermediate group nodes carry
+    no dimensions or data variables. Chunking must be applied at the
+    leaf nodes where the actual data and dimensions live, e.g.
+    /HDFEOS/GRIDS/OMI Column Amount O3/Data Fields.
+
+    Parameters
+    ----------
+    datatree : xr.DataTree
+        The datatree to chunk in place.
+
+    Returns
+    -------
+    xr.DataTree
+        The same datatree with all data-carrying nodes chunked.
+    """
+    for node in datatree.subtree:
+        # skip intermediate group nodes that carry no data variables
+        # or dimensions. these are structural nodes only.
+        if not node.ds or not node.ds.data_vars or not node.ds.dims:
+            continue
+
+        chunks = calculate_chunks(node)
+        if chunks:
+            # overide node chunks directly
+            node.ds = node.ds.chunk(chunks)
+
+    return datatree
+
+
+def calculate_chunks(node: xr.DataTree | xr.Dataset) -> Mapping[Hashable, int]:
+    """
+    For the given datatree node, calculate if the size on any dimension is
     worth chunking. Any dimension larger than 4000 will be chunked. This
     is done to ensure that the variable can fit in memory.
     """
-    if len(dataset.dims) <= 3:
-        chunk = {dim: 4000 for dim in dataset.dims
-                 if dataset.sizes[dim] > 4000
-                 and len(dataset.dims) > 1}
+    if len(node.dims) <= 3:
+        chunk = {dim: 4000 for dim in node.dims if node.sizes[dim] > 4000 and len(node.dims) > 1}
     else:
-        chunk = {dim: 500 for dim in dataset.dims
-                 if dataset.sizes[dim] > 500}
+        chunk = {dim: 500 for dim in node.dims if node.sizes[dim] > 500}
     return chunk
 
 
@@ -41,7 +73,7 @@ def override_decode_cf_datetime() -> None:
 
     def decode_cf_datetime(num_dates, units, calendar=None, use_cftime=None):
         try:
-            parser.parse(units.split('since')[-1])
+            parser.parse(units.split("since")[-1])
             return orig_decode_cf_datetime(num_dates, units, calendar, use_cftime)
         except dateutil.parser.ParserError:
             reference_time = cftime.num2date(0, units, calendar)
@@ -55,39 +87,37 @@ def test_access_sst_dtime_values(nc_dataset):
     """
     Test accessing values of 'sst_dtime' variable in a NetCDF file.
     """
-    args = {
-        'decode_coords': False,
-        'mask_and_scale': True,
-        'decode_times': True
-    }
+    args = {"decode_coords": False, "mask_and_scale": True, "decode_times": True}
     try:
-        with xr.open_dataset(
-                xr.backends.NetCDF4DataStore(nc_dataset),
-                **args
-        ) as dataset:
+        with xr.open_dataset(xr.backends.NetCDF4DataStore(nc_dataset), **args) as dataset:
             for var_name in dataset.variables:
-                dataset[var_name].values  # pylint: disable=pointless-statement
+                dataset[var_name].values  # noqa: B018  # pylint: disable=pointless-statement
     except (TypeError, ValueError, KeyError):
         return False
     return True
 
 
-def get_hdf_type(tree: DataTree) -> Optional[str]:
+def get_hdf_type(tree: DataTree) -> str | None:
     """
-    Determine the HDF type (OMI or MLS) from a DataTree object.
+    Determine the HDF type (OMI, MLS, or GPM) from a DataTree object.
     """
     try:
-        additional_attrs = tree['/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES']
-        if additional_attrs is not None and 'InstrumentName' in additional_attrs.attrs:
-            instrument = additional_attrs.attrs['InstrumentName']
+        if has_scantime(tree):
+            return "GPM"
+
+        # try to get types from instrument name
+        additional_attrs = tree["/HDFEOS/ADDITIONAL/FILE_ATTRIBUTES"]
+        if additional_attrs is not None and "InstrumentName" in additional_attrs.attrs:
+            instrument = additional_attrs.attrs["InstrumentName"]
             if isinstance(instrument, bytes):
                 instrument = instrument.decode("utf-8")
+
         else:
             return None
-        if 'OMI' in instrument:
-            return 'OMI'
-        if 'MLS' in instrument:
-            return 'MLS'
+        if "OMI" in instrument:
+            return "OMI"
+        if "MLS" in instrument:
+            return "MLS"
     except (KeyError, AttributeError):
         pass
     return None
@@ -95,5 +125,10 @@ def get_hdf_type(tree: DataTree) -> Optional[str]:
 
 def get_path(s):
     """Extracts the path by removing the last part after the final '/'."""
-    path = s.rsplit('/', 1)[0] if '/' in s else s
-    return path if path.startswith('/') else f'/{path}'
+    path = s.rsplit("/", 1)[0] if "/" in s else s
+    return path if path.startswith("/") else f"/{path}"
+
+
+def has_scantime(dataset: DataTree) -> bool:
+    """Check if "ScanTime" group present in dataset"""
+    return any("ScanTime" in group for group in dataset.groups)

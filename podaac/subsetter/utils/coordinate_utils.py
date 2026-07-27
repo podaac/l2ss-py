@@ -6,7 +6,6 @@ coordinate_utils.py
 Utility functions for coordinate operations and transformations.
 """
 
-from typing import Tuple, Union
 import numpy as np
 import xarray as xr
 
@@ -51,9 +50,9 @@ def _convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -
     Assumption that 0 is always on the prime meridian/equator.
     """
 
-    scale = coord_var.attrs.get('scale_factor', 1.0)
-    offset = coord_var.attrs.get('add_offset', 0.0)
-    valid_min = coord_var.attrs.get('valid_min', None)
+    scale = coord_var.attrs.get("scale_factor", 1.0)
+    offset = coord_var.attrs.get("add_offset", 0.0)
+    valid_min = coord_var.attrs.get("valid_min", None)
 
     if valid_min is None or valid_min > 0:
         # If coord var doesn't contain valid min, attempt to find
@@ -61,7 +60,7 @@ def _convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -
         # to find the actual bounds.
 
         # Filter out _FillValue from data before calculating min and max
-        fill_value = coord_var.attrs.get('_FillValue', None)
+        fill_value = coord_var.attrs.get("_FillValue", None)
         var_values = coord_var.values
         if fill_value:
             var_values = np.where(var_values != fill_value, var_values, np.nan)
@@ -126,8 +125,7 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
     lon_data = dataset[lon_var_name]
     lat_data = dataset[lat_var_name]
 
-    return np.array([_convert_bound(bbox[0], 360, lon_data),
-                     _convert_bound(bbox[1], 180, lat_data)])
+    return np.array([_convert_bound(bbox[0], 360, lon_data), _convert_bound(bbox[1], 180, lat_data)])
 
 
 def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
@@ -148,7 +146,7 @@ def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
     bool
         True if dataset is 360, False if not. Defaults to False.
     """
-    valid_min = lon_var.attrs.get('valid_min', None)
+    valid_min = lon_var.attrs.get("valid_min", None)
 
     if valid_min is None or valid_min > 0:
         var_min = remove_scale_offset(np.amin(lon_var.values), scale, offset)
@@ -167,10 +165,9 @@ def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
     return False
 
 
-def get_coordinate_variable_names(dataset: xr.Dataset,
-                                  lat_var_names: list = None,
-                                  lon_var_names: list = None,
-                                  time_var_names: list = None) -> Tuple[list[str], list[str], list[str]]:
+def get_coordinate_variable_names(
+    dataset: xr.Dataset, lat_var_names: list = None, lon_var_names: list = None, time_var_names: list = None
+) -> tuple[list[str], list[str], list[str]]:
     """
     Retrieve coordinate variables for this dataset. If coordinate
     variables are provided, use those, Otherwise, attempt to determine
@@ -211,14 +208,12 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
         time_var_names = []
         for lat_var_name in lat_var_names:
 
-            parent_path = '/'.join(lat_var_name.split('/')[:-1])  # gives "data_20/c"
+            parent_path = "/".join(lat_var_name.split("/")[:-1])  # gives "data_20/c"
             subtree = tree[parent_path]  # Gets the subtree at data_20/c
             variable = tree[lat_var_name]  # Gets the latitude variable
-            time_name = datatree_subset.compute_time_variable_name_tree(subtree,
-                                                                        variable,
-                                                                        time_var_names)
+            time_name = datatree_subset.compute_time_variable_name_tree(subtree, variable, time_var_names)
             if time_name:
-                time_name = time_name.strip('/')
+                time_name = time_name.strip("/")
                 time_var = f"{parent_path}/{time_name}"
                 time_var_names.append(time_var)
 
@@ -226,9 +221,7 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
             time_var_names.append(_compute_utc_name(tree))
 
         if time_name is None:
-            global_time_name = datatree_subset.compute_time_variable_name_tree(tree,
-                                                                               variable,
-                                                                               time_var_names)
+            global_time_name = datatree_subset.compute_time_variable_name_tree(tree, variable, time_var_names)
             if global_time_name:
                 time_var_names.append(global_time_name)
 
@@ -241,12 +234,95 @@ def get_coordinate_variable_names(dataset: xr.Dataset,
     return lat_var_names, lon_var_names, time_var_names
 
 
-def _compute_utc_name(dataset: xr.Dataset) -> Union[str, None]:
+def find_coordinate_origin_node(
+    tree: xr.DataTree,
+    node_path: str,
+    coord_name: str,
+) -> str | None:
+    """
+    Find the path of the DataTree node where a coordinate is actually defined.
+
+    Walks up the ancestry chain from the given node, checking each node's
+    own dataset (``node.ds``) for the coordinate. Returns the path of the
+    first ancestor that owns it, or ``None`` if the coordinate does not
+    exist anywhere in the ancestry.
+
+    Parameters
+    ----------
+    tree : DataTree
+        The root DataTree.
+    node_path : str
+        The path of the node to start searching from (e.g. "/group/subgroup").
+    coord_name : str
+        The name of the coordinate to locate.
+
+    Returns
+    -------
+    str or None
+        The path string of the node that defines the coordinate, or ``None``.
+
+    Examples
+    --------
+    >>> origin = find_coordinate_origin_node(dt, "/group/subgroup", "time")
+    >>> # Returns "/" if time is defined at the root
+    """
+    node: xr.DataTree | None = tree[node_path]
+
+    # iterate from current node to root via closest parents (inclusive
+    # of current node)
+    for n in (node, *node.parents):
+        # have to use to_dataset so that we can specificy *not* to
+        # include the inherited coords
+        if coord_name in n.to_dataset(inherit=False).coords:
+            return n.path
+
+    return None
+
+
+def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set[str]:
+    """
+    Collect and construct the full set of paths to coordinate
+    variables (if any) which each variable depends on.
+
+    Parameters
+    ----------
+    tree : DataTree
+        The root DataTree.
+    variables : list[str]
+        The name of the coordinate to locate.
+
+    Returns
+    -------
+    set[str]
+        A set containing the paths to the coordinate variables
+    """
+    keep_coords: set[str] = set()
+    for var in variables:
+        try:
+            var_node = tree[var]
+        except KeyError:
+            continue
+
+        node_path = var.rsplit("/", 1)[0]  # get the prefix path
+        for leaf in var_node.coords:
+            # want to find where the dimension variable
+            # actually lives, continuing if none present
+            owning_node = find_coordinate_origin_node(tree, node_path, leaf)
+            if not owning_node:
+                continue
+            # strip root "/", otherwise we end up with something like "//corner"
+            if owning_node == "/":
+                owning_node = ""
+            keep_coords.add(f"{owning_node}/{leaf}")
+    return keep_coords
+
+
+def _compute_utc_name(dataset: xr.Dataset) -> str | None:
     """
     Get the name of the utc variable if it is there to determine origine time
     """
     for var_name in list(dataset.data_vars.keys()):
-        if 'utc' in var_name.lower() and 'time' in var_name.lower():
+        if "utc" in var_name.lower() and "time" in var_name.lower():
             return var_name
 
     return None
@@ -276,12 +352,12 @@ def _normalize_paths(paths):
     normalized = []
     for path in paths:
         # Replace double underscore with slash
-        path = path.replace('__', '/')
+        path = path.replace("__", "/")
         # Remove any double slashes
-        while '//' in path:
-            path = path.replace('//', '/')
+        while "//" in path:
+            path = path.replace("//", "/")
         # Ensure path starts with /
-        if not path.startswith('/'):
-            path = '/' + path
+        if not path.startswith("/"):
+            path = "/" + path
         normalized.append(path)
     return normalized
