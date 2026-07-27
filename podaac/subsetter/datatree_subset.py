@@ -358,7 +358,9 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             if parent_processed_ds is not None:
                 sel_kwargs = {}
                 for dim in list(processed_ds.dims):
-                    if dim in parent_processed_ds.dims and dim in processed_ds.coords and dim in parent_processed_ds.coords:
+                    if (dim in parent_processed_ds.dims
+                            and dim in processed_ds.coords
+                            and dim in parent_processed_ds.coords):
                         parent_values = parent_processed_ds[dim].values
                         child_values = processed_ds[dim].values
                         if len(parent_values) != len(child_values) or not np.array_equal(parent_values, child_values):
