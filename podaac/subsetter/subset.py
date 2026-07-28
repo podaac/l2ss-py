@@ -399,6 +399,7 @@ def subset(
     time_calendar_attributes = {}
 
     if args["decode_times"]:
+        args['decode_timedelta'] = True
         with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
             lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
                 dataset=dataset, lat_var_names=lat_var_names, lon_var_names=lon_var_names, time_var_names=time_var_names
