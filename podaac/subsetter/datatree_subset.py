@@ -161,18 +161,17 @@ def get_sibling_or_parent_condition(condition_dict, path):
     # If no parent or sibling found, return root condition if it exists
     return condition_dict.get("/", None)
 
-
 def is_empty(dt, check_attrs=False):
     """
     Check if a DataTree node is empty.
-    If check_attrs is True, only require data_vars, ds.attrs, and dt.attrs to be empty.
+    If check_attrs is True, only require data_vars, coords, ds.attrs, and dt.attrs to be empty.
     If check_attrs is False, require both data_vars and coords to be empty.
     """
     ds = dt.ds
     if ds is None:
         return True
     if check_attrs:
-        return len(ds.data_vars) == 0 and len(ds.attrs) == 0 and len(dt.attrs) == 0
+        return len(ds.data_vars) == 0 and len(ds.coords) == 0 and len(ds.attrs) == 0 and len(dt.attrs) == 0
     return len(ds.data_vars) == 0 and len(ds.coords) == 0
 
 
@@ -196,6 +195,7 @@ def find_fully_empty_paths(dt: xr.DataTree):
         for child in dt.children.values():
             results.extend(find_fully_empty_paths(child))
     return results
+
 
 
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
