@@ -161,6 +161,7 @@ def get_sibling_or_parent_condition(condition_dict, path):
     # If no parent or sibling found, return root condition if it exists
     return condition_dict.get("/", None)
 
+
 def is_empty(dt, check_attrs=False):
     """
     Check if a DataTree node is empty.
@@ -195,7 +196,6 @@ def find_fully_empty_paths(dt: xr.DataTree):
         for child in dt.children.values():
             results.extend(find_fully_empty_paths(child))
     return results
-
 
 
 def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
