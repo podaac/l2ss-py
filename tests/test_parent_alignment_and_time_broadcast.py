@@ -251,6 +251,89 @@ class TestParentProcessedDsAlignment:
         )
 
 
+    def test_sibling_aligned_after_first_child_subsets_parent(self):
+        """When the first child returns indexers that subset the parent's
+        processed_ds, the second child (which has no condition) gets aligned
+        to the updated parent coordinates."""
+        from podaac.subsetter.datatree_subset import where_tree
+
+        # Root has x-dim data. Two children under 'child1' have conditions at depth 2.
+        # 'child2' at depth 1 has NO condition match -> goes to else branch.
+        # After child1's sub-nodes return indexers, root's processed_ds is updated,
+        # and child2 sees the subsetted parent_processed_ds.
+        root_ds = xr.Dataset(
+            {"temp": ("x", np.arange(10, dtype=float))},
+            coords={"x": np.arange(10)},
+        )
+        sub1_ds = xr.Dataset(
+            {"lat": ("x", np.linspace(-90, 90, 10))},
+            coords={"x": np.arange(10)},
+        )
+        sub2_ds = xr.Dataset(
+            {"lon": ("x", np.linspace(-180, 180, 10))},
+            coords={"x": np.arange(10)},
+        )
+        child2_ds = xr.Dataset(
+            {"nav": ("x", np.arange(10, dtype=float) * 2)},
+            coords={"x": np.arange(10)},
+        )
+
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child1"] = DataTree(
+            name="child1",
+            dataset=xr.Dataset(
+                {"flag": ("x", np.ones(10))}, coords={"x": np.arange(10)}
+            ),
+        )
+        tree["child1/sub1"] = DataTree(name="sub1", dataset=sub1_ds)
+        tree["child1/sub2"] = DataTree(name="sub2", dataset=sub2_ds)
+        tree["child2"] = DataTree(name="child2", dataset=child2_ds)
+
+        # Condition at depth-2 paths only (child2 at depth-1 won't match)
+        cond = xr.DataArray(
+            [False, False, True, True, True, True, True, False, False, False],
+            dims=["x"],
+            coords={"x": np.arange(10)},
+        )
+        condition_dict = {"/child1/sub1": cond, "/child1/sub2": cond}
+
+        result = where_tree(tree, condition_dict, cut=True)
+
+        # child2 should be aligned to the subsetted parent x=[2,3,4,5,6]
+        np.testing.assert_array_equal(
+            result["child2"].ds.coords["x"].values, [2, 3, 4, 5, 6]
+        )
+        np.testing.assert_array_equal(
+            result["child2"].ds["nav"].values, [4.0, 6.0, 8.0, 10.0, 12.0]
+        )
+
+    def test_empty_subtree_gets_indexers_applied(self):
+        """When a child is in empty_paths and the parent has indexers,
+        apply_indexers_to_tree is called with the parent's processed_ds."""
+        from podaac.subsetter.datatree_subset import where_tree
+
+        # Root with phony_dim (no coords, so children don't inherit)
+        root_ds = xr.Dataset(
+            {"temp": (("phony_dim_0",), np.arange(10, dtype=float))}
+        )
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["empty_sub"] = DataTree(name="empty_sub", dataset=xr.Dataset())
+        tree["empty_sub/also_empty"] = DataTree(
+            name="also_empty", dataset=xr.Dataset()
+        )
+
+        cond = xr.DataArray(
+            [False, False, True, True, True, True, True, False, False, False],
+            dims=["phony_dim_0"],
+        )
+        condition_dict = {"/": cond}
+
+        result = where_tree(tree, condition_dict, cut=True)
+
+        # Root should be subsetted (5 values kept from 10)
+        assert result.ds.sizes["phony_dim_0"] == 5
+
+
 class TestSubsetWithBboxSingleTimeVar:
     """Test that a single time variable is broadcast to all lat/lon pairs."""
 
