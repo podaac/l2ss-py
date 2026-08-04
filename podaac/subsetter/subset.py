@@ -31,6 +31,7 @@ import xarray.coding.times
 from shapely.geometry import Point
 
 from podaac.subsetter import datatree_subset, tree_time_converting
+from podaac.subsetter.where_tree_v2 import where_tree_v2
 from podaac.subsetter.utils import (
     coordinate_utils,
     file_utils,
@@ -246,7 +247,7 @@ def subset_with_bbox(
         elif lat_path == lon_path and len(time_var_names) == 1:
             subset_dictionary[lat_path] = operation
 
-    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
+    return_dataset = where_tree_v2(dataset, subset_dictionary, cut, pixel_subset)
 
     if vertical_var is not None:
         return vertical_subset(
