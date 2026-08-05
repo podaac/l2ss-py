@@ -43,18 +43,28 @@ def where_tree_v2(tree: DataTree, condition_dict, cut: bool, pixel_subset=False)
     shapes_match = all(c.shape == conditions[0].shape for c in conditions)
 
     if shapes_match:
-        # Same shape: combine with AND and apply uniformly
+        # Same shape: combine with OR for indexers (keep any row/col where
+        # ANY group has data), but apply each group's own condition for masking
         combined = conditions[0]
         for c in conditions[1:]:
-            combined = combined & c
-        return _apply_single_condition(tree, combined, cut, pixel_subset)
+            combined = combined | c
+        return _apply_single_condition(tree, combined, cut, pixel_subset, condition_dict)
 
     # Different shapes: apply each condition to its subtree independently
     return _apply_per_group(tree, condition_dict, cut, pixel_subset)
 
 
-def _apply_single_condition(tree, cond, cut, pixel_subset):
-    """Apply a single condition uniformly to the whole tree."""
+def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=None):
+    """Apply a single condition uniformly to the whole tree.
+
+    Parameters
+    ----------
+    per_group_conditions : dict, optional
+        When provided, maps group paths to their individual conditions.
+        Each group uses its own condition for masking instead of the
+        combined condition, so that pixels valid in one group aren't
+        incorrectly masked by another group's slightly different grid.
+    """
     ref_ds = _find_reference_dataset(tree, cond)
     cond = mask_utils.align_dims_cond_only(ref_ds, cond)
 
@@ -73,10 +83,39 @@ def _apply_single_condition(tree, cond, cut, pixel_subset):
     )
 
     if not pixel_subset:
-        indexed_cond = cond.isel(**indexers)
-        result = result.map_over_datasets(
-            lambda ds: _apply_masking(ds, indexed_cond)
-        )
+        if per_group_conditions:
+            indexed_per_group = {}
+            for path, grp_cond in per_group_conditions.items():
+                aligned = mask_utils.align_dims_cond_only(ref_ds, grp_cond)
+                indexed_per_group[path] = aligned.isel(**indexers)
+
+            def _mask_with_per_group(ds, node_path):
+                grp_indexed_cond = indexed_per_group.get(node_path)
+                if grp_indexed_cond is not None:
+                    return _apply_masking(ds, grp_indexed_cond)
+                from podaac.subsetter.datatree_subset import get_sibling_or_parent_condition
+                sibling_cond = get_sibling_or_parent_condition(indexed_per_group, node_path)
+                if sibling_cond is not None:
+                    return _apply_masking(ds, sibling_cond)
+                return ds
+
+            new_children = {}
+            for child_name, child_node in result.children.items():
+                child_path = f"/{child_name}"
+                new_child_ds = _mask_with_per_group(child_node.ds, child_path)
+                new_child = DataTree(name=child_name, dataset=new_child_ds)
+                for gc_name, gc_node in child_node.children.items():
+                    new_child[gc_name] = gc_node
+                new_children[child_name] = new_child
+            result = DataTree(name=result.name, dataset=result.ds)
+            result.attrs.update(tree.attrs)
+            for child_name, child_tree in new_children.items():
+                result[child_name] = child_tree
+        else:
+            indexed_cond = cond.isel(**indexers)
+            result = result.map_over_datasets(
+                lambda ds: _apply_masking(ds, indexed_cond)
+            )
 
     return _prune_empty(result)
 
