@@ -208,6 +208,8 @@ def subset_with_bbox(
         iterator = zip_longest(lat_var_names, lon_var_names, [])
     elif len(time_var_names) == 1 and len(lat_var_names) > 1:
         iterator = zip(lat_var_names, lon_var_names, time_var_names * len(lat_var_names))
+    else:
+        iterator = zip(lat_var_names, lon_var_names, time_var_names)
 
 
     #if not time_var_names:  # time_var_names == [] or evaluates to False
