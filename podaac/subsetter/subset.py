@@ -204,10 +204,16 @@ def subset_with_bbox(
 
     subset_dictionary = {}
 
-    if not time_var_names:  # time_var_names == [] or evaluates to False
+    if not time_var_names:
         iterator = zip_longest(lat_var_names, lon_var_names, [])
-    else:
-        iterator = zip(lat_var_names, lon_var_names, time_var_names)
+    elif len(time_var_names) == 1 and len(lat_var_names) > 1:
+        iterator = zip(lat_var_names, lon_var_names, time_var_names * len(lat_var_names))
+
+
+    #if not time_var_names:  # time_var_names == [] or evaluates to False
+    #    iterator = zip_longest(lat_var_names, lon_var_names, [])
+    ##else:
+    #    iterator = zip(lat_var_names, lon_var_names, time_var_names)
 
     for lat_var_name, lon_var_name, time_var_name in iterator:
         lat_path = file_utils.get_path(lat_var_name)
