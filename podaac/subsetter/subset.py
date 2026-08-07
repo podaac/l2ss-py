@@ -41,7 +41,7 @@ from podaac.subsetter.utils import (
 )
 from podaac.subsetter.vertical_subset import vertical_subset
 
-SERVICE_NAME = "l2ss-py"
+SERVICE_NAME = "podaac-l2ss-py"
 
 _HDF_EXTENSIONS: list[str] = [".hdf5", ".he5", ".h5", ".hdf"]
 
