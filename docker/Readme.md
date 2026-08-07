@@ -20,7 +20,7 @@ the `SOURCE` build argument with the package specification.
 Example:
 
 ```shell script
-docker build -f docker/Dockerfile --build-arg SOURCE="l2ss-py[harmony]==1.1.0-alpha.9" .
+docker build -f docker/Dockerfile --build-arg SOURCE="podaac-l2ss-py[harmony]==1.1.0-alpha.9" .
 ```
 
 ### Building from local code
