@@ -256,15 +256,6 @@ jobs:
           name: python-artifact
           path: dist/*
 
-      - name: Publish to test.pypi.org
-        id: pypi-test-publish
-        if: |
-          github.ref == 'refs/heads/develop' ||
-          startsWith(github.ref, 'refs/heads/release')
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          repository-url: https://test.pypi.org/legacy/
-
       - name: Publish to pypi.org
         if: |
           github.ref == 'refs/heads/main'
@@ -273,8 +264,9 @@ jobs:
 
       - name: Log in to the Container registry
         if: |
-          steps.pypi-test-publish.conclusion == 'success' ||
-          steps.pypi-publish.conclusion == 'success'
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -282,8 +274,9 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Extract metadata (tags, labels) for Docker
         if: |
-          steps.pypi-test-publish.conclusion == 'success' ||
-          steps.pypi-publish.conclusion == 'success'
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -291,17 +284,30 @@ jobs:
           tags: |
             type=pep440,pattern={{version}},value=${{ env.software_version }}
             type=raw,value=${{ env.venue }}
-      - name: Wait for package
+      - name: Wait for package on PyPI
         if: |
-          steps.pypi-test-publish.conclusion == 'success' ||
-          steps.pypi-publish.conclusion == 'success'
+          github.ref == 'refs/heads/main'
         run: |
           pip install tenacity
           ${GITHUB_WORKSPACE}/.github/workflows/wait-for-pypi.py ${{env.pyproject_name}}[harmony]==${{ env.software_version }}
-      - name: Build and push Docker image
+      - name: Build and push Docker image (from local dist)
         if: |
-          steps.pypi-test-publish.conclusion == 'success' ||
-          steps.pypi-publish.conclusion == 'success'
+          github.ref == 'refs/heads/develop' ||
+          startsWith(github.ref, 'refs/heads/release')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          build-args: |
+            SOURCE=dist/${{env.pyproject_name}}-${{ env.software_version }}-py3-none-any.whl[harmony]
+            DIST_PATH=dist/
+          push: true
+          pull: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+      - name: Build and push Docker image (from PyPI)
+        if: |
+          github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -314,10 +320,9 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
       - name: Run Snyk on Docker Image
         if: |
-          steps.pypi-test-publish.conclusion == 'success' ||
-          steps.pypi-publish.conclusion == 'success'
-        # Snyk can be used to break the build when it detects vulnerabilities.
-        # In this case we want to upload the issues to GitHub Code Scanning
+          github.ref == 'refs/heads/develop' ||
+          github.ref == 'refs/heads/main'    ||
+          startsWith(github.ref, 'refs/heads/release')
         continue-on-error: true
         uses: snyk/actions/docker@master
         env:

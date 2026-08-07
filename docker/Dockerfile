@@ -43,7 +43,7 @@ WORKDIR /worker
 
 COPY --chown=dockeruser $DIST_PATH $DIST_PATH
 USER dockeruser
-RUN pip3 install --no-cache-dir --force --user --index-url https://pypi.org/simple/ --extra-index-url https://test.pypi.org/simple/ $SOURCE \
+RUN pip3 install --no-cache-dir --force --user $SOURCE \
     && rm -rf $DIST_PATH
 
 COPY --chown=dockeruser ./docker/docker-entrypoint.sh docker-entrypoint.sh
