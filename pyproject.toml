@@ -11,7 +11,7 @@
 # persons.
 
 [tool.poetry]
-name = "podaac-l2ss-py"
+name = "l2ss-py"
 version = "3.4.0a3"
 description = "L2 Subsetter Service"
 authors = ["podaac-tva <podaac-tva@jpl.nasa.gov>"]
