@@ -56,10 +56,12 @@ def calculate_chunks(node: xr.DataTree | xr.Dataset) -> Mapping[Hashable, int]:
     worth chunking. Any dimension larger than 4000 will be chunked. This
     is done to ensure that the variable can fit in memory.
     """
-    if len(node.dims) <= 3:
-        chunk = {dim: 4000 for dim in node.dims if node.sizes[dim] > 4000 and len(node.dims) > 1}
+    ds = node.ds if hasattr(node, 'ds') else node
+    dims = ds.sizes
+    if len(dims) <= 3:
+        chunk = {dim: 4000 for dim in dims if dims[dim] > 4000 and len(dims) > 1}
     else:
-        chunk = {dim: 500 for dim in node.dims if node.sizes[dim] > 500}
+        chunk = {dim: 500 for dim in dims if dims[dim] > 500}
     return chunk
 
 
