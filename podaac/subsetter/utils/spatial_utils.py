@@ -102,11 +102,9 @@ def get_east_west_lon(dataset, lon_var_name):
     lon_2d = dataset[lon_var_name]
     if lon_2d is None:
         return None, None
-    fill_value = lon_2d.attrs.get("_FillValue", None)
     lon_flat = lon_2d.values.flatten()
-    if fill_value is not None:
-        lon_flat = lon_flat[lon_flat != fill_value]
     lon_flat = lon_flat[~np.isnan(lon_flat)]
+    lon_flat = lon_flat[(lon_flat >= -180) & (lon_flat <= 360)]
     if lon_flat.size == 0:
         return None, None
     crosses_antimeridian = np.any((lon_flat[:-1] > 150) & (lon_flat[1:] < -150))
