@@ -778,8 +778,8 @@ def tree_get_spatial_bounds(
                 continue
 
             # Scale all values, then filter to physically valid coordinate ranges
-            scaled_lats = (lats * lat_scale) - lat_offset
-            scaled_lons = (lons * lon_scale) - lon_offset
+            scaled_lats = (lats * lat_scale) + lat_offset
+            scaled_lons = (lons * lon_scale) + lon_offset
             scaled_lats = scaled_lats[(scaled_lats >= -90) & (scaled_lats <= 90)]
             scaled_lons = scaled_lons[(scaled_lons >= -180) & (scaled_lons <= 360)]
 
