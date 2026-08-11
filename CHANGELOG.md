@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 - [issue/429] (https://github.com/podaac/l2ss-py/issues/429) Change extension output to .nc
+- Renamed project to podaac-l2ss-py due to lockout of test.pypi.org project
+- Updated deploy process of project to pypi.org
+  - Now using Trusted Publisher Management
 ### Deprecated
 ### Removed
 - Removed poetry as a dependency (should have poetry externally already)

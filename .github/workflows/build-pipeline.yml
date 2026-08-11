@@ -17,19 +17,24 @@ jobs:
   # First job in the workflow installs and verifies the software
   build:
     name: Build, Test, Verify, Publish
-    # The type of runner that the job will run on
     timeout-minutes: 60  # stops this job after 60 minutes
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install Poetry
         uses: abatilo/actions-poetry@v4
         with:
-          poetry-version: 2.1.3
+          poetry-version: 2.3.2
       - name: Get version
         id: get-version
         run: |
@@ -91,7 +96,7 @@ jobs:
             tests/
       - name: SonarCloud Scan
         id: sonarcloud
-        uses: sonarsource/sonarqube-scan-action@v6
+        uses: sonarsource/sonarqube-scan-action@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -161,7 +166,7 @@ jobs:
 
       - name: Configure AWS credentials for UAT
         if: env.venue == 'uat'
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
@@ -169,7 +174,7 @@ jobs:
 
       - name: Configure AWS credentials for OPS
         if: env.venue == 'ops'
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_OPS }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_OPS }}
@@ -246,27 +251,26 @@ jobs:
       - name: Build Python Artifact
         run: |
           poetry build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: python-artifact
           path: dist/*
+
       - name: Publish to test.pypi.org
         id: pypi-test-publish
         if: |
           github.ref == 'refs/heads/develop' ||
           startsWith(github.ref, 'refs/heads/release')
-        env:
-          POETRY_PYPI_TOKEN_TESTPYPI: ${{secrets.POETRY_PYPI_TOKEN_TESTPYPI}}
-        run: |
-          poetry config repositories.testpypi https://test.pypi.org/legacy/
-          poetry publish -r testpypi
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
       - name: Publish to pypi.org
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: |
+          github.ref == 'refs/heads/main'
         id: pypi-publish
-        env:
-          POETRY_PYPI_TOKEN_PYPI: ${{secrets.POETRY_PYPI_TOKEN_PYPI}}
-        run: |
-          poetry publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+
       - name: Log in to the Container registry
         if: |
           steps.pypi-test-publish.conclusion == 'success' ||
