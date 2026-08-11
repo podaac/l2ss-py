@@ -340,8 +340,6 @@ class TestSubsetWithBboxSingleTimeVar:
     def test_single_time_var_replicated_for_multiple_lat_lon(self):
         """When there's 1 time var but multiple lat/lon vars, the time var
         should be replicated to pair with each lat/lon via zip."""
-        from itertools import zip_longest
-        from podaac.subsetter.subset import subset_with_bbox
 
         lat_var_names = ["/group1/lat", "/group2/lat"]
         lon_var_names = ["/group1/lon", "/group2/lon"]

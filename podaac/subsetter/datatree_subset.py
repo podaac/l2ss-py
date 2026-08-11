@@ -261,7 +261,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
     def process_node(
         node: DataTree, path: str, empty_paths, parent_processed_ds=None
-    ) -> tuple[xr.Dataset, dict[str, DataTree]]:  # pylint: disable=too-many-branches
+    ) -> tuple[xr.Dataset, dict[str, DataTree], dict | None]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
 
@@ -278,8 +278,8 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
         Returns
         -------
-        Tuple[xr.Dataset, Dict[str, DataTree]]
-            Processed dataset and dictionary of processed child nodes
+        Tuple[xr.Dataset, Dict[str, DataTree], dict | None]
+            Processed dataset, dictionary of processed child nodes, and indexers
         """
         cond = get_sibling_or_parent_condition(condition_dict, path)
 
@@ -1100,14 +1100,16 @@ def apply_indexers_to_tree(node: DataTree, indexers: dict, parent_ds=None) -> Da
     ds = node.ds
     if ds is not None:
         if parent_ds is not None:
-            # Align shared coordinate dimensions by value
             sel_kwargs = {}
             for dim in list(ds.dims):
                 if dim in parent_ds.dims and dim in ds.coords and dim in parent_ds.coords:
                     parent_values = parent_ds[dim].values
                     child_values = ds[dim].values
-                    common = np.intersect1d(parent_values, child_values)
-                    if len(common) < len(child_values):
+                    # Preserve parent order in the intersection
+                    common = parent_values[np.isin(parent_values, child_values)]
+                    if len(common) == 0:
+                        continue
+                    if not np.array_equal(common, child_values):
                         sel_kwargs[dim] = common
             if sel_kwargs:
                 ds = ds.sel(**sel_kwargs)
@@ -1117,5 +1119,5 @@ def apply_indexers_to_tree(node: DataTree, indexers: dict, parent_ds=None) -> Da
             ds = ds.isel(**indexers, missing_dims="ignore")
     new_node = DataTree(name=node.name, dataset=ds)
     for child_name, child_node in node.children.items():
-        new_node[child_name] = apply_indexers_to_tree(child_node, indexers, parent_ds)
+        new_node[child_name] = apply_indexers_to_tree(child_node, indexers, ds)
     return new_node
