@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now using Trusted Publisher Management
 ### Deprecated
 ### Removed
+### Fixed
+### Security
+
+
+## [3.3.2]
+### Added
+- [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
+### Changed
+- [issue/402] (https://github.com/podaac/l2ss-py/issues/402) Update tests which focus on HDF/EOS subsetting, add in pytest based granule fixtures
+### Deprecated
+### Removed
 - Removed poetry as a dependency (should have poetry externally already)
 ### Fixed
 - [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
@@ -25,11 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.3.1]
 ### Added
 - Updated readme documentation
-- [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
 ### Changed
 - Changed way Cygnss collection finds time variable
 - Update time encoding with units
-- [issue/402] (https://github.com/podaac/l2ss-py/issues/402) Update tests which focus on HDF/EOS subsetting, add in pytest based granule fixtures:w
 ### Deprecated
 ### Removed
 ### Fixed
