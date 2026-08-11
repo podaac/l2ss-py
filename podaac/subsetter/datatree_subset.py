@@ -730,7 +730,7 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
 
 def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     """Remove scale and offset from the given value"""
-    return (value * scale) - offset
+    return float((value * scale) - offset)
 
 
 def tree_get_spatial_bounds(
