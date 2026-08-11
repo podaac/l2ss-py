@@ -312,21 +312,46 @@ jobs:
           pull: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
       - name: Run Snyk on Docker Image
-        if: |
-          steps.pypi-test-publish.conclusion == 'success' ||
-          steps.pypi-publish.conclusion == 'success'
-        # Snyk can be used to break the build when it detects vulnerabilities.
-        # In this case we want to upload the issues to GitHub Code Scanning
+        # Use the modern `snyk container test` subcommand directly instead of the
+        # snyk/actions/docker action. That action runs legacy `snyk test --docker`,
+        # which (a) executes inside a container with no `python`, tripping over the
+        # repo's pyproject.toml, and (b) mishandles `--file`, treating the Dockerfile
+        # as an open-source manifest ("Could not detect package manager").
+        # `snyk container test` targets only the image, reads the Dockerfile via
+        # --file for base-image upgrade advice, and reliably writes SARIF for upload
+        # to GitHub Code Scanning. continue-on-error keeps a vulnerable image (or a
+        # scan error) from failing the build.
         continue-on-error: true
-        uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          IMAGE_URI: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        run: |
+          snyk container test "$IMAGE_URI" \
+            --file=docker/Dockerfile \
+            --severity-threshold=high \
+            --sarif-file-output=snyk.sarif
+
+      - name: Normalize Snyk SARIF for GitHub Code Scanning
+        # Snyk emits some rules (e.g. license findings) with a null
+        # "security-severity", which GitHub Code Scanning rejects during processing
+        # ("invalid security severity value, is not a number: null"). Coerce any
+        # null/"undefined" value to "0" so the SARIF is accepted.
+        if: ${{ always() && hashFiles('snyk.sarif') != '' }}
+        run: |
+          jq '(.runs[]?.tool.driver.rules[]?.properties."security-severity") |= (if (. == null or . == "undefined") then "0" else . end)' \
+            snyk.sarif > snyk.sarif.tmp && mv snyk.sarif.tmp snyk.sarif
+      
+      - name: Upload Snyk result to GitHub Code Scanning
+        # Always attempt to upload, even if the Snyk scan found vulnerabilities and
+        # exited non-zero. Guarded on the SARIF file existing so that a scan which
+        # fails to produce output does not fail the whole job.
+        if: ${{ always() && hashFiles('snyk.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          image: ${{ steps.meta.outputs.tags[0] }}
-          args: >
-            --severity-threshold=high
-            
+          sarif_file: snyk.sarif
+
       - name: Push Tag
         if: |
           github.ref == 'refs/heads/develop' ||

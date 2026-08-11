@@ -12,7 +12,11 @@
 
 [tool.poetry]
 name = "podaac-l2ss-py"
+<<<<<<< HEAD
 version = "3.3.3rc5"
+=======
+version = "3.4.0a16"
+>>>>>>> c3ab77ea (fix version)
 description = "L2 Subsetter Service"
 authors = ["podaac-tva <podaac-tva@jpl.nasa.gov>"]
 license = "Apache-2.0"
