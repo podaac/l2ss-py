@@ -728,7 +728,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     return None
 
 
-
 def tree_get_spatial_bounds(
     datatree: xr.Dataset, lat_var_names: list[str], lon_var_names: list[str]
 ) -> np.ndarray | None:
