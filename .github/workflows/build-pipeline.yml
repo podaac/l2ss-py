@@ -17,19 +17,24 @@ jobs:
   # First job in the workflow installs and verifies the software
   build:
     name: Build, Test, Verify, Publish
-    # The type of runner that the job will run on
     timeout-minutes: 60  # stops this job after 60 minutes
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
       - name: Install Poetry
         uses: abatilo/actions-poetry@v4
         with:
-          poetry-version: 2.1.3
+          poetry-version: 2.3.2
       - name: Get version
         id: get-version
         run: |
@@ -91,7 +96,7 @@ jobs:
             tests/
       - name: SonarCloud Scan
         id: sonarcloud
-        uses: sonarsource/sonarqube-scan-action@v6
+        uses: sonarsource/sonarqube-scan-action@v8
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -161,7 +166,7 @@ jobs:
 
       - name: Configure AWS credentials for UAT
         if: env.venue == 'uat'
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_UAT }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_UAT }}
@@ -169,7 +174,7 @@ jobs:
 
       - name: Configure AWS credentials for OPS
         if: env.venue == 'ops'
-        uses: aws-actions/configure-aws-credentials@v3
+        uses: aws-actions/configure-aws-credentials@v6
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_OPS }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_OPS }}
@@ -246,27 +251,26 @@ jobs:
       - name: Build Python Artifact
         run: |
           poetry build
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: python-artifact
           path: dist/*
+
       - name: Publish to test.pypi.org
         id: pypi-test-publish
         if: |
           github.ref == 'refs/heads/develop' ||
           startsWith(github.ref, 'refs/heads/release')
-        env:
-          POETRY_PYPI_TOKEN_TESTPYPI: ${{secrets.POETRY_PYPI_TOKEN_TESTPYPI}}
-        run: |
-          poetry config repositories.testpypi https://test.pypi.org/legacy/
-          poetry publish -r testpypi
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
       - name: Publish to pypi.org
-        if: ${{ github.ref == 'refs/heads/main' }}
+        if: |
+          github.ref == 'refs/heads/main'
         id: pypi-publish
-        env:
-          POETRY_PYPI_TOKEN_PYPI: ${{secrets.POETRY_PYPI_TOKEN_PYPI}}
-        run: |
-          poetry publish
+        uses: pypa/gh-action-pypi-publish@release/v1
+
       - name: Log in to the Container registry
         if: |
           steps.pypi-test-publish.conclusion == 'success' ||
@@ -308,21 +312,46 @@ jobs:
           pull: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
       - name: Run Snyk on Docker Image
-        if: |
-          steps.pypi-test-publish.conclusion == 'success' ||
-          steps.pypi-publish.conclusion == 'success'
-        # Snyk can be used to break the build when it detects vulnerabilities.
-        # In this case we want to upload the issues to GitHub Code Scanning
+        # Use the modern `snyk container test` subcommand directly instead of the
+        # snyk/actions/docker action. That action runs legacy `snyk test --docker`,
+        # which (a) executes inside a container with no `python`, tripping over the
+        # repo's pyproject.toml, and (b) mishandles `--file`, treating the Dockerfile
+        # as an open-source manifest ("Could not detect package manager").
+        # `snyk container test` targets only the image, reads the Dockerfile via
+        # --file for base-image upgrade advice, and reliably writes SARIF for upload
+        # to GitHub Code Scanning. continue-on-error keeps a vulnerable image (or a
+        # scan error) from failing the build.
         continue-on-error: true
-        uses: snyk/actions/docker@master
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+          IMAGE_URI: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
+        run: |
+          snyk container test "$IMAGE_URI" \
+            --file=docker/Dockerfile \
+            --severity-threshold=high \
+            --sarif-file-output=snyk.sarif
+
+      - name: Normalize Snyk SARIF for GitHub Code Scanning
+        # Snyk emits some rules (e.g. license findings) with a null
+        # "security-severity", which GitHub Code Scanning rejects during processing
+        # ("invalid security severity value, is not a number: null"). Coerce any
+        # null/"undefined" value to "0" so the SARIF is accepted.
+        if: ${{ always() && hashFiles('snyk.sarif') != '' }}
+        run: |
+          jq '(.runs[]?.tool.driver.rules[]?.properties."security-severity") |= (if (. == null or . == "undefined") then "0" else . end)' \
+            snyk.sarif > snyk.sarif.tmp && mv snyk.sarif.tmp snyk.sarif
+      
+      - name: Upload Snyk result to GitHub Code Scanning
+        # Always attempt to upload, even if the Snyk scan found vulnerabilities and
+        # exited non-zero. Guarded on the SARIF file existing so that a scan which
+        # fails to produce output does not fail the whole job.
+        if: ${{ always() && hashFiles('snyk.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          image: ${{ steps.meta.outputs.tags[0] }}
-          args: >
-            --severity-threshold=high
-            
+          sarif_file: snyk.sarif
+
       - name: Push Tag
         if: |
           github.ref == 'refs/heads/develop' ||

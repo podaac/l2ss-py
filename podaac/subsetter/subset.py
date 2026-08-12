@@ -41,7 +41,7 @@ from podaac.subsetter.utils import (
 )
 from podaac.subsetter.vertical_subset import vertical_subset
 
-SERVICE_NAME = "l2ss-py"
+SERVICE_NAME = "podaac-l2ss-py"
 
 _HDF_EXTENSIONS: list[str] = [".hdf5", ".he5", ".h5", ".hdf"]
 
@@ -178,12 +178,15 @@ def subset_with_bbox(
 
     subset_dictionary = {}
 
-    if not time_var_names:  # time_var_names == [] or evaluates to False
+    if not time_var_names:
         iterator = zip_longest(lat_var_names, lon_var_names, [])
+    elif len(time_var_names) == 1 and len(lat_var_names) > 1:
+        iterator = zip(lat_var_names, lon_var_names, time_var_names * len(lat_var_names))
     else:
         iterator = zip(lat_var_names, lon_var_names, time_var_names)
 
     for lat_var_name, lon_var_name, time_var_name in iterator:
+
         lat_path = file_utils.get_path(lat_var_name)
         lon_path = file_utils.get_path(lon_var_name)
 
@@ -521,7 +524,6 @@ def subset(
 
         encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(subsetted_dataset, lat_var_names, lon_var_names)
-
         metadata_utils.update_netcdf_attrs(
             output_file,
             subsetted_dataset,
