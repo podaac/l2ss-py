@@ -294,7 +294,7 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
         indexers = None
 
-        if dataset.variables and cond is not None:  # Only process if node has data
+        if dataset.data_vars and cond is not None:  # Only process if node has data
             # Create indexers from condition
             cond = mask_utils.align_dims_cond_only(dataset, cond)
 
