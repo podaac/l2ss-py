@@ -216,13 +216,12 @@ class L2SubsetterService(BaseHarmonyAdapter):
             subset_params["file_to_subset"] = input_filename
 
             operations = {"variable_subset": subset_params.get("variables"), "is_subsetted": True}
+            file_extension = ".nc"
 
-            original_file_extension = os.path.splitext(input_filename)[1]
-
-            staged_filename_true = generate_output_filename(asset.href, original_file_extension, **operations)
+            staged_filename_true = generate_output_filename(asset.href, file_extension, **operations)
 
             operations = {"variable_subset": subset_params.get("variables"), "is_subsetted": False}
-            staged_filename_false = generate_output_filename(asset.href, original_file_extension, **operations)
+            staged_filename_false = generate_output_filename(asset.href, file_extension, **operations)
 
             subset_params["stage_file_name_subsetted_true"] = staged_filename_true
             subset_params["stage_file_name_subsetted_false"] = staged_filename_false
@@ -236,7 +235,7 @@ class L2SubsetterService(BaseHarmonyAdapter):
                 "variable_subset": subset_params.get("variables"),
                 "is_subsetted": bool(result_bbox is not None),
             }
-            staged_filename = generate_output_filename(asset.href, original_file_extension, **operations)
+            staged_filename = generate_output_filename(asset.href, file_extension, **operations)
 
             url = stage(
                 subset_params["output_file"],

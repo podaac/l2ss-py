@@ -31,8 +31,9 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.pardir, 'scripts')))
 
 # -- Project information -----------------------------------------------------
 
-distribution_name = 'l2ss-py'
-project = importlib_metadata.distribution(distribution_name).metadata['Name']
+distribution_name = 'podaac-l2ss-py'
+# Display name is kept as 'l2ss-py' regardless of the PyPI distribution name
+project = 'l2ss-py'
 author = importlib_metadata.distribution(distribution_name).metadata['Author']
 version = importlib_metadata.distribution(distribution_name).version
 release = version

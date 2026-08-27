@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- [issue/429] (https://github.com/podaac/l2ss-py/issues/429) Change extension output to .nc
+- Renamed project to podaac-l2ss-py due to lockout of test.pypi.org project
+- Updated deploy process of project to pypi.org
+  - Now using Trusted Publisher Management
 ### Deprecated
 ### Removed
 - Removed poetry as a dependency (should have poetry externally already)
@@ -14,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
 - Optimize performance of ScanTime variable computation
 - [issue/435] (https://github.com/podaac/l2ss-py/issues/435) Extra unneeded dimension scales included in output
+- [issue/441] (https://github.com/podaac/l2ss-py/issues/441) Make l2ss-py work with TEMPO L1 data.
 ### Security
 - Updated dependency libraries
 

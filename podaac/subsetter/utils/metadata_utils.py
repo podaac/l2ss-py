@@ -20,7 +20,7 @@ from xarray import DataTree
 
 from podaac.subsetter.utils import spatial_utils
 
-SERVICE_NAME = "l2ss-py"
+SERVICE_NAME = "podaac-l2ss-py"
 
 
 def set_json_history(

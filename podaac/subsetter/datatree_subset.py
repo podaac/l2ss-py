@@ -1,6 +1,6 @@
 """script to help with subsetting xarray datatree objects"""
+# pylint: disable=inconsistent-return-statements, too-many-return-statements, too-many-nested-blocks
 
-# pylint: disable=inconsistent-return-statements
 import logging
 import re
 from typing import Literal
@@ -23,6 +23,45 @@ except ImportError:
 
 
 GROUP_DELIM = "/"  # Adjust based on actual dataset structure
+
+# netCDF4 default fill values keyed by numpy dtype kind+itemsize
+_NETCDF4_DEFAULT_FILLVALS = {
+    "i1": np.int8(-127),
+    "i2": np.int16(-32767),
+    "i4": np.int32(-2147483647),
+    "i8": np.int64(-9223372036854775806),
+    "u1": np.uint8(255),
+    "u2": np.uint16(65535),
+    "u4": np.uint32(4294967295),
+    "u8": np.uint64(18446744073709551614),
+    "f4": np.float32(9.969209968386869e+36),
+    "f8": np.float64(9.969209968386869e+36),
+}
+
+
+def _get_fill_value_for_var(var: xr.DataArray):
+    """Return the fill value to use for a variable during .where() masking.
+
+    Uses the variable's _FillValue attribute if present, otherwise falls back
+    to the netCDF4 default fill value for the variable's dtype. Returns np.nan
+    as a last resort (for dtypes without a default, e.g. strings).
+    """
+    fill = var.attrs.get("_FillValue")
+    if fill is not None:
+        if np.issubdtype(var.dtype, np.datetime64):
+            return np.datetime64("nat")
+        if np.issubdtype(var.dtype, np.timedelta64):
+            return np.timedelta64("nat")
+        return fill
+    if np.issubdtype(var.dtype, np.datetime64):
+        return np.datetime64("nat")
+    if np.issubdtype(var.dtype, np.timedelta64):
+        return np.timedelta64("nat")
+    key = f"{var.dtype.kind}{var.dtype.itemsize}"
+    default = _NETCDF4_DEFAULT_FILLVALS.get(key)
+    if default is not None:
+        return var.dtype.type(default)
+    return np.nan
 
 
 def get_indexers_from_1d(cond: xr.Dataset) -> dict:
@@ -221,8 +260,8 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
     """
 
     def process_node(
-        node: DataTree, path: str, empty_paths
-    ) -> tuple[xr.Dataset, dict[str, DataTree]]:  # pylint: disable=too-many-branches
+        node: DataTree, path: str, empty_paths, parent_processed_ds=None
+    ) -> tuple[xr.Dataset, dict[str, DataTree], dict | None]:  # pylint: disable=too-many-branches
         """
         Process a single node and its children in the tree.
 
@@ -232,11 +271,15 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             The node to process
         path : str
             The current path of the node
+        parent_processed_ds : xr.Dataset, optional
+            The parent's processed (subsetted) dataset, used to align children
+            that share dimensions with their parent but have no subset condition
+            of their own.
 
         Returns
         -------
-        Tuple[xr.Dataset, Dict[str, DataTree]]
-            Processed dataset and dictionary of processed child nodes
+        Tuple[xr.Dataset, Dict[str, DataTree], dict | None]
+            Processed dataset, dictionary of processed child nodes, and indexers
         """
         cond = get_sibling_or_parent_condition(condition_dict, path)
 
@@ -275,7 +318,11 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                 # Get variables with and without indexers
                 subset_vars, non_subset_vars = get_variables_with_indexers(dataset, indexers)
 
-                new_dataset_sub = indexed_ds[subset_vars].where(indexed_cond)
+                subset_dict = {}
+                for var_name in subset_vars:
+                    fv = _get_fill_value_for_var(indexed_ds[var_name])
+                    subset_dict[var_name] = indexed_ds[var_name].where(indexed_cond, other=fv)
+                new_dataset_sub = xr.Dataset(subset_dict)
                 # data with variables that shouldn't be subsetted
                 new_dataset_non_sub = indexed_ds[non_subset_vars]
 
@@ -287,7 +334,6 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             # Cast all variables to their original type
             for variable_name, variable in new_dataset.data_vars.items():
                 original_type = indexed_ds[variable_name].dtype
-                new_type = variable.dtype
                 indexed_var = indexed_ds[variable_name]
 
                 if (
@@ -304,7 +350,8 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
 
                     var_cond = cond.any(axis=cond.dims.index(missing_dim)).isel(**var_indexers)
                     indexed_var = dataset[variable_name].isel(**var_indexers)
-                    new_dataset[variable_name] = indexed_var.where(var_cond)
+                    fv = _get_fill_value_for_var(indexed_var)
+                    new_dataset[variable_name] = indexed_var.where(var_cond, other=fv)
                     variable = new_dataset[variable_name]
                 elif (
                     partial_dim_in_in_vars
@@ -316,41 +363,43 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
                     new_dataset[variable_name].attrs = indexed_var.attrs
                     variable.attrs = indexed_var.attrs
                 # Check if variable has no _FillValue. If so, use original data
-                if "_FillValue" not in variable.attrs or len(indexed_var.shape) == 0:
-                    if original_type != new_type:
-                        new_dataset[variable_name] = xr.apply_ufunc(
-                            cast_type, variable, str(original_type), dask="allowed", keep_attrs=True
-                        )
-
-                    # Replace nans with values from original dataset. If the
-                    # variable has more than one dimension, copy the entire
-                    # variable over, otherwise use a NaN mask to copy over the
-                    # relevant values.
-                    new_dataset[variable_name] = indexed_var
-                    new_dataset[variable_name].attrs = indexed_var.attrs
-                    variable.attrs = indexed_var.attrs
-                    new_dataset[variable_name].encoding["_FillValue"] = None
-                    variable.encoding["_FillValue"] = None
-
-                else:
-                    # Manually replace nans with FillValue
-                    # If variable represents time, cast _FillValue to datetime
+                if "_FillValue" in variable.attrs and len(indexed_var.shape) > 0:
                     fill_value = new_dataset[variable_name].attrs.get("_FillValue")
 
-                    if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.datetime64)):
+                    if np.issubdtype(original_type, np.dtype(np.datetime64)):
                         fill_value = np.datetime64("nat")
-                    if np.issubdtype(new_dataset[variable_name].dtype, np.dtype(np.timedelta64)):
+                    elif np.issubdtype(original_type, np.dtype(np.timedelta64)):
                         fill_value = np.timedelta64("nat")
+
                     new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
-                    if original_type != new_type:
+
+                    if original_type != new_dataset[variable_name].dtype:
                         new_dataset[variable_name] = xr.apply_ufunc(
-                            cast_type, new_dataset[variable_name], str(original_type), dask="allowed", keep_attrs=True
+                            cast_type,
+                            new_dataset[variable_name],
+                            str(original_type),
+                            dask="allowed",
+                            keep_attrs=True,
                         )
             processed_ds = new_dataset
             dc.sync_dims_inplace(dataset, processed_ds)
         else:
             processed_ds = dataset.copy()
             processed_ds.attrs.update(dataset.attrs)
+            if parent_processed_ds is not None:
+                sel_kwargs = {}
+                for dim in list(processed_ds.dims):
+                    if (dim in parent_processed_ds.dims
+                            and dim in processed_ds.coords
+                            and dim in parent_processed_ds.coords):
+                        parent_values = parent_processed_ds[dim].values
+                        child_values = processed_ds[dim].values
+                        if len(parent_values) != len(child_values) or not np.array_equal(parent_values, child_values):
+                            common = np.intersect1d(parent_values, child_values)
+                            if len(common) > 0:
+                                sel_kwargs[dim] = common
+                if sel_kwargs:
+                    processed_ds = processed_ds.sel(**sel_kwargs)
 
         processed_children = {}
         for child_name, child_node in node.children.items():
@@ -359,10 +408,12 @@ def where_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) ->
             # If the child is in empty_paths, apply indexers if present to align dimensions recursively
             if current_path in empty_paths:
                 if indexers is not None:
-                    child_node = apply_indexers_to_tree(child_node, indexers)
+                    child_node = apply_indexers_to_tree(child_node, indexers, processed_ds)
                 processed_children[child_name] = child_node
             else:
-                child_ds, child_children, child_indexers = process_node(child_node, current_path, empty_paths)
+                child_ds, child_children, child_indexers = process_node(
+                    child_node, current_path, empty_paths, processed_ds
+                )
 
                 # --- Align parent and child datasets before attaching child ---
                 if indexers is None and child_indexers:
@@ -691,7 +742,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
                 if result == "/sample_time":
                     # Check if '/solar_time' exists in the dataset
                     if "/solar_time" in [f"/{v}" for v in ds.variables]:
-                        print("returning solar time")
                         return "/solar_time"
                 return result
     return None
@@ -1038,15 +1088,36 @@ def update_dataset_with_time(
     return ds
 
 
-def apply_indexers_to_tree(node: DataTree, indexers: dict) -> DataTree:
+def apply_indexers_to_tree(node: DataTree, indexers: dict, parent_ds=None) -> DataTree:
     """
     Recursively apply indexers to a DataTree node and all its descendants.
     Returns a new DataTree with the same structure but with all datasets subsetted.
+
+    If parent_ds is provided, shared coordinate dimensions are aligned by value
+    (using .sel) rather than by position, to handle cases where the child has a
+    different range of coordinate values than the parent.
     """
     ds = node.ds
     if ds is not None:
-        ds = ds.isel(**indexers, missing_dims="ignore")
+        if parent_ds is not None:
+            sel_kwargs = {}
+            for dim in list(ds.dims):
+                if dim in parent_ds.dims and dim in ds.coords and dim in parent_ds.coords:
+                    parent_values = parent_ds[dim].values
+                    child_values = ds[dim].values
+                    # Preserve parent order in the intersection
+                    common = parent_values[np.isin(parent_values, child_values)]
+                    if len(common) == 0:
+                        continue
+                    if not np.array_equal(common, child_values):
+                        sel_kwargs[dim] = common
+            if sel_kwargs:
+                ds = ds.sel(**sel_kwargs)
+            else:
+                ds = ds.isel(**indexers, missing_dims="ignore")
+        else:
+            ds = ds.isel(**indexers, missing_dims="ignore")
     new_node = DataTree(name=node.name, dataset=ds)
     for child_name, child_node in node.children.items():
-        new_node[child_name] = apply_indexers_to_tree(child_node, indexers)
+        new_node[child_name] = apply_indexers_to_tree(child_node, indexers, ds)
     return new_node
