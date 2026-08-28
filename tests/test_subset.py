@@ -517,7 +517,7 @@ def test_shapefile_subset(data_dir, subset_output_dir, request):
 
     # Check that each point of data is within the shapefile
     shapefile_df = gpd.read_file(shapefile_file_path)
-    with xr.open_dataset(output_file_path) as result_dataset:
+    with xr.open_dataset(output_file_path, decode_times=False) as result_dataset:
         def in_shape(lon, lat):
             if np.isnan(lon) or np.isnan(lat):
                 return

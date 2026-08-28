@@ -234,6 +234,89 @@ def get_coordinate_variable_names(
     return lat_var_names, lon_var_names, time_var_names
 
 
+def find_coordinate_origin_node(
+    tree: xr.DataTree,
+    node_path: str,
+    coord_name: str,
+) -> str | None:
+    """
+    Find the path of the DataTree node where a coordinate is actually defined.
+
+    Walks up the ancestry chain from the given node, checking each node's
+    own dataset (``node.ds``) for the coordinate. Returns the path of the
+    first ancestor that owns it, or ``None`` if the coordinate does not
+    exist anywhere in the ancestry.
+
+    Parameters
+    ----------
+    tree : DataTree
+        The root DataTree.
+    node_path : str
+        The path of the node to start searching from (e.g. "/group/subgroup").
+    coord_name : str
+        The name of the coordinate to locate.
+
+    Returns
+    -------
+    str or None
+        The path string of the node that defines the coordinate, or ``None``.
+
+    Examples
+    --------
+    >>> origin = find_coordinate_origin_node(dt, "/group/subgroup", "time")
+    >>> # Returns "/" if time is defined at the root
+    """
+    node: xr.DataTree | None = tree[node_path]
+
+    # iterate from current node to root via closest parents (inclusive
+    # of current node)
+    for n in (node, *node.parents):
+        # have to use to_dataset so that we can specificy *not* to
+        # include the inherited coords
+        if coord_name in n.to_dataset(inherit=False).coords:
+            return n.path
+
+    return None
+
+
+def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set[str]:
+    """
+    Collect and construct the full set of paths to coordinate
+    variables (if any) which each variable depends on.
+
+    Parameters
+    ----------
+    tree : DataTree
+        The root DataTree.
+    variables : list[str]
+        The name of the coordinate to locate.
+
+    Returns
+    -------
+    set[str]
+        A set containing the paths to the coordinate variables
+    """
+    keep_coords: set[str] = set()
+    for var in variables:
+        try:
+            var_node = tree[var]
+        except KeyError:
+            continue
+
+        node_path = var.rsplit("/", 1)[0] or "/"  # get the prefix path
+        for leaf in var_node.coords:
+            # want to find where the dimension variable
+            # actually lives, continuing if none present
+            owning_node = find_coordinate_origin_node(tree, node_path, leaf)
+            if not owning_node:
+                continue
+            # strip root "/", otherwise we end up with something like "//corner"
+            if owning_node == "/":
+                owning_node = ""
+            keep_coords.add(f"{owning_node}/{leaf}")
+    return keep_coords
+
+
 def _compute_utc_name(dataset: xr.Dataset) -> str | None:
     """
     Get the name of the utc variable if it is there to determine origine time

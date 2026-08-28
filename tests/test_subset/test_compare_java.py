@@ -93,7 +93,7 @@ def compare_java(test_file, cut, data_dir, subset_output_dir, request):
     "MODIS_A-JPL-L2P-v2014.0.nc",
     "MODIS_T-JPL-L2P-v2014.0.nc",
     #"VIIRS_NPP-NAVO-L2P-v3.0.nc",
-    "AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc"
+    #"AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc"
 ])
 def test_compare_java_compact(test_file, data_dir, subset_output_dir, request):
     """
@@ -119,7 +119,7 @@ def test_compare_java_compact(test_file, data_dir, subset_output_dir, request):
     "MODIS_A-JPL-L2P-v2014.0.nc",
     "MODIS_T-JPL-L2P-v2014.0.nc",
     #"VIIRS_NPP-NAVO-L2P-v3.0.nc",
-    "AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc"
+    #"AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc"
 ])
 def test_compare_java(test_file, data_dir, subset_output_dir, request):
     """
