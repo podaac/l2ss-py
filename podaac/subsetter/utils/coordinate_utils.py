@@ -303,7 +303,7 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
         except KeyError:
             continue
 
-        node_path = var.rsplit("/", 1)[0]  # get the prefix path
+        node_path = var.rsplit("/", 1)[0] or "/"  # get the prefix path
         for leaf in var_node.coords:
             # want to find where the dimension variable
             # actually lives, continuing if none present
