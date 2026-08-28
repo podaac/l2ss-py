@@ -294,7 +294,7 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
     Returns
     -------
     set[str]
-        A set containing the paths to the coordinate and required 
+        A set containing the paths to the coordinate and required
         auxiliary parameter variables
     """
     keep_coords: set[str] = set()
