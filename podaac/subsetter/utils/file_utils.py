@@ -39,13 +39,25 @@ def chunk_datatree(datatree: xr.DataTree) -> xr.DataTree:
     for node in datatree.subtree:
         # skip intermediate group nodes that carry no data variables
         # or dimensions. these are structural nodes only.
-        if not node.ds or not node.ds.data_vars or not node.ds.dims:
+        if not node.ds or not node.ds.dims:
             continue
 
+        # some cases where a node will have dimensions that no data
+        # variables use. in that case a value error will be raised if
+        # we pass a mapping to the dataset with dimension that does not
+        # exist. collect only the dims that are used by at least 1
+        # variable, and chunks along their axis.
+        active_dims: set[str] = {dim for var in node.ds.data_vars.values() for dim in var.dims}
+
         chunks = calculate_chunks(node)
-        if chunks:
-            # overide node chunks directly
-            node.ds = node.ds.chunk(chunks)
+        if not chunks:
+            continue
+
+        # drop any chunk keys that belong to inherited but unused dimensions
+        active_chunks: dict[str, int] = {dim: size for dim, size in chunks.items() if dim in active_dims}
+
+        if active_chunks:
+            node.ds = node.ds.chunk(active_chunks)
 
     return datatree
 
@@ -56,10 +68,12 @@ def calculate_chunks(node: xr.DataTree | xr.Dataset) -> Mapping[Hashable, int]:
     worth chunking. Any dimension larger than 4000 will be chunked. This
     is done to ensure that the variable can fit in memory.
     """
-    if len(node.dims) <= 3:
-        chunk = {dim: 4000 for dim in node.dims if node.sizes[dim] > 4000 and len(node.dims) > 1}
+    ds = node.ds if hasattr(node, 'ds') else node
+    dims = ds.sizes
+    if len(dims) <= 3:
+        chunk = {dim: 4000 for dim in dims if dims[dim] > 4000 and len(dims) > 1}
     else:
-        chunk = {dim: 500 for dim in node.dims if node.sizes[dim] > 500}
+        chunk = {dim: 500 for dim in dims if dims[dim] > 500}
     return chunk
 
 

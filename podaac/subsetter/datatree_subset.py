@@ -747,11 +747,6 @@ def compute_time_variable_name_tree(tree, lat_var, total_time_vars):
     return None
 
 
-def remove_scale_offset(value: float, scale: float, offset: float) -> float:
-    """Remove scale and offset from the given value"""
-    return (value * scale) - offset
-
-
 def tree_get_spatial_bounds(
     datatree: xr.Dataset, lat_var_names: list[str], lon_var_names: list[str]
 ) -> np.ndarray | None:
@@ -798,22 +793,22 @@ def tree_get_spatial_bounds(
             lats = lat_data.values.flatten()
             lons = lon_data.values.flatten()
 
-            # Apply fill value masks if present
-            lat_fill = lat_attrs.get("_FillValue")
-            lon_fill = lon_attrs.get("_FillValue")
-
-            if lat_fill is not None:
-                lats = lats[lats != lat_fill]
-            if lon_fill is not None:
-                lons = lons[lons != lon_fill]
-
             if len(lats) == 0 or len(lons) == 0:
                 continue
 
-            original_min_lat = remove_scale_offset(np.nanmin(lats), lat_scale, lat_offset)
-            original_max_lat = remove_scale_offset(np.nanmax(lats), lat_scale, lat_offset)
-            original_min_lon = remove_scale_offset(np.nanmin(lons), lon_scale, lon_offset)
-            original_max_lon = remove_scale_offset(np.nanmax(lons), lon_scale, lon_offset)
+            # Scale all values, then filter to physically valid coordinate ranges
+            scaled_lats = (lats * lat_scale) + lat_offset
+            scaled_lons = (lons * lon_scale) + lon_offset
+            scaled_lats = scaled_lats[(scaled_lats >= -90) & (scaled_lats <= 90)]
+            scaled_lons = scaled_lons[(scaled_lons >= -180) & (scaled_lons <= 360)]
+
+            if len(scaled_lats) == 0 or len(scaled_lons) == 0:
+                continue
+
+            original_min_lat = np.nanmin(scaled_lats)
+            original_max_lat = np.nanmax(scaled_lats)
+            original_min_lon = np.nanmin(scaled_lons)
+            original_max_lon = np.nanmax(scaled_lons)
 
             min_lat = round(original_min_lat, 5)
             max_lat = round(original_max_lat, 5)
