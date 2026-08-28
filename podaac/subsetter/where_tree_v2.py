@@ -14,6 +14,7 @@ except ImportError:
         pass
 
 from podaac.subsetter.datatree_subset import (
+    _get_fill_value_for_var,
     cast_type,
     get_indexers_from_1d,
     get_indexers_from_nd,
@@ -227,25 +228,26 @@ def _apply_masking(ds, indexed_cond):
             # No overlap: don't mask this variable
             continue
 
-        # No _FillValue: keep original data (no NaN masking)
-        if "_FillValue" not in var.attrs or len(var.shape) == 0:
+        if len(var.shape) == 0:
             new_dataset[variable_name] = var
-            new_dataset[variable_name].encoding["_FillValue"] = None
-        else:
-            # Has _FillValue: apply .where(), replace NaN with fill value
-            masked = var.where(var_cond)
+            continue
+
+        fv = _get_fill_value_for_var(var)
+        new_dataset[variable_name] = var.where(var_cond, other=fv)
+
+        if "_FillValue" in var.attrs:
             fill_value = var.attrs.get("_FillValue")
             if np.issubdtype(var.dtype, np.dtype(np.datetime64)):
                 fill_value = np.datetime64("nat")
             if np.issubdtype(var.dtype, np.dtype(np.timedelta64)):
                 fill_value = np.timedelta64("nat")
-            new_dataset[variable_name] = masked.fillna(fill_value)
-            # Restore original dtype if changed
-            if new_dataset[variable_name].dtype != var.dtype:
-                new_dataset[variable_name] = xr.apply_ufunc(
-                    cast_type, new_dataset[variable_name], str(var.dtype),
-                    dask="allowed", keep_attrs=True
-                )
+            new_dataset[variable_name] = new_dataset[variable_name].fillna(fill_value)
+
+        if new_dataset[variable_name].dtype != var.dtype:
+            new_dataset[variable_name] = xr.apply_ufunc(
+                cast_type, new_dataset[variable_name], str(var.dtype),
+                dask="allowed", keep_attrs=True
+            )
 
     return new_dataset
 
