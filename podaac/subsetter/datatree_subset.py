@@ -204,14 +204,14 @@ def get_sibling_or_parent_condition(condition_dict, path):
 def is_empty(dt, check_attrs=False):
     """
     Check if a DataTree node is empty.
-    If check_attrs is True, only require data_vars, ds.attrs, and dt.attrs to be empty.
+    If check_attrs is True, only require data_vars, coords, ds.attrs, and dt.attrs to be empty.
     If check_attrs is False, require both data_vars and coords to be empty.
     """
     ds = dt.ds
     if ds is None:
         return True
     if check_attrs:
-        return len(ds.data_vars) == 0 and len(ds.attrs) == 0 and len(dt.attrs) == 0
+        return len(ds.data_vars) == 0 and len(ds.coords) == 0 and len(ds.attrs) == 0 and len(dt.attrs) == 0
     return len(ds.data_vars) == 0 and len(ds.coords) == 0
 
 

@@ -294,16 +294,33 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
     Returns
     -------
     set[str]
-        A set containing the paths to the coordinate variables
+        A set containing the paths to the coordinate and required
+        auxiliary parameter variables
     """
     keep_coords: set[str] = set()
+    all_var_dims: set[str] = set()
+
     for var in variables:
         try:
             var_node = tree[var]
         except KeyError:
             continue
 
+        all_var_dims.update(var_node.dims)
+
+        # xarray moves the CF "coordinates" attribute into .encoding during
+        # decode_cf, so check both locations.
+        coord_str = var_node.attrs.get("coordinates", None) or var_node.encoding.get("coordinates", None)
+        if coord_str:
+            node_path = var.rsplit("/", 1)[0]
+            for coord_ref in coord_str.split():
+                if "/" in coord_ref:
+                    keep_coords.add("/" + coord_ref.strip("/"))
+                else:
+                    keep_coords.add(f"{node_path}/{coord_ref}")
+
         node_path = var.rsplit("/", 1)[0] or "/"  # get the prefix path
+
         for leaf in var_node.coords:
             # want to find where the dimension variable
             # actually lives, continuing if none present
@@ -314,6 +331,41 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
             if owning_node == "/":
                 owning_node = ""
             keep_coords.add(f"{owning_node}/{leaf}")
+
+    # Determine spatial/geolocation dimensions from coordinate variables
+    # already identified (lat, lon, time). Parameter groups should not
+    # overlap with these dimensions.
+    spatial_dims: set[str] = set()
+    for coord_path in keep_coords:
+        try:
+            spatial_dims.update(tree[coord_path].dims)
+        except KeyError:
+            continue
+
+    # Retain variables from "parameter" groups — groups where every variable's
+    # dimensions are a subset of the requested variables' dimensions AND do not
+    # overlap with spatial/geolocation dimensions. These groups hold auxiliary
+    # coordinate/descriptor variables (e.g. sensor_band_parameters) that
+    # describe non-spatial dimensions like wavelength or view angle.
+    var_groups = {var.rsplit("/", 1)[0] or "/" for var in variables if "/" in var}
+    for node in tree.subtree:
+        if node.ds is None or not node.ds.data_vars:
+            continue
+        group_path = node.path
+        if group_path in var_groups:
+            continue
+        group_dims: set[str] = set()
+        for v in node.ds.data_vars:
+            group_dims.update(node.ds[v].dims)
+        if group_dims & spatial_dims:
+            continue
+        if group_dims.issubset(all_var_dims):
+            prefix = group_path.rstrip("/")
+            for v in node.ds.data_vars:
+                keep_coords.add(f"{prefix}/{v}")
+            for c in node.to_dataset(inherit=False).coords:
+                keep_coords.add(f"{prefix}/{c}")
+
     return keep_coords
 
 

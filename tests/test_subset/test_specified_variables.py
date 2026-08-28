@@ -67,7 +67,7 @@ _test_table: list[VariableTestCase] = [
             "/sea_state_bias_ku",
             "/range_used_20hz_ku",
         },
-        want_coord={"/lat", "/lon", "/time", "/meas_ind"},
+        want_coord={"/lat", "/lon", "/lat_20hz", "/lon_20hz", "/time", "/meas_ind"},
     ),
     VariableTestCase(
         input="AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc",

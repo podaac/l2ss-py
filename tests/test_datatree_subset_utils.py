@@ -26,6 +26,32 @@ def test_is_empty_and_subtree_is_empty():
     tree.ds = xr.Dataset()
     assert subtree_is_empty(tree)
 
+def test_is_empty_check_attrs_true():
+    # Dataset with coords only (no data_vars) is NOT empty when check_attrs=True
+    ds_with_coords = xr.Dataset(coords={"x": [1, 2, 3]})
+    tree = DataTree(ds_with_coords)
+    assert not is_empty(tree, check_attrs=True)
+    assert is_empty(tree, check_attrs=False) is False
+
+    # Dataset with attrs only is NOT empty when check_attrs=True
+    ds_with_attrs = xr.Dataset()
+    ds_with_attrs.attrs["key"] = "value"
+    tree_attrs = DataTree(ds_with_attrs)
+    assert not is_empty(tree_attrs, check_attrs=True)
+    assert is_empty(tree_attrs, check_attrs=False)
+
+    # Fully empty dataset is empty regardless of check_attrs
+    empty_tree = DataTree(xr.Dataset())
+    assert is_empty(empty_tree, check_attrs=True)
+    assert is_empty(empty_tree, check_attrs=False)
+
+    # subtree_is_empty with check_attrs=True: child has coords only
+    parent = DataTree(xr.Dataset())
+    parent["child"] = DataTree(xr.Dataset(coords={"y": [4, 5]}))
+    assert subtree_is_empty(parent, check_attrs=False) is False
+    assert subtree_is_empty(parent, check_attrs=True) is False
+
+
 def test_find_fully_empty_paths():
     tree = make_simple_tree()
     tree.ds = xr.Dataset()
