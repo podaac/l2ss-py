@@ -7,18 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- [issue/444] (https://github.com/podaac/l2ss-py/issues/444) HARP2 and SPEXone subset file by variable subset needs to include the sensor_band_parameters group.
+### Deprecated
+### Removed
+### Fixed
+### Security
+
+
+## [3.3.3]
+### Added
+### Changed
 - [issue/429] (https://github.com/podaac/l2ss-py/issues/429) Change extension output to .nc
 - Renamed project to podaac-l2ss-py due to lockout of test.pypi.org project
 - Updated deploy process of project to pypi.org
   - Now using Trusted Publisher Management
 ### Deprecated
 ### Removed
-- Removed poetry as a dependency (should have poetry externally already)
 ### Fixed
-- [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
 - Optimize performance of ScanTime variable computation
 - [issue/435] (https://github.com/podaac/l2ss-py/issues/435) Extra unneeded dimension scales included in output
 - [issue/441] (https://github.com/podaac/l2ss-py/issues/441) Make l2ss-py work with TEMPO L1 data.
+### Security
+
+
+## [3.3.2]
+### Added
+- [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
+### Changed
+- [issue/402] (https://github.com/podaac/l2ss-py/issues/402) Update tests which focus on HDF/EOS subsetting, add in pytest based granule fixtures
+### Deprecated
+### Removed
+- Removed poetry as a dependency (should have poetry externally already)
+### Fixed
+- [issue/405] (https://github.com/podaac/l2ss-py/issues/405) Chunk logic now handles data without dimensions in root node.
 ### Security
 - Updated dependency libraries
 
@@ -26,11 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [3.3.1]
 ### Added
 - Updated readme documentation
-- [issue/399] (https://github.com/podaac/l2ss-py/issues/399) Added ruff and black to the project
 ### Changed
 - Changed way Cygnss collection finds time variable
 - Update time encoding with units
-- [issue/402] (https://github.com/podaac/l2ss-py/issues/402) Update tests which focus on HDF/EOS subsetting, add in pytest based granule fixtures:w
 ### Deprecated
 ### Removed
 ### Fixed
