@@ -294,7 +294,8 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
     Returns
     -------
     set[str]
-        A set containing the paths to the coordinate variables
+        A set containing the paths to the coordinate and required 
+        auxiliary parameter variables
     """
     keep_coords: set[str] = set()
     all_var_dims: set[str] = set()
@@ -347,7 +348,7 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
     # describe non-spatial dimensions like wavelength or view angle.
     var_groups = {var.rsplit("/", 1)[0] or "/" for var in variables if "/" in var}
     for node in tree.subtree:
-        if not node.ds.data_vars:
+        if node.ds is None or not node.ds.data_vars:
             continue
         group_path = node.path
         if group_path in var_groups:
