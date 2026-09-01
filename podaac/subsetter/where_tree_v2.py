@@ -11,9 +11,9 @@ from podaac.subsetter.datatree_subset import (
     cast_type,
     get_indexers_from_1d,
     get_indexers_from_nd,
-    subtree_is_empty,
     get_sibling_or_parent_condition,
-    where_tree
+    subtree_is_empty,
+    where_tree,
 )
 from podaac.subsetter.utils import mask_utils
 
