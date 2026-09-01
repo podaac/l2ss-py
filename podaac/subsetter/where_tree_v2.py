@@ -1,25 +1,27 @@
 """Simplified where_tree using DataTree.isel for tree-wide subsetting."""
 
+# pylint: disable=duplicate-code
 import numpy as np
 import xarray as xr
 from xarray import DataTree
 
 from podaac.subsetter import dimension_cleanup as dc
-from podaac.subsetter.utils import mask_utils
-
-try:
-    from harmony_service_lib.exceptions import NoDataException
-except ImportError:
-    class NoDataException(Exception):
-        pass
-
 from podaac.subsetter.datatree_subset import (
     _get_fill_value_for_var,
     cast_type,
     get_indexers_from_1d,
     get_indexers_from_nd,
     subtree_is_empty,
+    get_sibling_or_parent_condition,
+    where_tree
 )
+from podaac.subsetter.utils import mask_utils
+
+try:
+    from harmony_service_lib.exceptions import NoDataException
+except ImportError:
+    class NoDataException(Exception):
+        """Fallback exception when harmony_service_lib is not installed."""
 
 
 def where_tree_v2(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
@@ -94,7 +96,6 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
                 grp_indexed_cond = indexed_per_group.get(node_path)
                 if grp_indexed_cond is not None:
                     return _apply_masking(ds, grp_indexed_cond)
-                from podaac.subsetter.datatree_subset import get_sibling_or_parent_condition
                 sibling_cond = get_sibling_or_parent_condition(indexed_per_group, node_path)
                 if sibling_cond is not None:
                     return _apply_masking(ds, sibling_cond)
@@ -123,11 +124,6 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
 
 def _apply_per_group(tree, condition_dict, cut, pixel_subset):
     """Apply different conditions to different subtrees when dimensions conflict."""
-    from podaac.subsetter.datatree_subset import (
-        get_sibling_or_parent_condition,
-        where_tree,
-    )
-    # Fall back to the original where_tree for this complex case
     return where_tree(tree, condition_dict, cut, pixel_subset)
 
 
@@ -172,7 +168,7 @@ def _resolve_condition(tree, condition_dict):
     # Pick condition whose dims best match the tree
     best_cond = None
     best_score = -1
-    for path, cond in condition_dict.items():
+    for _, cond in condition_dict.items():
         score = 0
         for dim in cond.dims:
             if dim in dim_sizes:
