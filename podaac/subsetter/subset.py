@@ -42,7 +42,7 @@ from podaac.subsetter.utils import (
     variables_utils,
 )
 from podaac.subsetter.vertical_subset import vertical_subset
-from podaac.subsetter.where_tree_v2 import where_tree_v2
+from podaac.subsetter.subset_tree import subset_tree
 
 SERVICE_NAME = "podaac-l2ss-py"
 
@@ -135,7 +135,7 @@ def subset_with_shapefile_multi(dataset: xr.Dataset,
         masks[lat_path] = mask_da
 
     # Apply your datatree-aware masking logic
-    return_dataset = datatree_subset.where_tree(dataset, masks, cut, pixel_subset)
+    return_dataset = subset_tree(dataset, masks, cut, pixel_subset)
     return return_dataset
 
 
@@ -250,7 +250,7 @@ def subset_with_bbox(
         elif lat_path == lon_path and len(time_var_names) == 1:
             subset_dictionary[lat_path] = operation
 
-    return_dataset = where_tree_v2(dataset, subset_dictionary, cut, pixel_subset)
+    return_dataset = subset_tree(dataset, subset_dictionary, cut, pixel_subset)
 
     if vertical_var is not None:
         return vertical_subset(

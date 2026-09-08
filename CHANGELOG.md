@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 - [issue/429] (https://github.com/podaac/l2ss-py/issues/429) Change extension output to .nc
+- [issue/89] (https://github.com/podaac/l2ss-py/issues/89) Variables without fill value will use xarray default fill value for the type.
 - Renamed project to podaac-l2ss-py due to lockout of test.pypi.org project
 - Updated deploy process of project to pypi.org
   - Now using Trusted Publisher Management

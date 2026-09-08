@@ -151,14 +151,14 @@ class TestApplyIndexersToTreeWithParentDs:
 class TestParentProcessedDsAlignment:
     """Tests for the parent_processed_ds alignment in the else branch of process_node.
 
-    This tests the behavior indirectly through where_tree since process_node is
+    This tests the behavior indirectly through subset_tree since process_node is
     a nested function.
     """
 
     def test_child_aligned_to_parent_when_subsetted(self):
         """A child node that shares a coordinate dimension with a subsetted
         parent should be trimmed to match the parent's subsetted range."""
-        from podaac.subsetter.datatree_subset import where_tree
+        from podaac.subsetter.subset_tree import subset_tree
 
         # Parent and child share x with same size (DataTree allows this)
         parent_ds = xr.Dataset(
@@ -179,7 +179,7 @@ class TestParentProcessedDsAlignment:
         )
         condition_dict = {"/": cond}
 
-        result = where_tree(tree, condition_dict, cut=True)
+        result = subset_tree(tree, condition_dict, cut=True)
 
         # Parent should be subsetted to x=[1,2,3]
         np.testing.assert_array_equal(result.ds.coords["x"].values, [1, 2, 3])
@@ -194,7 +194,7 @@ class TestParentProcessedDsAlignment:
     def test_child_not_modified_when_all_kept(self):
         """A child with the same coordinate range as the parent is unchanged
         when all values pass the condition."""
-        from podaac.subsetter.datatree_subset import where_tree
+        from podaac.subsetter.subset_tree import subset_tree
 
         coords = np.arange(5)
         parent_ds = xr.Dataset(
@@ -215,7 +215,7 @@ class TestParentProcessedDsAlignment:
         )
         condition_dict = {"/": cond}
 
-        result = where_tree(tree, condition_dict, cut=True)
+        result = subset_tree(tree, condition_dict, cut=True)
 
         np.testing.assert_array_equal(
             result["child"].ds.coords["x"].values, coords
@@ -223,7 +223,7 @@ class TestParentProcessedDsAlignment:
 
     def test_child_with_no_shared_dim_unchanged(self):
         """A child with different dims from parent is not affected by parent subsetting."""
-        from podaac.subsetter.datatree_subset import where_tree
+        from podaac.subsetter.subset_tree import subset_tree
 
         parent_ds = xr.Dataset(
             {"temp": ("x", np.arange(5, dtype=float))},
@@ -243,7 +243,7 @@ class TestParentProcessedDsAlignment:
         )
         condition_dict = {"/": cond}
 
-        result = where_tree(tree, condition_dict, cut=True)
+        result = subset_tree(tree, condition_dict, cut=True)
 
         # Child has dim 'y' - should be unchanged
         np.testing.assert_array_equal(
@@ -255,7 +255,7 @@ class TestParentProcessedDsAlignment:
         """When the first child returns indexers that subset the parent's
         processed_ds, the second child (which has no condition) gets aligned
         to the updated parent coordinates."""
-        from podaac.subsetter.datatree_subset import where_tree
+        from podaac.subsetter.subset_tree import subset_tree
 
         # Root has x-dim data. Two children under 'child1' have conditions at depth 2.
         # 'child2' at depth 1 has NO condition match -> goes to else branch.
@@ -297,7 +297,7 @@ class TestParentProcessedDsAlignment:
         )
         condition_dict = {"/child1/sub1": cond, "/child1/sub2": cond}
 
-        result = where_tree(tree, condition_dict, cut=True)
+        result = subset_tree(tree, condition_dict, cut=True)
 
         # child2 should be aligned to the subsetted parent x=[2,3,4,5,6]
         np.testing.assert_array_equal(
@@ -310,7 +310,7 @@ class TestParentProcessedDsAlignment:
     def test_empty_subtree_gets_indexers_applied(self):
         """When a child is in empty_paths and the parent has indexers,
         apply_indexers_to_tree is called with the parent's processed_ds."""
-        from podaac.subsetter.datatree_subset import where_tree
+        from podaac.subsetter.subset_tree import subset_tree
 
         # Root with phony_dim (no coords, so children don't inherit)
         root_ds = xr.Dataset(
@@ -328,7 +328,7 @@ class TestParentProcessedDsAlignment:
         )
         condition_dict = {"/": cond}
 
-        result = where_tree(tree, condition_dict, cut=True)
+        result = subset_tree(tree, condition_dict, cut=True)
 
         # Root should be subsetted (5 values kept from 10)
         assert result.ds.sizes["phony_dim_0"] == 5

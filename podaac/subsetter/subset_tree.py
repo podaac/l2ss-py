@@ -1,4 +1,4 @@
-"""Simplified where_tree using DataTree.isel for tree-wide subsetting."""
+"""Subset a DataTree spatially using condition masks and index slicing."""
 
 # pylint: disable=duplicate-code
 import numpy as np
@@ -8,12 +8,13 @@ from xarray import DataTree
 from podaac.subsetter import dimension_cleanup as dc
 from podaac.subsetter.datatree_subset import (
     _get_fill_value_for_var,
+    apply_indexers_to_tree,
     cast_type,
+    find_fully_empty_paths,
     get_indexers_from_1d,
     get_indexers_from_nd,
     get_sibling_or_parent_condition,
     subtree_is_empty,
-    where_tree,
 )
 from podaac.subsetter.utils import mask_utils
 
@@ -24,9 +25,9 @@ except ImportError:
         """Fallback exception when harmony_service_lib is not installed."""
 
 
-def where_tree_v2(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
+def subset_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
-    Simplified where_tree using DataTree operations for tree-wide subsetting.
+    Subset a DataTree by applying spatial condition masks.
 
     When all groups share the same dimension sizes, a single tree-wide isel is
     used. When groups have conflicting sizes on the same dimension name (e.g.,
@@ -122,9 +123,98 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
     return _prune_empty(result)
 
 
+def _align_to_parent(child_ds, parent_ds):
+    """Align a child dataset to a parent's subsetted coordinate values."""
+    sel_kwargs = {}
+    for dim in list(child_ds.dims):
+        if (dim in parent_ds.dims
+                and dim in child_ds.coords
+                and dim in parent_ds.coords):
+            parent_values = parent_ds[dim].values
+            child_values = child_ds[dim].values
+            if len(parent_values) != len(child_values) or not np.array_equal(parent_values, child_values):
+                common = np.intersect1d(parent_values, child_values)
+                if len(common) > 0:
+                    sel_kwargs[dim] = common
+    if sel_kwargs:
+        return child_ds.sel(**sel_kwargs)
+    return child_ds
+
+
 def _apply_per_group(tree, condition_dict, cut, pixel_subset):
-    """Apply different conditions to different subtrees when dimensions conflict."""
-    return where_tree(tree, condition_dict, cut, pixel_subset)
+    """Apply different conditions to different subtrees when dimensions conflict.
+
+    Each node finds its matching condition via path lookup, builds its own
+    indexers, applies isel + masking independently, then the tree is
+    reassembled.
+    """
+    empty_paths = find_fully_empty_paths(tree)
+
+    def _process_node(node, path, parent_processed_ds=None):
+        cond = get_sibling_or_parent_condition(condition_dict, path)
+        if cond is None and len(condition_dict) == 1:
+            _, cond = next(iter(condition_dict.items()))
+
+        dataset = dc.remove_duplicate_dims_xarray(node.ds)
+        indexers = None
+
+        if dataset.data_vars and cond is not None:
+            cond = mask_utils.align_dims_cond_only(dataset, cond)
+
+            if cond.values.ndim == 1:
+                indexers = get_indexers_from_1d(cond)
+            else:
+                indexers = get_indexers_from_nd(cond, cut)
+
+            if not all(len(v) > 0 for v in indexers.values()):
+                raise NoDataException("No data in subsetted granule.")
+
+            indexed_ds = dataset.isel(**indexers, missing_dims="ignore")
+
+            if pixel_subset:
+                processed_ds = indexed_ds
+            else:
+                indexed_cond = cond.isel(**indexers)
+                processed_ds = _apply_masking(indexed_ds, indexed_cond)
+
+            processed_ds.attrs.update(dataset.attrs)
+            dc.sync_dims_inplace(dataset, processed_ds)
+        else:
+            processed_ds = dataset.copy()
+            processed_ds.attrs.update(dataset.attrs)
+            if parent_processed_ds is not None:
+                processed_ds = _align_to_parent(processed_ds, parent_processed_ds)
+
+        processed_children = {}
+        for child_name, child_node in node.children.items():
+            current_path = f"{path}/{child_name}"
+            if current_path in empty_paths:
+                if indexers is not None:
+                    child_node = apply_indexers_to_tree(child_node, indexers, processed_ds)
+                processed_children[child_name] = child_node
+            else:
+                child_ds, child_children, child_indexers = _process_node(
+                    child_node, current_path, processed_ds
+                )
+                if indexers is None and child_indexers:
+                    indexers = child_indexers
+                    processed_ds = processed_ds.isel(**child_indexers, missing_dims="ignore")
+
+                child_tree = DataTree(name=child_name, dataset=child_ds)
+                for gc_name, gc_tree in child_children.items():
+                    child_tree[gc_name] = gc_tree
+
+                if not subtree_is_empty(child_tree, check_attrs=True):
+                    processed_children[child_name] = child_tree
+
+        return processed_ds, processed_children, indexers
+
+    root_ds, children, _ = _process_node(tree, "")
+    result = DataTree(name=tree.name, dataset=root_ds)
+    for child_name, child_tree in children.items():
+        result[child_name] = child_tree
+    result.attrs.update(tree.attrs)
+    return result
 
 
 def _find_reference_dataset(tree, cond):
