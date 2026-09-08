@@ -362,7 +362,6 @@ def subset(
     """
 
     file_extension = os.path.splitext(file_to_subset)[1]
-    # file_utils.override_decode_cf_datetime()
 
     hdf_type = ""
     scantime_present = False
