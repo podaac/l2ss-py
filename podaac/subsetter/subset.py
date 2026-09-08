@@ -58,7 +58,7 @@ def patched_decode_cf_datetime_dtype(data, units, calendar, use_cftime, time_uni
     """override _decode_cf_datetime_dtype in xarray"""
     try:
         # First, try doing it the normal Xarray way
-        return original_decode_dtype(data, units, calendar, use_cftime, time_unit)
+        return original_decode_dtype(data, units, calendar, use_cftime, time_unit=time_unit)
     except ValueError as e:
         # If it hits your specific "unable to decode time units" bug, intercept it!
         if "unable to decode time units" in str(e):
@@ -67,7 +67,7 @@ def patched_decode_cf_datetime_dtype(data, units, calendar, use_cftime, time_uni
             if use_cftime:
                 return np.dtype("O")  # Object type for cftime
             return np.dtype("datetime64[ns]")
-        raise e
+        raise
 
 
 # 3. Inject our patched function back into Xarray's internals

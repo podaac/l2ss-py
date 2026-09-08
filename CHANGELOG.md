@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 ### Changed
 - [issue/444] (https://github.com/podaac/l2ss-py/issues/444) HARP2 and SPEXone subset file by variable subset needs to include the sensor_band_parameters group.
+- [issue/391] (https://github.com/podaac/l2ss-py/issues/391) Update xarray version and modify datatree subsetting. 
 ### Deprecated
 ### Removed
 ### Fixed

@@ -828,8 +828,8 @@ def test_duplicate_dims_sndr(data_dir, subset_output_dir, request):
     )
     # check if the box_test is
 
-    in_nc = nc.Dataset(join(SNDR_dir, sndr_file), decode_times=False)
-    out_nc = nc.Dataset(join(subset_output_dir, output_file), decode_times=False)
+    in_nc = nc.Dataset(join(SNDR_dir, sndr_file))
+    out_nc = nc.Dataset(join(subset_output_dir, output_file))
 
     for var_name, _ in in_nc.variables.items():
         assert in_nc[var_name].shape == out_nc[var_name].shape

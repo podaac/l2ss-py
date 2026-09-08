@@ -102,18 +102,16 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
                     return _apply_masking(ds, sibling_cond)
                 return ds
 
-            new_children = {}
-            for child_name, child_node in result.children.items():
-                child_path = f"/{child_name}"
-                new_child_ds = _mask_with_per_group(child_node.ds, child_path)
-                new_child = DataTree(name=child_name, dataset=new_child_ds)
-                for gc_name, gc_node in child_node.children.items():
-                    new_child[gc_name] = gc_node
-                new_children[child_name] = new_child
-            result = DataTree(name=result.name, dataset=result.ds)
-            result.attrs.update(tree.attrs)
-            for child_name, child_tree in new_children.items():
-                result[child_name] = child_tree
+            def _mask_tree_recursive(node, path):
+                masked_ds = _mask_with_per_group(node.ds, path)
+                new_node = DataTree(name=node.name, dataset=masked_ds)
+                new_node.attrs.update(node.attrs)
+                for child_name, child_node in node.children.items():
+                    child_path = f"{path}/{child_name}" if path != "/" else f"/{child_name}"
+                    new_node[child_name] = _mask_tree_recursive(child_node, child_path)
+                return new_node
+
+            result = _mask_tree_recursive(result, "/")
         else:
             indexed_cond = cond.isel(**indexers)
             result = result.map_over_datasets(
