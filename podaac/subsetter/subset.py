@@ -31,6 +31,7 @@ import xarray.coding.times
 from shapely.geometry import Point
 
 from podaac.subsetter import datatree_subset, tree_time_converting
+from podaac.subsetter.subset_tree import subset_tree
 from podaac.subsetter.utils import (
     coordinate_utils,
     file_utils,
@@ -42,7 +43,6 @@ from podaac.subsetter.utils import (
     variables_utils,
 )
 from podaac.subsetter.vertical_subset import vertical_subset
-from podaac.subsetter.subset_tree import subset_tree
 
 SERVICE_NAME = "podaac-l2ss-py"
 
