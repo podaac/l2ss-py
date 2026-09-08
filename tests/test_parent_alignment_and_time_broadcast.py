@@ -393,3 +393,317 @@ class TestSubsetWithBboxSingleTimeVar:
         assert len(pairs) == 2
         assert pairs[0] == ("/group1/lat", "/group1/lon", None)
         assert pairs[1] == ("/group2/lat", "/group2/lon", None)
+
+
+class TestSubsetTreeEmptyConditionDict:
+    """Test subset_tree with empty condition dict returns tree unchanged."""
+
+    def test_empty_condition_dict_returns_tree(self):
+        from podaac.subsetter.subset_tree import subset_tree
+
+        ds = xr.Dataset({"temp": (("x", "y"), np.arange(12).reshape(3, 4))})
+        tree = DataTree(name="root", dataset=ds)
+        result = subset_tree(tree, {}, cut=True)
+        assert result is tree
+
+
+class TestSubsetTreeMultiConditionSameShape:
+    """Test subset_tree with multiple conditions that have the same shape."""
+
+    def test_same_shape_conditions_combined_with_or(self):
+        from podaac.subsetter.subset_tree import subset_tree
+
+        root_ds = xr.Dataset({"temp": (("x", "y"), np.arange(20, dtype=np.float64).reshape(4, 5))})
+        root_ds["temp"].attrs["_FillValue"] = -999.0
+        child_ds = xr.Dataset({"salt": (("x", "y"), np.arange(20, dtype=np.float64).reshape(4, 5) * 10)})
+        child_ds["salt"].attrs["_FillValue"] = -999.0
+
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child"] = DataTree(name="child", dataset=child_ds)
+
+        cond1 = xr.DataArray(
+            np.array([[True, True, False, False, False]] * 4),
+            dims=("x", "y"),
+        )
+        cond2 = xr.DataArray(
+            np.array([[False, False, False, True, True]] * 4),
+            dims=("x", "y"),
+        )
+        condition_dict = {"/": cond1, "/child": cond2}
+        result = subset_tree(tree, condition_dict, cut=True)
+
+        assert "child" in result.children
+        assert result.ds.sizes["y"] == 4
+        assert result["child"].ds.sizes["y"] == 4
+
+
+class TestSubsetTreePerGroupDifferentShapes:
+    """Test _apply_per_group with conditions of different shapes."""
+
+    def test_different_shape_conditions(self):
+        from podaac.subsetter.subset_tree import subset_tree
+
+        root_ds = xr.Dataset()
+        child1_ds = xr.Dataset({
+            "temp": (("x",), np.arange(10, dtype=np.float64)),
+        })
+        child1_ds["temp"].attrs["_FillValue"] = -999.0
+        child2_ds = xr.Dataset({
+            "salt": (("y",), np.arange(5, dtype=np.float64)),
+        })
+        child2_ds["salt"].attrs["_FillValue"] = -999.0
+
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child1"] = DataTree(name="child1", dataset=child1_ds)
+        tree["child2"] = DataTree(name="child2", dataset=child2_ds)
+
+        cond1 = xr.DataArray(np.array([True] * 5 + [False] * 5), dims=("x",))
+        cond2 = xr.DataArray(np.array([True, True, False, False, False]), dims=("y",))
+
+        condition_dict = {"/child1": cond1, "/child2": cond2}
+        result = subset_tree(tree, condition_dict, cut=True)
+
+        assert result["child1"].ds.sizes["x"] == 5
+        assert result["child2"].ds.sizes["y"] == 2
+
+
+class TestApplyPerGroupPixelSubset:
+    """Test _apply_per_group with pixel_subset=True."""
+
+    def test_pixel_subset_skips_masking(self):
+        from podaac.subsetter.subset_tree import subset_tree
+
+        root_ds = xr.Dataset()
+        child_ds = xr.Dataset({
+            "temp": (("x",), np.arange(10, dtype=np.float64)),
+        })
+        child_ds["temp"].attrs["_FillValue"] = -999.0
+
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child1"] = DataTree(name="child1", dataset=child_ds)
+
+        cond1 = xr.DataArray(np.array([True] * 5 + [False] * 5), dims=("x",))
+        cond2 = xr.DataArray(np.array([True, True, False]), dims=("z",))
+        condition_dict = {"/child1": cond1, "/other": cond2}
+
+        result = subset_tree(tree, condition_dict, cut=True, pixel_subset=True)
+        assert result["child1"].ds.sizes["x"] == 5
+
+
+class TestApplyPerGroupEmptyPaths:
+    """Test _apply_per_group when child is in empty_paths."""
+
+    def test_empty_child_gets_indexers_applied(self):
+        from podaac.subsetter.subset_tree import subset_tree
+
+        root_ds = xr.Dataset()
+        child_ds = xr.Dataset({
+            "temp": (("x",), np.arange(10, dtype=np.float64)),
+        })
+        child_ds["temp"].attrs["_FillValue"] = -999.0
+        empty_child_ds = xr.Dataset()
+
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child"] = DataTree(name="child", dataset=child_ds)
+        tree["child"]["empty_grandchild"] = DataTree(name="empty_grandchild", dataset=empty_child_ds)
+
+        cond = xr.DataArray(np.array([True] * 5 + [False] * 5), dims=("x",))
+        cond2 = xr.DataArray(np.array([True, True, False]), dims=("z",))
+        condition_dict = {"/child": cond, "/other": cond2}
+
+        result = subset_tree(tree, condition_dict, cut=True)
+        assert result["child"].ds.sizes["x"] == 5
+
+
+class TestApplyPerGroupChildIndexersPropagateToParent:
+    """Test that child indexers propagate up to parent when parent has no condition."""
+
+    def test_child_indexers_propagate(self):
+        from podaac.subsetter.subset_tree import subset_tree
+
+        root_ds = xr.Dataset({
+            "root_var": (("x",), np.arange(10, dtype=np.float64)),
+        })
+        child_ds = xr.Dataset({
+            "temp": (("x",), np.arange(10, dtype=np.float64)),
+        })
+        child_ds["temp"].attrs["_FillValue"] = -999.0
+
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child"] = DataTree(name="child", dataset=child_ds)
+
+        cond1 = xr.DataArray(np.array([True] * 5 + [False] * 5), dims=("x",))
+        cond2 = xr.DataArray(np.array([True, True, False]), dims=("z",))
+        condition_dict = {"/child": cond1, "/other": cond2}
+
+        result = subset_tree(tree, condition_dict, cut=True)
+        assert result.ds.sizes["x"] == 5
+
+
+class TestAlignToParent:
+    """Test _align_to_parent directly."""
+
+    def test_aligns_child_to_parent_coords(self):
+        from podaac.subsetter.subset_tree import _align_to_parent
+
+        parent_ds = xr.Dataset(
+            {"temp": ("x", [10, 20, 30])},
+            coords={"x": [0, 1, 2]},
+        )
+        child_ds = xr.Dataset(
+            {"salt": ("x", [100, 200, 300, 400, 500])},
+            coords={"x": [0, 1, 2, 3, 4]},
+        )
+        result = _align_to_parent(child_ds, parent_ds)
+        np.testing.assert_array_equal(result.coords["x"].values, [0, 1, 2])
+
+    def test_no_change_when_already_aligned(self):
+        from podaac.subsetter.subset_tree import _align_to_parent
+
+        parent_ds = xr.Dataset(
+            {"temp": ("x", [10, 20, 30])},
+            coords={"x": [0, 1, 2]},
+        )
+        child_ds = xr.Dataset(
+            {"salt": ("x", [100, 200, 300])},
+            coords={"x": [0, 1, 2]},
+        )
+        result = _align_to_parent(child_ds, parent_ds)
+        np.testing.assert_array_equal(result.coords["x"].values, [0, 1, 2])
+
+
+class TestFindReferenceDataset:
+    """Test _find_reference_dataset."""
+
+    def test_finds_child_when_root_has_no_matching_dims(self):
+        from podaac.subsetter.subset_tree import _find_reference_dataset
+
+        root_ds = xr.Dataset({"meta": (("z",), [1, 2])})
+        child_ds = xr.Dataset({"temp": (("x", "y"), np.zeros((3, 4)))})
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child"] = DataTree(name="child", dataset=child_ds)
+
+        cond = xr.DataArray(np.ones((3, 4), dtype=bool), dims=("x", "y"))
+        ref = _find_reference_dataset(tree, cond)
+        assert set(ref.dims) == {"x", "y"}
+
+    def test_falls_back_to_root(self):
+        from podaac.subsetter.subset_tree import _find_reference_dataset
+
+        root_ds = xr.Dataset({"meta": (("z",), [1, 2])})
+        tree = DataTree(name="root", dataset=root_ds)
+
+        cond = xr.DataArray(np.ones(3, dtype=bool), dims=("x",))
+        ref = _find_reference_dataset(tree, cond)
+        assert "z" in ref.dims
+
+
+class TestResolveCondition:
+    """Test _resolve_condition."""
+
+    def test_single_condition(self):
+        from podaac.subsetter.subset_tree import _resolve_condition
+
+        tree = DataTree(name="root", dataset=xr.Dataset({"temp": (("x",), [1, 2, 3])}))
+        cond = xr.DataArray(np.ones(3, dtype=bool), dims=("x",))
+        result = _resolve_condition(tree, {"path": cond})
+        assert result is cond
+
+    def test_empty_dict(self):
+        from podaac.subsetter.subset_tree import _resolve_condition
+
+        tree = DataTree(name="root", dataset=xr.Dataset({"temp": (("x",), [1, 2, 3])}))
+        result = _resolve_condition(tree, {})
+        assert result is None
+
+    def test_picks_best_matching_condition(self):
+        from podaac.subsetter.subset_tree import _resolve_condition
+
+        child_ds = xr.Dataset({"temp": (("x",), np.arange(5))})
+        root_ds = xr.Dataset({"meta": (("x",), np.arange(5))})
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["child"] = DataTree(name="child", dataset=child_ds)
+
+        cond_good = xr.DataArray(np.ones(5, dtype=bool), dims=("x",))
+        cond_bad = xr.DataArray(np.ones(3, dtype=bool), dims=("y",))
+        result = _resolve_condition(tree, {"/child": cond_good, "/other": cond_bad})
+        assert result is cond_good
+
+
+class TestApplyMaskingEdgeCases:
+    """Test _apply_masking edge cases."""
+
+    def test_no_data_vars_returns_unchanged(self):
+        from podaac.subsetter.subset_tree import _apply_masking
+
+        ds = xr.Dataset()
+        cond = xr.DataArray(np.ones(3, dtype=bool), dims=("x",))
+        result = _apply_masking(ds, cond)
+        assert len(result.data_vars) == 0
+
+    def test_no_dim_overlap_returns_unchanged(self):
+        from podaac.subsetter.subset_tree import _apply_masking
+
+        ds = xr.Dataset({"temp": (("z",), [1.0, 2.0, 3.0])})
+        cond = xr.DataArray(np.ones(3, dtype=bool), dims=("x",))
+        result = _apply_masking(ds, cond)
+        np.testing.assert_array_equal(result["temp"].values, [1.0, 2.0, 3.0])
+
+    def test_partial_dim_overlap_collapses_extra_dims(self):
+        from podaac.subsetter.subset_tree import _apply_masking
+
+        ds = xr.Dataset({
+            "temp_1d": (("x",), np.arange(3, dtype=np.float64)),
+        })
+        ds["temp_1d"].attrs["_FillValue"] = -999.0
+        cond = xr.DataArray(
+            np.array([[True, False], [True, True], [False, False]]),
+            dims=("x", "y"),
+        )
+        result = _apply_masking(ds, cond)
+        assert result["temp_1d"].values[0] == 0.0
+        assert result["temp_1d"].values[1] == 1.0
+        assert result["temp_1d"].values[2] == -999.0
+
+    def test_scalar_variable_preserved(self):
+        from podaac.subsetter.subset_tree import _apply_masking
+
+        ds = xr.Dataset({
+            "temp": (("x",), [1.0, 2.0, 3.0]),
+            "scalar_val": ((), 42.0),
+        })
+        ds["scalar_val"].attrs["_FillValue"] = -999.0
+        cond = xr.DataArray(np.array([True, False, True]), dims=("x",))
+        result = _apply_masking(ds, cond)
+        assert float(result["scalar_val"].values) == 42.0
+
+    def test_fillna_and_dtype_casting(self):
+        from podaac.subsetter.subset_tree import _apply_masking
+
+        ds = xr.Dataset({
+            "temp": (("x",), np.array([1, 2, 3], dtype=np.int32)),
+        })
+        ds["temp"].attrs["_FillValue"] = -999
+        cond = xr.DataArray(np.array([True, False, True]), dims=("x",))
+        result = _apply_masking(ds, cond)
+        assert result["temp"].dtype == np.int32
+        assert result["temp"].values[1] == -999
+
+
+class TestPruneEmpty:
+    """Test _prune_empty."""
+
+    def test_removes_fully_empty_subtrees(self):
+        from podaac.subsetter.subset_tree import _prune_empty
+
+        root_ds = xr.Dataset({"temp": (("x",), [1, 2, 3])})
+        tree = DataTree(name="root", dataset=root_ds)
+        tree["empty_child"] = DataTree(name="empty_child", dataset=xr.Dataset())
+        tree["data_child"] = DataTree(
+            name="data_child",
+            dataset=xr.Dataset({"salt": (("x",), [4, 5, 6])}),
+        )
+
+        result = _prune_empty(tree)
+        assert "data_child" in result.children
+        assert "empty_child" not in result.children
