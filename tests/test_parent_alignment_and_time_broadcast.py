@@ -598,36 +598,54 @@ class TestFindReferenceDataset:
         assert "z" in ref.dims
 
 
-class TestResolveCondition:
-    """Test _resolve_condition."""
+class TestBuildIndexers:
+    """Test _build_indexers."""
 
-    def test_single_condition(self):
-        from podaac.subsetter.subset_tree import _resolve_condition
+    def test_1d_condition(self):
+        from podaac.subsetter.subset_tree import _build_indexers
 
-        tree = DataTree(name="root", dataset=xr.Dataset({"temp": (("x",), [1, 2, 3])}))
-        cond = xr.DataArray(np.ones(3, dtype=bool), dims=("x",))
-        result = _resolve_condition(tree, {"path": cond})
-        assert result is cond
+        cond = xr.DataArray(np.array([True, False, True, False]), dims=("x",))
+        indexers = _build_indexers(cond, cut=True)
+        np.testing.assert_array_equal(indexers["x"], [0, 2])
 
-    def test_empty_dict(self):
-        from podaac.subsetter.subset_tree import _resolve_condition
+    def test_2d_condition(self):
+        from podaac.subsetter.subset_tree import _build_indexers
 
-        tree = DataTree(name="root", dataset=xr.Dataset({"temp": (("x",), [1, 2, 3])}))
-        result = _resolve_condition(tree, {})
-        assert result is None
+        cond = xr.DataArray(
+            np.array([[True, False], [False, False], [True, True]]),
+            dims=("x", "y"),
+        )
+        indexers = _build_indexers(cond, cut=True)
+        assert "x" in indexers
+        assert "y" in indexers
 
-    def test_picks_best_matching_condition(self):
-        from podaac.subsetter.subset_tree import _resolve_condition
 
-        child_ds = xr.Dataset({"temp": (("x",), np.arange(5))})
-        root_ds = xr.Dataset({"meta": (("x",), np.arange(5))})
-        tree = DataTree(name="root", dataset=root_ds)
-        tree["child"] = DataTree(name="child", dataset=child_ds)
+class TestSubsetDataset:
+    """Test _subset_dataset."""
 
-        cond_good = xr.DataArray(np.ones(5, dtype=bool), dims=("x",))
-        cond_bad = xr.DataArray(np.ones(3, dtype=bool), dims=("y",))
-        result = _resolve_condition(tree, {"/child": cond_good, "/other": cond_bad})
-        assert result is cond_good
+    def test_subsets_and_masks(self):
+        from podaac.subsetter.subset_tree import _subset_dataset
+
+        ds = xr.Dataset({
+            "temp": (("x",), np.arange(6, dtype=np.float64)),
+        })
+        ds["temp"].attrs["_FillValue"] = -999.0
+        cond = xr.DataArray(np.array([True, True, True, False, False, False]), dims=("x",))
+
+        processed_ds, indexers = _subset_dataset(ds, cond, cut=True, pixel_subset=False)
+        assert processed_ds.sizes["x"] == 3
+        np.testing.assert_array_equal(indexers["x"], [0, 1, 2])
+
+    def test_pixel_subset_skips_masking(self):
+        from podaac.subsetter.subset_tree import _subset_dataset
+
+        ds = xr.Dataset({
+            "temp": (("x",), np.arange(6, dtype=np.float64)),
+        })
+        cond = xr.DataArray(np.array([True, True, True, False, False, False]), dims=("x",))
+
+        processed_ds, indexers = _subset_dataset(ds, cond, cut=True, pixel_subset=True)
+        assert processed_ds.sizes["x"] == 3
 
 
 class TestApplyMaskingEdgeCases:

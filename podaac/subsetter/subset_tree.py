@@ -25,6 +25,36 @@ except ImportError:
         """Fallback exception when harmony_service_lib is not installed."""
 
 
+def _build_indexers(cond, cut):
+    """Build indexers from a boolean condition array."""
+    if cond.values.ndim == 1:
+        return get_indexers_from_1d(cond)
+    return get_indexers_from_nd(cond, cut)
+
+
+def _subset_dataset(dataset, cond, cut, pixel_subset):
+    """Align condition to dataset, build indexers, apply isel and optional masking.
+
+    Returns (processed_ds, indexers).
+    """
+    cond = mask_utils.align_dims_cond_only(dataset, cond)
+    indexers = _build_indexers(cond, cut)
+
+    if not all(len(v) > 0 for v in indexers.values()):
+        raise NoDataException("No data in subsetted granule.")
+
+    indexed_ds = dataset.isel(**indexers, missing_dims="ignore")
+
+    if pixel_subset:
+        processed_ds = indexed_ds
+    else:
+        indexed_cond = cond.isel(**indexers)
+        processed_ds = _apply_masking(indexed_ds, indexed_cond, pre_aligned=True)
+
+    processed_ds.attrs.update(dataset.attrs)
+    return processed_ds, indexers
+
+
 def subset_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -> DataTree:
     """
     Subset a DataTree by applying spatial condition masks.
@@ -71,17 +101,12 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
     """
     ref_ds = _find_reference_dataset(tree, cond)
     cond = mask_utils.align_dims_cond_only(ref_ds, cond)
-
-    if cond.values.ndim == 1:
-        indexers = get_indexers_from_1d(cond)
-    else:
-        indexers = get_indexers_from_nd(cond, cut)
+    indexers = _build_indexers(cond, cut)
 
     if not all(len(value) > 0 for value in indexers.values()):
         raise NoDataException("No data in subsetted granule.")
 
     # Tree-wide isel via map_over_datasets (handles empty nodes gracefully).
-    # Also fix duplicate dims before indexing.
     result = tree.map_over_datasets(
         lambda ds: dc.remove_duplicate_dims_xarray(ds).isel(**indexers, missing_dims="ignore")
     )
@@ -96,10 +121,10 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
             def _mask_with_per_group(ds, node_path):
                 grp_indexed_cond = indexed_per_group.get(node_path)
                 if grp_indexed_cond is not None:
-                    return _apply_masking(ds, grp_indexed_cond)
+                    return _apply_masking(ds, grp_indexed_cond, pre_aligned=True)
                 sibling_cond = get_sibling_or_parent_condition(indexed_per_group, node_path)
                 if sibling_cond is not None:
-                    return _apply_masking(ds, sibling_cond)
+                    return _apply_masking(ds, sibling_cond, pre_aligned=True)
                 return ds
 
             def _mask_tree_recursive(node, path):
@@ -157,25 +182,7 @@ def _apply_per_group(tree, condition_dict, cut, pixel_subset):
         indexers = None
 
         if dataset.data_vars and cond is not None:
-            cond = mask_utils.align_dims_cond_only(dataset, cond)
-
-            if cond.values.ndim == 1:
-                indexers = get_indexers_from_1d(cond)
-            else:
-                indexers = get_indexers_from_nd(cond, cut)
-
-            if not all(len(v) > 0 for v in indexers.values()):
-                raise NoDataException("No data in subsetted granule.")
-
-            indexed_ds = dataset.isel(**indexers, missing_dims="ignore")
-
-            if pixel_subset:
-                processed_ds = indexed_ds
-            else:
-                indexed_cond = cond.isel(**indexers)
-                processed_ds = _apply_masking(indexed_ds, indexed_cond)
-
-            processed_ds.attrs.update(dataset.attrs)
+            processed_ds, indexers = _subset_dataset(dataset, cond, cut, pixel_subset)
             dc.sync_dims_inplace(dataset, processed_ds)
         else:
             processed_ds = dataset.copy()
@@ -219,11 +226,9 @@ def _find_reference_dataset(tree, cond):
     """Find a dataset in the tree that shares dimensions with the condition.
     Falls back to the root dataset if no match is found."""
     cond_dims = set(cond.dims)
-    # Check root first
     root_ds = dc.remove_duplicate_dims_xarray(tree.ds)
     if cond_dims.intersection(set(root_ds.dims)):
         return root_ds
-    # Search children for a dataset with matching dims
     for node in tree.subtree:
         ds = node.ds
         if ds is not None and ds.dims:
@@ -233,63 +238,28 @@ def _find_reference_dataset(tree, cond):
     return root_ds
 
 
-def _resolve_condition(tree, condition_dict):
-    """Resolve a single unified condition to apply to the whole tree.
-
-    For single-condition dicts, return it directly. For multi-condition dicts,
-    find the condition whose dimensions best match the tree's primary dimensions.
-    Multiple conditions typically represent the same spatial bbox applied to
-    different groups — we pick the one that aligns with the most nodes.
-    """
-    if not condition_dict:
-        return None
-    if len(condition_dict) == 1:
-        return next(iter(condition_dict.values()))
-    # Multiple conditions with potentially different sizes (e.g., different
-    # groups with different time dimension lengths). Find the condition
-    # whose size matches the most common dimension size in the tree.
-    dim_sizes = {}
-    for node in tree.subtree:
-        for dim, size in node.ds.sizes.items():
-            dim_sizes.setdefault(dim, []).append(size)
-
-    # Pick condition whose dims best match the tree
-    best_cond = None
-    best_score = -1
-    for _, cond in condition_dict.items():
-        score = 0
-        for dim in cond.dims:
-            if dim in dim_sizes:
-                cond_size = cond.sizes[dim]
-                if cond_size in dim_sizes[dim]:
-                    score += dim_sizes[dim].count(cond_size)
-        if score > best_score:
-            best_score = score
-            best_cond = cond
-    return best_cond
-
-
-def _apply_masking(ds, indexed_cond):
+def _apply_masking(ds, indexed_cond, pre_aligned=False):
     """Apply .where() NaN masking and fill-value/type-casting logic per dataset.
 
-    At this point, `ds` has already been isel'd (cut to the bounding region).
-    We apply .where() to NaN-mask values that are inside the bounding box of
-    indices but outside the actual spatial condition.
+    Parameters
+    ----------
+    ds : xr.Dataset
+        Dataset already cut to the bounding region via isel.
+    indexed_cond : xr.DataArray
+        Boolean condition, already isel'd to match ds dimensions.
+    pre_aligned : bool
+        If True, skip the align_dims_cond_only call (caller already aligned).
     """
     if not ds.data_vars:
         return ds
 
-    # Check if condition dims overlap with this dataset's dims
     cond_dims = set(indexed_cond.dims)
     ds_dims = set(ds.dims)
     if not cond_dims.intersection(ds_dims):
         return ds
 
-    # Align condition to this dataset's dims
-    aligned_cond = mask_utils.align_dims_cond_only(ds, indexed_cond)
+    aligned_cond = indexed_cond if pre_aligned else mask_utils.align_dims_cond_only(ds, indexed_cond)
 
-    # For variables with partial dim overlap (e.g., 1D time var when cond is 2D),
-    # collapse the missing dims in the condition before applying .where()
     new_dataset = ds.copy()
     new_dataset.attrs.update(ds.attrs)
 
@@ -298,18 +268,14 @@ def _apply_masking(ds, indexed_cond):
         var_dims = set(var.dims)
         cond_var_dims = set(aligned_cond.dims)
 
-        # Determine the appropriate condition for this variable
         if cond_var_dims.issubset(var_dims):
-            # Full overlap: apply condition directly
             var_cond = aligned_cond
         elif cond_var_dims.intersection(var_dims):
-            # Partial overlap: collapse dims not in the variable
             extra_dims = cond_var_dims - var_dims
             var_cond = aligned_cond
             for dim in extra_dims:
                 var_cond = var_cond.any(dim=dim)
         else:
-            # No overlap: don't mask this variable
             continue
 
         if len(var.shape) == 0:
