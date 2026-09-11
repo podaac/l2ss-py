@@ -207,7 +207,7 @@ jobs:
 
       - name: Publish UMM-S with new version
         id: publish-umm-s
-        uses: podaac/cmr-umm-updater@0.6.0
+        uses: podaac/cmr-umm-updater@0.8.0
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')

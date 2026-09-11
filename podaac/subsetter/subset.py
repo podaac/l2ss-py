@@ -18,6 +18,7 @@ subset.py
 Functions related to subsetting a NetCDF file.
 """
 
+# pylint: disable=protected-access
 import copy
 import os
 from itertools import zip_longest
@@ -26,9 +27,11 @@ import geopandas as gpd
 import netCDF4 as nc
 import numpy as np
 import xarray as xr
+import xarray.coding.times
 from shapely.geometry import Point
 
 from podaac.subsetter import datatree_subset, tree_time_converting
+from podaac.subsetter.subset_tree import subset_tree
 from podaac.subsetter.utils import (
     coordinate_utils,
     file_utils,
@@ -46,14 +49,37 @@ SERVICE_NAME = "podaac-l2ss-py"
 _HDF_EXTENSIONS: list[str] = [".hdf5", ".he5", ".h5", ".hdf"]
 
 
-def subset_with_shapefile_multi(
-    dataset: xr.Dataset,
-    lat_var_names: list[str],
-    lon_var_names: list[str],
-    shapefile: str,
-    cut: bool,
-    pixel_subset: bool,
-) -> xr.Dataset:
+# 1. Save the original Xarray function so we don't permanently break it
+original_decode_dtype = xarray.coding.times._decode_cf_datetime_dtype
+
+
+# 2. Define our custom, error-proof version
+def patched_decode_cf_datetime_dtype(data, units, calendar, use_cftime, time_unit="ns"):
+    """override _decode_cf_datetime_dtype in xarray"""
+    try:
+        # First, try doing it the normal Xarray way
+        return original_decode_dtype(data, units, calendar, use_cftime, time_unit=time_unit)
+    except ValueError as e:
+        # If it hits your specific "unable to decode time units" bug, intercept it!
+        if "unable to decode time units" in str(e):
+            # Bypass the test and force Xarray to assume the standard time types.
+            # It will replace the bad fill values with 'NaT' (Not a Time) later.
+            if use_cftime:
+                return np.dtype("O")  # Object type for cftime
+            return np.dtype("datetime64[ns]")
+        raise
+
+
+# 3. Inject our patched function back into Xarray's internals
+xarray.coding.times._decode_cf_datetime_dtype = patched_decode_cf_datetime_dtype
+
+
+def subset_with_shapefile_multi(dataset: xr.Dataset,
+                                lat_var_names: list[str],
+                                lon_var_names: list[str],
+                                shapefile: str,
+                                cut: bool,
+                                pixel_subset: bool) -> xr.Dataset:
     """
     Subset an xarray Dataset using a shapefile for multiple latitude and longitude variable pairs
 
@@ -109,7 +135,7 @@ def subset_with_shapefile_multi(
         masks[lat_path] = mask_da
 
     # Apply your datatree-aware masking logic
-    return_dataset = datatree_subset.where_tree(dataset, masks, cut, pixel_subset)
+    return_dataset = subset_tree(dataset, masks, cut, pixel_subset)
     return return_dataset
 
 
@@ -224,7 +250,7 @@ def subset_with_bbox(
         elif lat_path == lon_path and len(time_var_names) == 1:
             subset_dictionary[lat_path] = operation
 
-    return_dataset = datatree_subset.where_tree(dataset, subset_dictionary, cut, pixel_subset)
+    return_dataset = subset_tree(dataset, subset_dictionary, cut, pixel_subset)
 
     if vertical_var is not None:
         return vertical_subset(
@@ -336,7 +362,6 @@ def subset(
     """
 
     file_extension = os.path.splitext(file_to_subset)[1]
-    file_utils.override_decode_cf_datetime()
 
     hdf_type = ""
     scantime_present = False
@@ -351,9 +376,9 @@ def subset(
             scantime_present = file_utils.has_scantime(dataset)
 
     if min_time or max_time:
-        fill_value_f8 = nc.default_fillvals.get("f8")
-        float_dtypes = ["float64", "float32"]
-        args["decode_times"] = True
+        fill_value_f8 = nc.default_fillvals.get('f8')
+        float_dtypes = ['float64', 'float32']
+        args['decode_times'] = (xr.coders.CFDatetimeCoder(use_cftime=True, time_unit="ns"), None)
         # try to open file to see if we can access the time variable
         try:
             with nc.Dataset(file_to_subset, "r") as nc_dataset:
@@ -377,6 +402,7 @@ def subset(
     time_calendar_attributes = {}
 
     if args["decode_times"]:
+        args['decode_timedelta'] = True
         with xr.open_datatree(file_to_subset, decode_times=False) as dataset:
             lat_var_names, lon_var_names, time_var_names = coordinate_utils.get_coordinate_variable_names(
                 dataset=dataset, lat_var_names=lat_var_names, lon_var_names=lon_var_names, time_var_names=time_var_names
