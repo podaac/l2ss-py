@@ -549,6 +549,21 @@ def subset(
         subsetted_dataset = datatree_subset.clean_inherited_coords(subsetted_dataset)
 
         encoding = datatree_subset.prepare_basic_encoding(subsetted_dataset, time_encoding)
+
+        if time_encoding:
+            for group_path, group_vars in time_encoding.items():
+                for var_name in group_vars:
+                    full_path = f"{group_path}/{var_name}" if group_path != "/" else f"/{var_name}"
+                    try:
+                        var = subsetted_dataset[full_path]
+                    except KeyError:
+                        continue
+                    if hasattr(var.data, 'dask'):
+                        node = subsetted_dataset[group_path]
+                        ds = node.to_dataset()
+                        ds[var_name] = var.compute()
+                        node.ds = ds
+
         spatial_bounds_array = datatree_subset.tree_get_spatial_bounds(subsetted_dataset, lat_var_names, lon_var_names)
         metadata_utils.update_netcdf_attrs(
             output_file,
