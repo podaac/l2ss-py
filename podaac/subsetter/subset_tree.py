@@ -74,7 +74,10 @@ def subset_tree(tree: DataTree, condition_dict, cut: bool, pixel_subset=False) -
 
     # Multiple conditions: check if they're compatible (same shape)
     conditions = list(condition_dict.values())
-    shapes_match = all(c.shape == conditions[0].shape for c in conditions)
+    shapes_match = all(
+        c.shape == conditions[0].shape and c.dims == conditions[0].dims
+        for c in conditions
+    )
 
     if shapes_match:
         # Same shape: combine with OR for indexers (keep any row/col where

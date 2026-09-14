@@ -560,7 +560,7 @@ def subset(
                         continue
                     if hasattr(var.data, 'dask'):
                         node = subsetted_dataset[group_path]
-                        ds = node.to_dataset()
+                        ds = node.to_dataset(inherit=False)
                         ds[var_name] = var.compute()
                         node.ds = ds
 

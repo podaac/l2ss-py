@@ -1588,9 +1588,8 @@ def test_bad_time_unit(subset_output_dir):
     nc_out_location = join(subset_output_dir, "bad_time.nc")
     ds.to_netcdf(nc_out_location)
 
-    #file_utils.override_decode_cf_datetime()
-
     ds_test = xr.open_dataset(nc_out_location)
+    ds_test["time"].values
     ds_test.close()
 
 

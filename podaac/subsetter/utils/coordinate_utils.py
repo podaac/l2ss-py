@@ -359,7 +359,7 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
             group_dims.update(node.ds[v].dims)
         if group_dims & spatial_dims:
             continue
-        if group_dims.issubset(all_var_dims):
+        if group_dims and group_dims.issubset(all_var_dims):
             prefix = group_path.rstrip("/")
             for v in node.ds.data_vars:
                 keep_coords.add(f"{prefix}/{v}")
