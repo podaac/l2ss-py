@@ -4,10 +4,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+### Added
+### Changed
+### Deprecated
+### Removed
+### Fixed
+### Security
+
+
+## [3.3.4]
+### Added
+### Changed
+- [issue/444] (https://github.com/podaac/l2ss-py/issues/444) HARP2 and SPEXone subset file by variable subset needs to include the sensor_band_parameters group.
+- [issue/391] (https://github.com/podaac/l2ss-py/issues/391) Update xarray version and modify datatree subsetting. 
+### Deprecated
+### Removed
+### Fixed
+- [issue/441](https://github.com/podaac/l2ss-py/issues/441): Make l2ss-py work with TEMPO L1 data.
+### Security
+
+
 ## [3.3.3]
 ### Added
 ### Changed
 - [issue/429] (https://github.com/podaac/l2ss-py/issues/429) Change extension output to .nc
+- [issue/89] (https://github.com/podaac/l2ss-py/issues/89) Variables without fill value will use xarray default fill value for the type.
 - Renamed project to podaac-l2ss-py due to lockout of test.pypi.org project
 - Updated deploy process of project to pypi.org
   - Now using Trusted Publisher Management
@@ -16,7 +38,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Optimize performance of ScanTime variable computation
 - [issue/435] (https://github.com/podaac/l2ss-py/issues/435) Extra unneeded dimension scales included in output
-- [issue/441] (https://github.com/podaac/l2ss-py/issues/441) Make l2ss-py work with TEMPO L1 data.
 ### Security
 
 

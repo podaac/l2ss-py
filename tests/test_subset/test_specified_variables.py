@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from podaac.subsetter import subset
+from podaac.subsetter.utils.coordinate_utils import collect_coordinate_variables
 from podaac.subsetter.utils.variables_utils import get_vars_with_paths
 
 
@@ -67,7 +68,7 @@ _test_table: list[VariableTestCase] = [
             "/sea_state_bias_ku",
             "/range_used_20hz_ku",
         },
-        want_coord={"/lat", "/lon", "/time", "/meas_ind"},
+        want_coord={"/lat", "/lon", "/lat_20hz", "/lon_20hz", "/time", "/meas_ind"},
     ),
     VariableTestCase(
         input="AMSR2-L2B_v08_r38622-v02.0-fv01.0.nc",
@@ -171,3 +172,48 @@ def test_specified_variables(case, data_dir: str, tmp_path: Path):
         # indicating that nothing is present that is not expected to
         # be present. E.g. extra dimension scale vars
         assert (case.want_var | case.want_coord) ^ all_vars == set()
+
+
+def test_variable_subset_no_extra_groups_without_cf_coords():
+    """Regression test: when a multi-group file has no CF coordinate
+    attributes (e.g. GPM/TRMM HDF5), variable subsetting must not
+    retain variables from sibling groups that share the same dimensions
+    as lat/lon."""
+
+    nscan, nray = 20, 5
+
+    root_ds = xr.Dataset({"AlgorithmRuntimeInfo": ("info", ["v1"])})
+    tree = xr.DataTree(dataset=root_ds)
+
+    tree["FS"] = xr.DataTree(dataset=xr.Dataset({
+        "Latitude": (("nscan", "nray"), np.random.rand(nscan, nray).astype(np.float32)),
+        "Longitude": (("nscan", "nray"), np.random.rand(nscan, nray).astype(np.float32)),
+    }))
+    tree["FS/ScanTime"] = xr.DataTree(dataset=xr.Dataset({
+        "Year": ("nscan", np.full(nscan, 2024, dtype=np.int16)),
+    }))
+    tree["FS/scanStatus"] = xr.DataTree(dataset=xr.Dataset({
+        "dataQuality": ("nscan", np.zeros(nscan, dtype=np.int8)),
+        "modeStatus": ("nscan", np.zeros(nscan, dtype=np.int8)),
+    }))
+    tree["FS/CSF"] = xr.DataTree(dataset=xr.Dataset({
+        "flagBB": (("nscan", "nray"), np.zeros((nscan, nray), dtype=np.int32)),
+        "typePrecip": (("nscan", "nray"), np.zeros((nscan, nray), dtype=np.int32)),
+    }))
+    tree["FS/navigation"] = xr.DataTree(dataset=xr.Dataset({
+        "scLat": ("nscan", np.zeros(nscan, dtype=np.float32)),
+    }))
+
+    keep_variables = ["/AlgorithmRuntimeInfo", "/FS/Latitude", "/FS/Longitude", "/FS/ScanTime/Year"]
+    keep_coords = collect_coordinate_variables(tree, keep_variables)
+
+    keep_set = set(keep_variables) | keep_coords
+
+    unwanted = {
+        "/FS/scanStatus/dataQuality", "/FS/scanStatus/modeStatus",
+        "/FS/CSF/flagBB", "/FS/CSF/typePrecip",
+        "/FS/navigation/scLat",
+    }
+    assert not (unwanted & keep_set), (
+        f"collect_coordinate_variables incorrectly retained: {unwanted & keep_set}"
+    )
