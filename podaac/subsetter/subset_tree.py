@@ -102,6 +102,8 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
         combined condition, so that pixels valid in one group aren't
         incorrectly masked by another group's slightly different grid.
     """
+    empty_paths = set(find_fully_empty_paths(tree))
+
     ref_ds = _find_reference_dataset(tree, cond)
     cond = mask_utils.align_dims_cond_only(ref_ds, cond)
     indexers = _build_indexers(cond, cut)
@@ -146,7 +148,7 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
                 lambda ds: _apply_masking(ds, indexed_cond)
             )
 
-    return _prune_empty(result)
+    return _prune_empty(result, empty_paths)
 
 
 def _align_to_parent(child_ds, parent_ds):
@@ -305,11 +307,15 @@ def _apply_masking(ds, indexed_cond, pre_aligned=False):
     return new_dataset
 
 
-def _prune_empty(tree: DataTree) -> DataTree:
-    """Remove fully empty subtrees from the result."""
+def _prune_empty(tree: DataTree, preserve_paths: set[str] | None = None) -> DataTree:
+    """Remove fully empty subtrees from the result, preserving groups
+    that were already empty in the original input."""
     result = DataTree(name=tree.name, dataset=tree.ds)
     result.attrs.update(tree.attrs)
     for child_name, child_node in tree.children.items():
-        if not subtree_is_empty(child_node, check_attrs=True):
-            result[child_name] = _prune_empty(child_node)
+        child_path = child_node.path
+        if preserve_paths and child_path in preserve_paths:
+            result[child_name] = child_node
+        elif not subtree_is_empty(child_node, check_attrs=True):
+            result[child_name] = _prune_empty(child_node, preserve_paths)
     return result

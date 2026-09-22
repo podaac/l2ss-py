@@ -347,6 +347,12 @@ def collect_coordinate_variables(tree: xr.DataTree, variables: list[str]) -> set
     # overlap with spatial/geolocation dimensions. These groups hold auxiliary
     # coordinate/descriptor variables (e.g. sensor_band_parameters) that
     # describe non-spatial dimensions like wavelength or view angle.
+    # When no spatial dims were identified (e.g. HDF5 files without CF
+    # coordinate attributes), we cannot distinguish spatial data groups from
+    # parameter groups, so skip this heuristic to avoid retaining unrelated
+    # variables.
+    if not spatial_dims:
+        return keep_coords
     var_groups = {var.rsplit("/", 1)[0] or "/" for var in variables if "/" in var}
     for node in tree.subtree:
         if node.ds is None or not node.ds.data_vars:
