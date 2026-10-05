@@ -207,7 +207,7 @@ jobs:
 
       - name: Publish UMM-S with new version
         id: publish-umm-s
-        uses: podaac/cmr-umm-updater@0.6.0
+        uses: podaac/cmr-umm-updater@0.8.0
         if: |
           github.ref == 'refs/heads/main'    ||
           startsWith(github.ref, 'refs/heads/release')
@@ -232,7 +232,7 @@ jobs:
           sleep 120
       - name: Publish UMM-S with new version retry
         id: publish-umm-s-retry
-        uses: podaac/cmr-umm-updater@0.6.0
+        uses: podaac/cmr-umm-updater@0.8.0
         if: |
           steps.publish-umm-s.outcome == 'failure'
         with:
@@ -324,10 +324,11 @@ jobs:
         # to GitHub Code Scanning. continue-on-error keeps a vulnerable image (or a
         # scan error) from failing the build.
         continue-on-error: true
+        if: ${{ (steps.pypi-test-publish.conclusion == 'success' || steps.pypi-publish.conclusion == 'success') && steps.meta.outputs.tags != '' }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-          IMAGE_URI: ${{ fromJSON(steps.meta.outputs.json).tags[0] }}
         run: |
+          IMAGE_URI="$(echo "${{ steps.meta.outputs.tags }}" | head -n1)"
           snyk container test "$IMAGE_URI" \
             --file=docker/Dockerfile \
             --severity-threshold=high \
