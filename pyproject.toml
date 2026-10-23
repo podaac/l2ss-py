@@ -38,9 +38,9 @@ julian = "^0.14"
 importlib-metadata = "^9.0.0"
 h5py = "^3.6.0"
 cf-xarray = "*"
-earthdata-varinfo = { git = "https://github.com/sliu008/earthdata-varinfo.git", branch = "update-numpy" }
+earthdata-varinfo = ">=5.2.1"
 numpy = ">=2.2.4,<2.6"
-pandas = "^2.3"
+pandas = "^3.0.5"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.0.0"
