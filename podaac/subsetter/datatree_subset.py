@@ -137,6 +137,37 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     return indexers
 
 
+def get_all_sibling_conditions(condition_dict, path):
+    """
+    Return all conditions from condition_dict that are siblings of `path`
+    (same parent, same depth).
+
+    Falls back to a list containing the single
+    get_sibling_or_parent_condition result when no same-parent siblings exist.
+    Returns an empty list when no condition can be found at all.
+    """
+    path = path.rstrip("/")
+
+    if path in condition_dict:
+        return [condition_dict[path]]
+
+    path_parts = path.split("/")
+    siblings = [
+        cond
+        for key, cond in condition_dict.items()
+        if (
+            key.rstrip("/").split("/") != path_parts
+            and len(key.rstrip("/").split("/")) == len(path_parts)
+            and key.rstrip("/").split("/")[:-1] == path_parts[:-1]
+        )
+    ]
+    if siblings:
+        return siblings
+
+    single = get_sibling_or_parent_condition(condition_dict, path)
+    return [single] if single is not None else []
+
+
 def get_sibling_or_parent_condition(condition_dict, path):
     """
     Retrieve a condition from a dictionary based on a given path, prioritizing
