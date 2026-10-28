@@ -6,7 +6,11 @@ variables_utils.py
 Utility functions to get variables and normalize variables for a granule files.
 """
 
+import logging
+
 import xarray as xr
+
+logger = logging.getLogger(__name__)
 
 
 def get_vars_with_paths(tree: xr.DataTree) -> set[str]:
@@ -121,3 +125,59 @@ def normalize_candidate_paths_against_dtree(candidates: list[str], all_vars: lis
         resolved.append(resolved_path)
 
     return resolved
+
+
+def get_varinfo_required_variables(
+    file_to_subset: str,
+    requested_variables: list[str] | set[str],
+    all_vars: set[str],
+    short_name: str | None = None,
+) -> set[str]:
+    """
+    Use ``earthdata-varinfo`` to expand a set of requested variables with all
+    variables they require (coordinates, bounds, grid mapping, ancillary
+    variables, cell measures, etc.) by parsing the granule's CF attributes.
+
+    This augments the hand-rolled resolution in
+    ``coordinate_utils.collect_coordinate_variables`` which does not parse the
+    CF ``bounds``, ``grid_mapping``, ``ancillary_variables`` or ``cell_measures``
+    attributes.
+
+    The call is additive and fails soft: any error reading the granule or
+    resolving dependencies results in an empty set so that subsetting can
+    continue using the existing coordinate resolution.
+
+    Parameters
+    ----------
+    file_to_subset : str
+        Path to the granule file to inspect.
+    requested_variables : list[str] or set[str]
+        The variables requested by the user (full DataTree paths, e.g.
+        '/group/var'), including any lat/lon/time variables already added.
+    all_vars : set[str]
+        All variable/coordinate paths present in the DataTree, used to
+        reconcile varinfo's path convention with l2ss-py's and to ensure only
+        existing variables are returned.
+    short_name : str, optional
+        Collection short name, passed through to varinfo.
+
+    Returns
+    -------
+    set[str]
+        Required variable paths in canonical DataTree form ('/group/var'),
+        intersected with ``all_vars``. Empty if varinfo is unavailable or fails.
+    """
+    try:
+        # Imported lazily so a varinfo import error never breaks subsetting.
+        from varinfo import VarInfoFromNetCDF4  # pylint: disable=import-outside-toplevel
+
+        var_info = VarInfoFromNetCDF4(file_to_subset, short_name=short_name)
+        required = var_info.get_required_variables(set(requested_variables))
+    except Exception as err:  # pylint: disable=broad-except
+        logger.warning("earthdata-varinfo required-variable resolution failed: %s", err)
+        return set()
+
+    # Reconcile varinfo's leading-slash full paths with the DataTree convention
+    # and keep only variables that actually exist in the tree.
+    normalized = normalize_candidate_paths_against_dtree(list(required), list(all_vars))
+    return {path for path in normalized if path in all_vars}

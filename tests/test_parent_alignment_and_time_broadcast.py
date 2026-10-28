@@ -725,3 +725,120 @@ class TestPruneEmpty:
         result = _prune_empty(tree)
         assert "data_child" in result.children
         assert "empty_child" not in result.children
+
+
+class TestSiblingGroupWithoutLatLon:
+    """Regression test: a sibling group that has no lat/lon of its own (e.g.
+    TEMPO cloud_mask_group) must retain data whenever ANY sibling band's
+    coordinates fall inside the bounding box — not just the first one found."""
+
+    def test_cloud_mask_retained_when_only_vis_band_matches(self):
+        """Simulate TEMPO: UV band and visible band share identical dims/shapes
+        but have slightly different lat/lon values.  A bbox that selects only
+        visible-band pixels must NOT fill the cloud-mask group with fill values.
+        """
+        from podaac.subsetter.subset_tree import subset_tree
+
+        n = 5  # mirror_step (atrack)
+        m = 6  # xtrack
+
+        # UV-band condition: only cols 0-1 are inside bbox
+        uv_cond = xr.DataArray(
+            np.array([
+                [True,  True,  False, False, False, False],
+                [True,  True,  False, False, False, False],
+                [True,  True,  False, False, False, False],
+                [True,  True,  False, False, False, False],
+                [True,  True,  False, False, False, False],
+            ], dtype=bool),
+            dims=("mirror_step", "xtrack"),
+        )
+        # VIS-band condition: only cols 4-5 are inside bbox (different pixels)
+        vis_cond = xr.DataArray(
+            np.array([
+                [False, False, False, False, True,  True],
+                [False, False, False, False, True,  True],
+                [False, False, False, False, True,  True],
+                [False, False, False, False, True,  True],
+                [False, False, False, False, True,  True],
+            ], dtype=bool),
+            dims=("mirror_step", "xtrack"),
+        )
+
+        uv_ds = xr.Dataset(
+            {"radiance": (("mirror_step", "xtrack"), np.ones((n, m), dtype=np.float32))},
+        )
+        uv_ds["radiance"].attrs["_FillValue"] = -9999.0
+
+        vis_ds = xr.Dataset(
+            {"radiance": (("mirror_step", "xtrack"), np.ones((n, m), dtype=np.float32) * 2)},
+        )
+        vis_ds["radiance"].attrs["_FillValue"] = -9999.0
+
+        # cloud_mask_group has no lat/lon; shares the same dims
+        cloud_ds = xr.Dataset(
+            {"cloud_mask": (("mirror_step", "xtrack"), np.arange(n * m, dtype=np.float32).reshape(n, m))},
+        )
+        cloud_ds["cloud_mask"].attrs["_FillValue"] = -9999.0
+
+        tree = DataTree(name="root", dataset=xr.Dataset())
+        tree["band_290_490_nm"] = DataTree(name="band_290_490_nm", dataset=uv_ds)
+        tree["band_540_740_nm"] = DataTree(name="band_540_740_nm", dataset=vis_ds)
+        tree["cloud_mask_group"] = DataTree(name="cloud_mask_group", dataset=cloud_ds)
+
+        # Only vis-band condition has True pixels in the selected region
+        condition_dict = {
+            "/band_290_490_nm": uv_cond,
+            "/band_540_740_nm": vis_cond,
+        }
+
+        result = subset_tree(tree, condition_dict, cut=True)
+
+        # Cloud mask must still have data (not all fill values)
+        cloud_result = result["cloud_mask_group"].ds["cloud_mask"].values
+        fv = -9999.0
+        assert np.any(cloud_result != fv), (
+            "cloud_mask_group was entirely filled — sibling OR logic not applied"
+        )
+
+    def test_cloud_mask_retained_when_only_uv_band_matches(self):
+        """Symmetrical case: UV matches, VIS does not — cloud mask still retained."""
+        from podaac.subsetter.subset_tree import subset_tree
+
+        n, m = 4, 6
+
+        uv_cond = xr.DataArray(
+            np.zeros((n, m), dtype=bool), dims=("mirror_step", "xtrack")
+        )
+        uv_cond.values[:, :2] = True  # UV selects cols 0-1
+
+        vis_cond = xr.DataArray(
+            np.zeros((n, m), dtype=bool), dims=("mirror_step", "xtrack")
+        )  # VIS selects nothing
+
+        uv_ds = xr.Dataset({"r": (("mirror_step", "xtrack"), np.ones((n, m), dtype=np.float32))})
+        uv_ds["r"].attrs["_FillValue"] = -9999.0
+        vis_ds = xr.Dataset({"r": (("mirror_step", "xtrack"), np.ones((n, m), dtype=np.float32))})
+        vis_ds["r"].attrs["_FillValue"] = -9999.0
+        cloud_ds = xr.Dataset(
+            {"cloud_mask": (("mirror_step", "xtrack"), np.arange(n * m, dtype=np.float32).reshape(n, m))}
+        )
+        cloud_ds["cloud_mask"].attrs["_FillValue"] = -9999.0
+
+        tree = DataTree(name="root", dataset=xr.Dataset())
+        tree["band_290_490_nm"] = DataTree(name="band_290_490_nm", dataset=uv_ds)
+        tree["band_540_740_nm"] = DataTree(name="band_540_740_nm", dataset=vis_ds)
+        tree["cloud_mask_group"] = DataTree(name="cloud_mask_group", dataset=cloud_ds)
+
+        condition_dict = {
+            "/band_290_490_nm": uv_cond,
+            "/band_540_740_nm": vis_cond,
+        }
+
+        result = subset_tree(tree, condition_dict, cut=True)
+
+        cloud_result = result["cloud_mask_group"].ds["cloud_mask"].values
+        fv = -9999.0
+        assert np.any(cloud_result != fv), (
+            "cloud_mask_group was entirely filled — sibling OR logic not applied"
+        )
