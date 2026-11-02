@@ -474,7 +474,13 @@ def subset(
 
             keep_coords = coordinate_utils.collect_coordinate_variables(dataset, keep_variables)
 
-            keep_set = set(keep_variables) | keep_coords
+            # Augment with CF-reference dependencies (bounds, grid_mapping,
+            # ancillary_variables, cell_measures, ...) resolved by earthdata-varinfo.
+            varinfo_required = variables_utils.get_varinfo_required_variables(
+                file_to_subset, keep_variables, all_vars
+            )
+
+            keep_set = set(keep_variables) | keep_coords | varinfo_required
 
             drop_variables = all_vars - keep_set
 

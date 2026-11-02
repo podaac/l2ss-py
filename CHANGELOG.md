@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- [issue/454] (https://github.com/podaac/l2ss-py/issues/454) Support ASDC/TRACE for TRT-803
 ### Deprecated
 ### Removed
 ### Fixed
