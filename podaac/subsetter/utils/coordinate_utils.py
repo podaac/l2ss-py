@@ -22,7 +22,9 @@ def remove_scale_offset(value: float, scale: float, offset: float) -> float:
     return (value * scale) - offset
 
 
-def _convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -> np.ndarray:
+def _convert_bound(
+    bound: np.ndarray, coord_max: int, coord_var: xr.DataArray, infer_range: bool = True
+) -> np.ndarray:
     """
     This function will return a converted bound, which matches the
     range of the given input file.
@@ -37,6 +39,12 @@ def _convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -
         example, the max for longitude is 360.
     coord_var : xarray.DataArray
         The xarray variable for some coordinate.
+    infer_range : bool
+        Whether a 0 --> max range may be inferred from the coordinate
+        values when the variable has no usable valid_min. Latitude
+        values are never stored as 0 --> 180, so this is disabled for
+        latitude: a granule entirely north of the equator would
+        otherwise be mistaken for a 0 --> 180 dataset.
 
     Returns
     -------
@@ -54,7 +62,7 @@ def _convert_bound(bound: np.ndarray, coord_max: int, coord_var: xr.DataArray) -
     offset = coord_var.attrs.get("add_offset", 0.0)
     valid_min = coord_var.attrs.get("valid_min", None)
 
-    if valid_min is None or valid_min > 0:
+    if infer_range and (valid_min is None or valid_min > 0):
         # If coord var doesn't contain valid min, attempt to find
         # manually. Note: Given the perfect storm, this could still fail
         # to find the actual bounds.
@@ -125,7 +133,10 @@ def convert_bbox(bbox: np.ndarray, dataset: xr.Dataset, lat_var_name: str, lon_v
     lon_data = dataset[lon_var_name]
     lat_data = dataset[lat_var_name]
 
-    return np.array([_convert_bound(bbox[0], 360, lon_data), _convert_bound(bbox[1], 180, lat_data)])
+    return np.array([
+        _convert_bound(bbox[0], 360, lon_data),
+        _convert_bound(bbox[1], 180, lat_data, infer_range=False)
+    ])
 
 
 def is_360(lon_var: xr.DataArray, scale: float, offset: float) -> bool:
