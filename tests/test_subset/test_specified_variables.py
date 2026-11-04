@@ -119,7 +119,8 @@ _test_table: list[VariableTestCase] = [
             "/support_data/amf_cloud_pressure",
             "/geolocation/viewing_azimuth_angle",
         },
-        want_coord={"/mirror_step", "/xtrack", "/geolocation/latitude", "/geolocation/longitude", "/geolocation/time"},
+        want_coord={"/mirror_step", "/xtrack", "/geolocation/latitude", "/geolocation/longitude",
+                    "/geolocation/time", "/geolocation/latitude_bounds"},
     ),
     VariableTestCase(
         input="VIIRS_NPP-NAVO-L2P-v3.0.nc",

@@ -7,10 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 ### Changed
+- [issue/454] (https://github.com/podaac/l2ss-py/issues/454) Support ASDC/TRACE for TRT-803
 ### Deprecated
 ### Removed
 ### Fixed
 - Spatial subsetting of a granule that lies entirely north of the equator and has no latitude `valid_min` no longer treats latitude as a 0 --> 180 range, which turned a negative southern bound into a bound above 90 and returned no data.
+- [issue/467] (https://github.com/podaac/l2ss-py/issues/467) Fix edge case for subsetting TEMPO Level 1 radiance data
 ### Security
 
 
