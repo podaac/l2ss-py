@@ -732,7 +732,7 @@ class TestSiblingGroupWithoutLatLon:
     TEMPO cloud_mask_group) must retain data whenever ANY sibling band's
     coordinates fall inside the bounding box — not just the first one found."""
 
-    def test_cloud_mask_retained_when_only_vis_band_matches(self):
+    def test_cloud_mask_retained_when_only_vis_band_matches(self) -> None:
         """Simulate TEMPO: UV band and visible band share identical dims/shapes
         but have slightly different lat/lon values.  A bbox that selects only
         visible-band pixels must NOT fill the cloud-mask group with fill values.
@@ -801,7 +801,7 @@ class TestSiblingGroupWithoutLatLon:
             "cloud_mask_group was entirely filled — sibling OR logic not applied"
         )
 
-    def test_cloud_mask_retained_when_only_uv_band_matches(self):
+    def test_cloud_mask_retained_when_only_uv_band_matches(self) -> None:
         """Symmetrical case: UV matches, VIS does not — cloud mask still retained."""
         from podaac.subsetter.subset_tree import subset_tree
 

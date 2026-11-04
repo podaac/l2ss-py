@@ -137,7 +137,7 @@ def get_indexers_from_nd(cond: xr.Dataset, cut: bool) -> dict:
     return indexers
 
 
-def get_all_sibling_conditions(condition_dict, path):
+def get_all_sibling_conditions(condition_dict: dict[str, xr.DataArray], path: str) -> list[xr.DataArray]:
     """
     Return all conditions from condition_dict that are siblings of `path`
     (same parent, same depth).
