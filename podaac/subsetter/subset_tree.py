@@ -11,6 +11,7 @@ from podaac.subsetter.datatree_subset import (
     apply_indexers_to_tree,
     cast_type,
     find_fully_empty_paths,
+    get_all_sibling_conditions,
     get_indexers_from_1d,
     get_indexers_from_nd,
     get_sibling_or_parent_condition,
@@ -127,9 +128,16 @@ def _apply_single_condition(tree, cond, cut, pixel_subset, per_group_conditions=
                 grp_indexed_cond = indexed_per_group.get(node_path)
                 if grp_indexed_cond is not None:
                     return _apply_masking(ds, grp_indexed_cond, pre_aligned=True)
-                sibling_cond = get_sibling_or_parent_condition(indexed_per_group, node_path)
-                if sibling_cond is not None:
-                    return _apply_masking(ds, sibling_cond, pre_aligned=True)
+                # OR all sibling conditions so a group with no own lat/lon
+                # (e.g. a cloud-mask group) retains data whenever ANY sibling
+                # band's coordinates fall inside the bounding box.
+                all_conds = get_all_sibling_conditions(indexed_per_group, node_path)
+                if all_conds:
+                    combined = all_conds[0]
+                    for c in all_conds[1:]:
+                        if c.shape == combined.shape and c.dims == combined.dims:
+                            combined = combined | c
+                    return _apply_masking(ds, combined, pre_aligned=True)
                 return ds
 
             def _mask_tree_recursive(node, path):

@@ -218,6 +218,51 @@ def test_bbox_conversion(data_dir):
 
         np.testing.assert_equal(actual_result, expected_result)
 
+def test_bbox_conversion_keeps_latitude_for_northern_granule():
+    """
+    A granule that lies entirely north of the equator and has no
+    latitude valid_min must not be treated as a 0 --> 180 dataset:
+    a southern bound below 0 must stay as requested.
+    """
+    lat = np.linspace(10, 50, 9)
+    lon = np.linspace(-120, -60, 7)
+    dataset = xr.Dataset(coords={'lat': ('lat', lat), 'lon': ('lon', lon)})
+
+    _, lat_bounds = coordinate_utils.convert_bbox(
+        np.array([[-180.0, 180.0], [-20.0, 30.0]]), dataset, 'lat', 'lon')
+
+    np.testing.assert_equal(lat_bounds, (-20, 30))
+
+
+def test_subset_bbox_northern_granule_without_valid_min(subset_output_dir, request):
+    """
+    Subsetting a northern-hemisphere granule without a latitude
+    valid_min with a bbox whose southern bound is below the equator
+    keeps the points inside the bbox instead of returning no data.
+    """
+    lat = np.linspace(10, 50, 9)
+    lon = np.linspace(-120, -60, 7)
+    lat2d, lon2d = np.meshgrid(lat, lon, indexing='ij')
+    dataset = xr.Dataset(
+        {'sst': (('y', 'x'), np.arange(lat2d.size, dtype='f4').reshape(lat2d.shape))},
+        coords={'lat': (('y', 'x'), lat2d), 'lon': (('y', 'x'), lon2d)},
+    )
+    input_file = join(subset_output_dir, f'{request.node.name}_input.nc')
+    output_file = join(subset_output_dir, f'{request.node.name}_output.nc')
+    dataset.to_netcdf(input_file)
+
+    subset.subset(
+        file_to_subset=input_file,
+        bbox=np.array([[-180, 180], [-20, 30]]),
+        output_file=output_file
+    )
+
+    with xr.open_dataset(output_file) as out_ds:
+        lat_values = out_ds['lat'].values[np.isfinite(out_ds['sst'].values)]
+        assert lat_values.size == (lat <= 30).sum() * lon.size
+        assert lat_values.min() >= 10 and lat_values.max() <= 30
+
+
 def test_history_metadata_append(data_dir, subset_output_dir, request):
     """
     Tests that the history metadata header is appended to when it
