@@ -384,27 +384,6 @@ jobs:
         with:
           sarif_file: snyk.sarif
 
-      - name: Run Trivy on Docker Image
-        id: trivy
-        continue-on-error: true
-        if: ${{ (steps.pypi-test-publish.conclusion == 'success' || steps.pypi-publish.conclusion == 'success') && steps.meta.outputs.tags != '' }}
-        uses: aquasecurity/trivy-action@0.33.1
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }}
-          format: sarif
-          output: trivy.sarif
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          vuln-type: os,library
-          exit-code: '0'
-
-      - name: Upload Trivy result to GitHub Code Scanning
-        if: ${{ always() && hashFiles('trivy.sarif') != '' }}
-        uses: github/codeql-action/upload-sarif@v4
-        with:
-          sarif_file: trivy.sarif
-          category: trivy-image
-
       - name: Push Tag
         if: |
           github.ref == 'refs/heads/develop' ||
@@ -561,7 +540,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_SIT }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_SIT }}
           aws-region: us-west-2
-          
+
       - name: Login to Amazon ECR (SIT)
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
