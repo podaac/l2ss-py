@@ -509,12 +509,16 @@ jobs:
           pull: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          sbom: false
+
       - name: Configure AWS credentials for SIT
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_CUMULUS_SIT }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_CUMULUS_SIT }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_SERVICES_SIT }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_SERVICES_SIT }}
           aws-region: us-west-2
+          
       - name: Login to Amazon ECR (SIT)
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
