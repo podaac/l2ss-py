@@ -24,6 +24,7 @@ jobs:
       contents: write
       packages: write
       id-token: write
+      security-events: write
 
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
@@ -383,6 +384,27 @@ jobs:
         with:
           sarif_file: snyk.sarif
 
+      - name: Run Trivy on Docker Image
+        id: trivy
+        continue-on-error: true
+        if: ${{ (steps.pypi-test-publish.conclusion == 'success' || steps.pypi-publish.conclusion == 'success') && steps.meta.outputs.tags != '' }}
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }}
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          vuln-type: os,library
+          exit-code: '0'
+
+      - name: Upload Trivy result to GitHub Code Scanning
+        if: ${{ always() && hashFiles('trivy.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-image
+
       - name: Push Tag
         if: |
           github.ref == 'refs/heads/develop' ||
@@ -455,6 +477,7 @@ jobs:
       contents: read
       packages: write
       id-token: write
+      security-events: write
     env:
       venue: sit
     steps:
@@ -511,6 +534,26 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           provenance: false
           sbom: false
+
+      - name: Run Trivy on Docker Image
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.software_version }}
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          vuln-type: os,library
+          exit-code: '0'
+
+      - name: Upload Trivy result to GitHub Code Scanning
+        if: ${{ always() && hashFiles('trivy.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: trivy.sarif
+          category: trivy-image-sit
 
       - name: Configure AWS credentials for SIT
         uses: aws-actions/configure-aws-credentials@v6
