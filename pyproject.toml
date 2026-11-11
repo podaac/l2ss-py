@@ -35,7 +35,7 @@ Shapely = "^2.0.6"
 harmony-service-lib = { version = "^3.0.0", optional = true }
 pystac = { version = "^1.10.1", optional = true }
 julian = "^0.14"
-importlib-metadata = "^9.0.0"
+importlib-metadata = "^10.2.0"
 h5py = "^3.6.0"
 cf-xarray = "*"
 earthdata-varinfo = ">=5.2.1"
@@ -51,13 +51,12 @@ sphinx = "^9.1.0"
 pytest-benchmark = "^5.1.0"
 moto = "^5.0.2"
 jsonschema = "^4.20.0"
-m2r2 = "^0.3.2"
 sphinx-rtd-theme = "^3.0.2"
 pytest-rerunfailures = "^16.0"
 pytest-xdist = "^3.6.1"
 myst-parser = "^5.0.0"
 black = "^26.3.1"
-ruff = "^0.16.10"
+ruff = "^0.17.4"
 pre-commit = "^4.5.1"
 
 [tool.pytest.ini_options]
