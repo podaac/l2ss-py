@@ -14,13 +14,17 @@ FROM python:3.12-slim
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     gcc \
     libnetcdf-dev \
     libhdf5-dev \
     hdf5-helpers \
-    && pip3 install --upgrade pip \
+    && pip3 install --upgrade pip setuptools wheel \
     && pip3 install cython \
-    && apt-get clean
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create a new user
 RUN adduser --quiet --disabled-password --shell /bin/sh --home /home/dockeruser --gecos "" --uid 1000 dockeruser
