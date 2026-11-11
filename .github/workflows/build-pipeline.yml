@@ -9,10 +9,6 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
-  # Allows a "/deploy sit" PR comment to publish a test build to SIT
-  issue_comment:
-    types: [created]
-
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
@@ -21,7 +17,6 @@ jobs:
   # First job in the workflow installs and verifies the software
   build:
     name: Build, Test, Verify, Publish
-    if: github.event_name != 'issue_comment'
     timeout-minutes: 60  # stops this job after 60 minutes
     runs-on: ubuntu-latest
 
@@ -445,41 +440,25 @@ jobs:
           generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
 
-  # Triggered by commenting "/deploy sit" on a pull request. Publishes the PR to
+  # Triggered by a push whose commit message starts with "/deploy sit". Publishes the PR to
   # test.pypi.org, builds the Docker image and pushes it to GHCR and SIT ECR.
   # Does NOT run tests/scans and does NOT deploy to Harmony.
   # NOTE: lives in this file (not a new one) so PyPI trusted publishing still matches.
   deploy-sit:
     name: Deploy PR to SIT (PyPI test + image + ECR)
     if: |
-      github.event_name == 'issue_comment' &&
-      github.event.issue.pull_request &&
-      startsWith(github.event.comment.body, '/deploy sit') &&
-      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      github.event_name == 'push' &&
+      startsWith(github.event.head_commit.message, '/deploy sit')
     timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
       id-token: write
-      pull-requests: write
     env:
       venue: sit
     steps:
-      - name: Get PR details
-        id: pr
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          pr=$(gh api repos/${{ github.repository }}/pulls/${{ github.event.issue.number }})
-          if [ "$(echo "$pr" | jq -r '.head.repo.full_name')" != "${{ github.repository }}" ]; then
-            echo "Refusing to deploy a PR from a fork" >&2
-            exit 1
-          fi
-          echo "sha=$(echo "$pr" | jq -r '.head.sha')" >> $GITHUB_OUTPUT
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ steps.pr.outputs.sha }}
       - uses: actions/setup-python@v7
         with:
           python-version: '3.12'
@@ -550,9 +529,3 @@ jobs:
           docker pull "${REGISTRY}/${IMAGE_NAME}:${tag}"
           docker tag "${REGISTRY}/${IMAGE_NAME}:${tag}" "${ECR_REGISTRY}/${ECR_REPOSITORY}:${tag}"
           docker push "${ECR_REGISTRY}/${ECR_REPOSITORY}:${tag}"
-      - name: Comment result on PR
-        if: always()
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh pr comment ${{ github.event.issue.number }} --body "SIT deploy of \`${{ env.software_version }}\`: **${{ job.status }}** ([run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}))"
