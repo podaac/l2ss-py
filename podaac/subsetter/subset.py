@@ -23,6 +23,7 @@ import copy
 import os
 from itertools import zip_longest
 
+import dask
 import geopandas as gpd
 import netCDF4 as nc
 import numpy as np
@@ -581,13 +582,19 @@ def subset(
             stage_file_name_subsetted_false,
         )
 
+        def safe_to_netcdf(current_encoding):
+            # Use dask's synchronous scheduler: threaded reads/writes contending
+            # for the HDF5 lock deadlocked in production.
+            with dask.config.set(scheduler="synchronous"):
+                subsetted_dataset.to_netcdf(output_file, encoding=current_encoding)
+
         def write_with_illegal_name_recovery(current_encoding):
             try:
-                subsetted_dataset.to_netcdf(output_file, encoding=current_encoding)
+                safe_to_netcdf(current_encoding)
             except AttributeError as e:
                 if "NetCDF: Name contains illegal characters" in str(e):
                     metadata_utils.fix_illegal_datatree_attrs(subsetted_dataset)
-                    subsetted_dataset.to_netcdf(output_file, encoding=current_encoding)
+                    safe_to_netcdf(current_encoding)
                 else:
                     raise
 
