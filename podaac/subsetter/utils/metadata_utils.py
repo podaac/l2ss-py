@@ -10,9 +10,9 @@ import datetime
 import json
 import os
 import re
+from importlib import metadata as importlib_metadata
 from typing import Any
 
-import importlib_metadata
 import netCDF4 as nc
 import numpy as np
 import xarray as xr

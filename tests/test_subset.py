@@ -30,13 +30,12 @@ import operator
 import os
 import shutil
 import tempfile
+from importlib import metadata as importlib_metadata
 from os import listdir
 from os.path import basename, dirname, isfile, join, realpath
 from pathlib import Path
 
 import geopandas as gpd
-import h5py
-import importlib_metadata
 import netCDF4 as nc
 import numpy as np
 import pandas as pd
@@ -1361,7 +1360,7 @@ def test_he5_timeattrs_output(fake_omi_bro_file: Path, tmp_path: Path):
                 pass
             else:
                 raise AssertionError(
-                    "Attributes for {} do not equal each other".format(key)
+                    f"Attributes for {key} do not equal each other"
                 )
         else:
             assert inattrs[key] == outattrs[key]

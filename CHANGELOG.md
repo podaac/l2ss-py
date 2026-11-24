@@ -4,10 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [3.4.0]
 ### Added
 ### Changed
 - [issue/454] (https://github.com/podaac/l2ss-py/issues/454) Support ASDC/TRACE for TRT-803
+- [issue/478] https://github.com/podaac/l2ss-py/issues/478) Fixed a deadlock when writing output to NetCDF by using dask's synchronous scheduler.
 ### Deprecated
 ### Removed
 ### Fixed
